@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Summarum</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar" class="hidden">
+        <div id="doc-list"></div>
+        <button id="new-doc" title="New document">+</button>
+      </aside>
+      <main id="content">
+        <div id="titlebar" data-tauri-drag-region>
+          <button id="toggle-sidebar" title="Documents (Ctrl+B)">☰</button>
+          <input id="doc-title" spellcheck="false" autocomplete="off" />
+          <span class="spacer" data-tauri-drag-region></span>
+          <button id="open-settings" title="Settings">⚙</button>
+          <div id="win-controls">
+            <button id="win-min" title="Minimize">─</button>
+            <button id="win-close" title="Hide to tray">✕</button>
+          </div>
+        </div>
+        <div id="editor-wrap">
+          <div id="editor"></div>
+          <div id="results"></div>
+          <div id="col-divider" title="Drag to resize"></div>
+        </div>
+        <div id="statusbar">
+          <span id="rates-info" title=""></span>
+          <span class="spacer"></span>
+          <span id="total-line" title=""></span>
+        </div>
+      </main>
+      <div id="settings-panel" class="hidden">
+        <h2 data-i18n="settings">Settings</h2>
+        <label><span data-i18n="theme">Theme</span>
+          <select id="set-theme">
+            <option value="system" data-i18n="system">System</option>
+            <option value="light" data-i18n="light">Light</option>
+            <option value="dark" data-i18n="dark">Dark</option>
+          </select>
+        </label>
+        <label><span data-i18n="precision">Decimal places</span>
+          <input id="set-precision" type="number" min="0" max="15" />
+        </label>
+        <label><span data-i18n="groupsep">Thousands separator</span>
+          <select id="set-groupsep">
+            <option value=",">1,000</option>
+            <option value=" ">1 000</option>
+            <option value="">1000</option>
+          </select>
+        </label>
+        <label><span data-i18n="language">Language</span>
+          <select id="set-lang">
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+          </select>
+        </label>
+        <label><span data-i18n="hotkey">Global hotkey</span>
+          <input id="set-hotkey" type="text" placeholder="Ctrl+Alt+N" />
+        </label>
+        <label class="row"><input id="set-autostart" type="checkbox" />
+          <span data-i18n="autostart">Launch at startup</span>
+        </label>
+        <label><span data-i18n="fontsize">Font size</span>
+          <input id="set-fontsize" type="number" min="10" max="32" />
+        </label>
+        <label><span data-i18n="resultswidth">Results column</span>
+          <input id="set-resultswidth" type="range" min="20" max="60" step="1" />
+        </label>
+        <label><span data-i18n="bindays">Bin retention (days)</span>
+          <input id="set-bindays" type="number" min="1" max="365" step="1" />
+        </label>
+        <label><span data-i18n="datadir">Data folder</span>
+          <button id="set-datadir" class="path-btn" title=""></button>
+        </label>
+        <div class="settings-footer">
+          <button id="open-extensions" data-i18n="extensions">Extensions folder</button>
+          <button id="open-backups" data-i18n="backups">Backups</button>
+          <button id="close-settings" data-i18n="done">Done</button>
+        </div>
+      </div>
+      <div id="toast" class="hidden"></div>
+      <div id="modal" class="hidden">
+        <div class="modal-box">
+          <p id="modal-msg"></p>
+          <div class="modal-btns">
+            <button id="modal-a"></button>
+            <button id="modal-b"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
