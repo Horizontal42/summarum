@@ -4,7 +4,7 @@ import { SumEngine } from "./engine";
 import { SumEditor } from "./ui/editor";
 import {
   AppData, DocMeta, SettingsData, defaultSettingsData,
-  loadAppData, saveAppData, loadSettings, saveSettings,
+  loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
   fetchRates, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
@@ -13,9 +13,12 @@ import {
 import type { LineResult } from "./engine";
 import { setLang, detectLang, t } from "./i18n";
 import { runExtensions } from "./extensions";
-import * as vocabApi from "./engine/vocab";
+import { EN, RU } from "./engine/vocab-data";
 
-const WELCOME = (vocabApi.entry("Samples", "sample.welcome") ?? "# Sample\n8 / (45 - 20%)\n5 inches in cm\n$9 in Euro") + "\n";
+function welcomeText(lang: string): string {
+  const sample = (lang === "ru" ? RU : EN).Samples?.["sample.welcome"];
+  return (sample ?? "# Sample\n8 / (45 - 20%)\n5 inches in cm\n$9 in Euro") + "\n";
+}
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
 
@@ -117,7 +120,11 @@ function applySettings(): void {
   document.documentElement.style.setProperty("--editor-font-size", `${settings.fontSize}px`);
   $("#editor-wrap").style.setProperty("--results-width", `${settings.resultsWidth}%`);
   setLang(settings.language);
-  engine.updateSettings({ precision: settings.precision, groupSeparator: settings.groupSeparator });
+  engine.updateSettings({
+    precision: settings.precision,
+    groupSeparator: settings.groupSeparator,
+    decimalSeparator: settings.decimalSeparator,
+  });
   editor?.refresh();
   syncTitleField();
   $<HTMLElement>("#sidebar").classList.toggle("hidden", !settings.sidebarVisible);
@@ -127,6 +134,7 @@ function bindSettingsUI(): void {
   const themeSel = $<HTMLSelectElement>("#set-theme");
   const precision = $<HTMLInputElement>("#set-precision");
   const groupSep = $<HTMLSelectElement>("#set-groupsep");
+  const decimalSep = $<HTMLSelectElement>("#set-decimalsep");
   const langSel = $<HTMLSelectElement>("#set-lang");
   const hotkey = $<HTMLInputElement>("#set-hotkey");
   const autostart = $<HTMLInputElement>("#set-autostart");
@@ -136,6 +144,7 @@ function bindSettingsUI(): void {
   themeSel.value = settings.theme;
   precision.value = String(settings.precision);
   groupSep.value = settings.groupSeparator;
+  decimalSep.value = settings.decimalSeparator;
   langSel.value = settings.language;
   hotkey.value = settings.hotkey;
   autostart.checked = settings.autostart;
@@ -146,13 +155,19 @@ function bindSettingsUI(): void {
     settings.theme = themeSel.value as SettingsData["theme"];
     settings.precision = Math.max(0, Math.min(15, Number(precision.value) || 2));
     settings.groupSeparator = groupSep.value;
+    settings.decimalSeparator = decimalSep.value;
+    // "1,234,56" is unreadable — a comma decimal forces a space group separator
+    if (settings.decimalSeparator === settings.groupSeparator) {
+      settings.groupSeparator = settings.decimalSeparator === "," ? " " : ",";
+      groupSep.value = settings.groupSeparator;
+    }
     settings.language = langSel.value;
     settings.fontSize = Math.max(10, Math.min(32, Number(fontSize.value) || 15));
     settings.resultsWidth = Math.max(20, Math.min(60, Number(resultsWidth.value) || 42));
     applySettings();
     void saveSettings(settings);
   };
-  for (const el of [themeSel, precision, groupSep, langSel, fontSize]) {
+  for (const el of [themeSel, precision, groupSep, decimalSep, langSel, fontSize]) {
     el.addEventListener("change", save);
   }
   resultsWidth.addEventListener("input", save); // live while sliding
@@ -188,10 +203,15 @@ function bindSettingsUI(): void {
     if (!keyName) return;
     const combo = [...mods, keyName].join("+");
     const old = settings.hotkey;
-    settings.hotkey = combo;
-    hotkey.value = combo;
-    await registerHotkey(old, combo);
-    void saveSettings(settings);
+    if (await registerHotkey(old, combo)) {
+      settings.hotkey = combo;
+      hotkey.value = combo;
+      void saveSettings(settings);
+    } else {
+      // combo is taken by another app — restore the old one
+      await registerHotkey(null, old);
+      toast(t("hotkeyFailed"));
+    }
     hotkey.blur();
   });
   autostart.addEventListener("change", async () => {
@@ -224,7 +244,13 @@ function bindSettingsUI(): void {
       if (ans === null) return;
       strategy = ans === "a" ? "use_existing" : "overwrite";
     }
-    await migrateDataDir(settings.dataDir, picked, strategy);
+    try {
+      await migrateDataDir(settings.dataDir, picked, strategy);
+    } catch (e) {
+      console.warn("migrate failed", e);
+      toast(t("folderError"));
+      return;
+    }
     settings.dataDir = picked;
     setDataDir(picked);
     await saveSettings(settings);
@@ -273,8 +299,8 @@ function normalizeKeyName(e: KeyboardEvent): string | null {
 
 // ---------- tauri integration
 
-async function registerHotkey(old: string | null, combo: string): Promise<void> {
-  if (!isTauri()) return;
+async function registerHotkey(old: string | null, combo: string): Promise<boolean> {
+  if (!isTauri()) return true;
   try {
     const gs = await import("@tauri-apps/plugin-global-shortcut");
     if (old) await gs.unregister(old).catch(() => {});
@@ -289,8 +315,10 @@ async function registerHotkey(old: string | null, combo: string): Promise<void> 
         await win.setFocus();
       }
     });
+    return true;
   } catch (e) {
     console.warn("hotkey registration failed", e);
+    return false;
   }
 }
 
@@ -417,11 +445,12 @@ async function boot(): Promise<void> {
   await runBackups(settings.dataDir, settings.deletedRetentionDays);
 
   const stored = await loadAppData(settings.dataDir);
-  if (stored && stored.docs.length > 0) {
+  // a corrupt or foreign documents.json must not crash the boot
+  if (stored && Array.isArray(stored.docs) && stored.docs.length > 0 && stored.contents && typeof stored.contents === "object") {
     data = stored;
   } else {
     const id = uid();
-    data = { docs: [{ id, title: "Sample" }], activeId: id, contents: { [id]: WELCOME } };
+    data = { docs: [{ id, title: "Sample" }], activeId: id, contents: { [id]: welcomeText(settings.language) } };
   }
   if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
 
@@ -563,6 +592,7 @@ async function boot(): Promise<void> {
 
   await registerHotkey(null, settings.hotkey);
   if (settings.autostart) await applyAutostart(true);
+  void onAppQuit(() => flushAppData());
   void refreshRates();
   setInterval(() => void refreshRates(), 60 * 60 * 1000);
 

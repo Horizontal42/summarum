@@ -39,6 +39,9 @@ const dict: Record<string, Record<string, string>> = {
     useExisting: "Use existing",
     replaceMine: "Replace with mine",
     folderChanged: "Data folder changed",
+    folderError: "Could not change the data folder",
+    hotkeyFailed: "Hotkey is taken by another app",
+    decimalsep: "Decimal separator",
   },
   ru: {
     settings: "Настройки",
@@ -78,6 +81,9 @@ const dict: Record<string, Record<string, string>> = {
     useExisting: "Использовать их",
     replaceMine: "Заменить моими",
     folderChanged: "Папка данных изменена",
+    folderError: "Не удалось сменить папку данных",
+    hotkeyFailed: "Хоткей занят другой программой",
+    decimalsep: "Десятичный разделитель",
   },
 };
 

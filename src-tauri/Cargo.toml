@@ -1,6 +1,6 @@
 [package]
 name = "summarum"
-version = "1.0.0"
+version = "1.1.0"
 description = "Summarum — natural language calculator notebook for Windows"
 edition = "2021"
 
@@ -16,7 +16,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 chrono = "0.4"
 
 [profile.release]

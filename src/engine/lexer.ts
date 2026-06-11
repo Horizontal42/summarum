@@ -12,8 +12,14 @@ export interface Lex {
 }
 
 const WORD_RE = /^[\p{L}_]+/u;
-// Order matters: grouped thousands first, then plain decimal/exponent, then leading-dot.
-const NUM_RE = /^(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\.\d+)/;
+// Number forms, tried in order. Space/NBSP-grouped numbers may use a decimal
+// comma ("1 000,5" — what the app itself prints with the space separator);
+// comma-grouped is the en convention ("1,000"), and a comma that does not
+// form groups of three is a decimal comma ("1,23" → 1.23).
+const NUM_SPACE_GROUPED_RE = /^\d{1,3}(?:[   ]\d{3})+(?:[.,]\d+)?(?!\d)/;
+const NUM_COMMA_GROUPED_RE = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)/;
+const NUM_DECIMAL_COMMA_RE = /^\d+,\d+/;
+const NUM_PLAIN_RE = /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
 export function lexLine(text: string): Lex[] {
   const out: Lex[] = [];
@@ -46,12 +52,31 @@ export function lexLine(text: string): Lex[] {
         continue;
       }
     }
-    const num = NUM_RE.exec(rest);
-    if (num && (ch >= "0" && ch <= "9")) {
-      const raw = num[0];
-      out.push({ type: "num", raw, start: i, end: i + raw.length, value: new Decimal(raw.replace(/,/g, "")), repr: "decimal" });
-      i += raw.length;
-      continue;
+    if (ch >= "0" && ch <= "9") {
+      let raw: string | null = null;
+      let cleaned = "";
+      const sp = NUM_SPACE_GROUPED_RE.exec(rest);
+      const cg = sp ? null : NUM_COMMA_GROUPED_RE.exec(rest);
+      const dc = sp || cg ? null : NUM_DECIMAL_COMMA_RE.exec(rest);
+      const pl = sp || cg || dc ? null : NUM_PLAIN_RE.exec(rest);
+      if (sp) {
+        raw = sp[0];
+        cleaned = raw.replace(/[   ]/g, "").replace(",", ".");
+      } else if (cg) {
+        raw = cg[0];
+        cleaned = raw.replace(/,/g, "");
+      } else if (dc) {
+        raw = dc[0];
+        cleaned = raw.replace(",", ".");
+      } else if (pl) {
+        raw = pl[0];
+        cleaned = raw;
+      }
+      if (raw) {
+        out.push({ type: "num", raw, start: i, end: i + raw.length, value: new Decimal(cleaned), repr: "decimal" });
+        i += raw.length;
+        continue;
+      }
     }
     if (ch === "." && /^\.\d/.test(rest)) {
       const m = /^\.\d+/.exec(rest)!;

@@ -142,3 +142,68 @@ describe("crypto", () => {
     expect(r).toMatch(/^\$/);
   });
 });
+
+describe("regressions", () => {
+  it("a broken line does not kill the document (BigInt from NaN)", () => {
+    const r = eng.evaluateDocument("2+2\nasin(5) & 3\n3+3").map((x) => x.text);
+    expect(r).toEqual(["4", null, "6"]);
+  });
+  it("non-finite results are suppressed", () => {
+    expect(calc("100 / 0%")).toBe(null);
+    expect(calc("asin(5)")).toBe(null);
+    expect(calc("sqrt(-1)")).toBe(null);
+  });
+  it("arithmetic continues after a line-level conversion", () => {
+    expect(calc("100 USD in EUR + 20")).toBe("€ 70"); // 50 € + 20
+    expect(calc("100 USD in EUR - 20")).toBe("€ 30");
+    expect(calc("100 USD in EUR * 2")).toBe("€ 100");
+    expect(calc("1 km in m + 1")).toBe("1,001 m");
+  });
+  it("uppercase prefixed symbols are accepted when unambiguous", () => {
+    expect(calc("5 KM in miles")).toBe("3.11 mi.");
+    expect(calc("2 KG in pounds")).toBe("4.41 lb");
+    expect(calc("5 КМ в метрах")).toBe("5,000 m");
+  });
+  it("ambiguous case stays strict: MM is not megameters", () => {
+    expect(calc("5 MM in m")).toBe("5 m"); // unrecognized, bare 5 converted
+  });
+  it("space-grouped numbers", () => {
+    expect(calc("1 000 + 234")).toBe("1,234");
+    expect(calc("1 000 000 / 2")).toBe("500,000");
+    expect(calc("1 000,5 + 0,5")).toBe("1,001");
+  });
+  it("decimal comma", () => {
+    expect(calc("1,23 + 1")).toBe("2.23");
+    expect(calc("0,5 * 4")).toBe("2");
+    expect(calc("1,234 + 0")).toBe("1,234"); // exactly 3 digits = thousands
+  });
+  it("single-letter unit names can be variables", () => {
+    expect(eng.evaluateDocument("m = 5\nm * 2").map((x) => x.text)).toEqual(["5", "10"]);
+    expect(eng.evaluateDocument("t = 100\nt + 20%").map((x) => x.text)).toEqual(["100", "120"]);
+  });
+  it("tiny conversion results show significant digits, not 0", () => {
+    expect(calc("1 mm in km")).toBe("0.000001 km");
+    expect(calc("32 F in C")).toBe("0°C"); // conversion noise stays zero
+  });
+  it("log with a space is log10", () => {
+    expect(calc("log 1000")).toBe("3");
+    expect(calc("log2(8)")).toBe("3");
+    expect(calc("log 2 + 1")).toBe("1.3");
+  });
+  it("percent of a percent stays a percent", () => {
+    expect(calc("50% of 50%")).toBe("25%");
+    expect(calc("10% off 50%")).toBe("45%");
+  });
+  it("percent base on the left of ^", () => {
+    expect(calc("50% ^ 2")).toBe("0.25");
+    expect(calc("4 ^ 50%")).toBe("2");
+  });
+  it("avg skips incompatible lines in the denominator", () => {
+    expect(eng.evaluateDocument("10 kg\n20 kg\n5 hours\navg").map((x) => x.text)).toEqual(["10 kg", "20 kg", "5 h", "15 kg"]);
+  });
+  it("calendar month add clamps to month end", () => {
+    const doc = eng.evaluateDocument("today + 1 month");
+    const v = doc[0].value;
+    expect(v?.kind).toBe("date");
+  });
+});

@@ -4,11 +4,12 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
 const SAMPLE_JS: &str = include_str!("../extension-sample.js");
@@ -39,12 +40,19 @@ fn safe_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")
 }
 
+/// write via a temp file + rename so a crash mid-write cannot corrupt the target
+fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+    let tmp = path.with_extension("tmp");
+    fs::write(&tmp, contents).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn save_file(app: AppHandle, name: String, contents: String) -> Result<(), String> {
     if !safe_name(&name) {
         return Err("bad file name".into());
     }
-    fs::write(data_dir(&app).join(name), contents).map_err(|e| e.to_string())
+    write_atomic(&data_dir(&app).join(name), &contents)
 }
 
 #[tauri::command]
@@ -152,7 +160,7 @@ async fn fetch_rates(app: AppHandle, force: bool) -> Result<RatesPayload, String
         Ok(payload) => {
             let cache = RatesCache { fetched_at: now_secs(), payload: payload.clone() };
             if let Ok(raw) = serde_json::to_string(&cache) {
-                fs::write(data_dir(&app).join("rates.json"), raw).ok();
+                write_atomic(&data_dir(&app).join("rates.json"), &raw).ok();
             }
             Ok(payload)
         }
@@ -179,7 +187,7 @@ fn load_documents(app: AppHandle, dir: Option<String>) -> Result<Option<String>,
 
 #[tauri::command]
 fn save_documents(app: AppHandle, dir: Option<String>, contents: String) -> Result<(), String> {
-    fs::write(docs_dir(&app, &dir).join("documents.json"), contents).map_err(|e| e.to_string())
+    write_atomic(&docs_dir(&app, &dir).join("documents.json"), &contents)
 }
 
 // ---------- backups
@@ -255,11 +263,9 @@ fn backup_deleted_sheet(app: AppHandle, dir: Option<String>, title: String, cont
 fn open_backups_folder(app: AppHandle, dir: Option<String>) -> Result<(), String> {
     let bdir = docs_dir(&app, &dir).join("backups");
     fs::create_dir_all(&bdir).ok();
-    std::process::Command::new("explorer")
-        .arg(bdir)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    app.opener()
+        .open_path(bdir.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 // ---------- data folder migration
@@ -276,7 +282,10 @@ fn migrate_data_dir(app: AppHandle, old_dir: Option<String>, new_dir: String, st
     let old = docs_dir(&app, &old_dir);
     let new = PathBuf::from(&new_dir);
     fs::create_dir_all(&new).map_err(|e| e.to_string())?;
-    if old == new {
+    // canonicalize: "C:\Data" and "c:\data" are the same folder on Windows
+    let canon_old = fs::canonicalize(&old).unwrap_or_else(|_| old.clone());
+    let canon_new = fs::canonicalize(&new).unwrap_or_else(|_| new.clone());
+    if canon_old == canon_new {
         return Ok(());
     }
     if strategy == "use_existing" {
@@ -287,6 +296,7 @@ fn migrate_data_dir(app: AppHandle, old_dir: Option<String>, new_dir: String, st
         fs::copy(&old_docs, new.join("documents.json")).map_err(|e| e.to_string())?;
     }
     // merge backups (skip files that already exist in the target)
+    let mut all_copied = true;
     for sub in ["backups", "backups/deleted"] {
         let from = old.join(sub);
         let to = new.join(sub);
@@ -294,17 +304,19 @@ fn migrate_data_dir(app: AppHandle, old_dir: Option<String>, new_dir: String, st
         if let Ok(entries) = fs::read_dir(&from) {
             for entry in entries.flatten() {
                 let dest = to.join(entry.file_name());
-                if entry.path().is_file() && !dest.exists() {
-                    fs::copy(entry.path(), dest).ok();
+                if entry.path().is_file() && !dest.exists() && fs::copy(entry.path(), dest).is_err() {
+                    all_copied = false;
                 }
             }
         }
     }
-    // originals removed only after everything is copied
+    // originals removed only after everything is actually copied
     if old_docs.exists() {
         fs::remove_file(&old_docs).ok();
     }
-    fs::remove_dir_all(old.join("backups")).ok();
+    if all_copied {
+        fs::remove_dir_all(old.join("backups")).ok();
+    }
     Ok(())
 }
 
@@ -317,7 +329,7 @@ fn read_text_file(path: String) -> Result<String, String> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    if !["numi", "txt", "md"].contains(&ext.as_str()) {
+    if !["numi", "sum", "txt", "md"].contains(&ext.as_str()) {
         return Err("unsupported file type".into());
     }
     let meta = fs::metadata(&p).map_err(|e| e.to_string())?;
@@ -365,11 +377,16 @@ fn load_extensions(app: AppHandle) -> Vec<ExtensionScript> {
     out
 }
 
-/// Contents of a .numi file passed on the command line (file association).
+fn is_sheet_path(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".numi") || lower.ends_with(".sum")
+}
+
+/// Contents of a .numi/.sum file passed on the command line (file association).
 #[tauri::command]
 fn get_launch_file() -> Option<String> {
     let arg = std::env::args().nth(1)?;
-    if arg.to_lowercase().ends_with(".numi") {
+    if is_sheet_path(&arg) {
         fs::read_to_string(arg).ok()
     } else {
         None
@@ -379,11 +396,29 @@ fn get_launch_file() -> Option<String> {
 #[tauri::command]
 fn open_extensions_folder(app: AppHandle) -> Result<(), String> {
     let dir = extensions_dir(&app);
-    std::process::Command::new("explorer")
-        .arg(dir)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Called by the frontend after it has flushed unsaved edits on "app-quit".
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+/// Quit via the frontend so the debounced autosave gets flushed first;
+/// a watchdog exits anyway in case the webview is unresponsive.
+fn request_quit(app: &AppHandle) {
+    if app.emit("app-quit", ()).is_err() {
+        app.exit(0);
+        return;
+    }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+        handle.exit(0);
+    });
 }
 
 fn toggle_window(app: &AppHandle) {
@@ -401,7 +436,7 @@ fn toggle_window(app: &AppHandle) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if let Some(path) = args.iter().skip(1).find(|a| a.to_lowercase().ends_with(".numi")) {
+            if let Some(path) = args.iter().skip(1).find(|a| is_sheet_path(a)) {
                 if let Ok(content) = fs::read_to_string(path) {
                     app.emit("open-file", content).ok();
                 }
@@ -432,7 +467,8 @@ fn main() {
             load_extensions,
             open_extensions_folder,
             get_launch_file,
-            read_text_file
+            read_text_file,
+            exit_app
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -446,7 +482,7 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => toggle_window(app),
-                    "quit" => app.exit(0),
+                    "quit" => request_quit(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {

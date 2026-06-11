@@ -17,6 +17,7 @@ export interface SettingsData {
   theme: "system" | "light" | "dark";
   precision: number;
   groupSeparator: string;
+  decimalSeparator: string;
   language: string;
   hotkey: string;
   autostart: boolean;
@@ -34,6 +35,7 @@ export const defaultSettingsData: SettingsData = {
   theme: "system",
   precision: 2,
   groupSeparator: ",",
+  decimalSeparator: ".",
   language: "en",
   hotkey: "Ctrl+Alt+N",
   autostart: false,
@@ -93,6 +95,7 @@ export async function loadAppData(dataDir: string): Promise<AppData | null> {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingData: AppData | null = null;
 let currentDataDir = "";
 
 export function setDataDir(dataDir: string): void {
@@ -101,16 +104,33 @@ export function setDataDir(dataDir: string): void {
 
 export function saveAppData(data: AppData): void {
   // debounce: autosave on every keystroke without disk churn
+  pendingData = data;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const raw = JSON.stringify(data);
-    try {
-      if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
-      else localStorage.setItem("numi.documents", raw);
-    } catch (e) {
-      console.warn("saveAppData failed", e);
-    }
-  }, 400);
+  saveTimer = setTimeout(() => void flushAppData(), 400);
+}
+
+/** write whatever is pending right now (used before quitting) */
+export async function flushAppData(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (!pendingData) return;
+  const raw = JSON.stringify(pendingData);
+  pendingData = null;
+  try {
+    if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
+    else localStorage.setItem("numi.documents", raw);
+  } catch (e) {
+    console.warn("saveAppData failed", e);
+  }
+}
+
+/** quit initiated from the tray: flush unsaved edits, then exit for real */
+export async function onAppQuit(cb: () => Promise<void>): Promise<void> {
+  if (!isTauri()) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen("app-quit", () => void cb().finally(() => void invoke("exit_app")));
 }
 
 // ---------- backups & data folder
