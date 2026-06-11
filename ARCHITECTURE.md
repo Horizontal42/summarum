@@ -114,6 +114,7 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
 
 ## Tests
 
-`npm test` runs ~80 vitest cases over the engine (`src/engine/*.test.ts`):
-every expression class, both languages, deterministic injected rates.
+`npm test` runs ~94 vitest cases over the engine (`src/engine/*.test.ts`):
+every expression class, both languages, deterministic injected rates,
+plus a regression suite covering all known-fixed bugs.
 UI is exercised manually; the engine is where the complexity lives.

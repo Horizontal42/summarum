@@ -195,7 +195,11 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
       case "div":
         if (l.kind === "percent") throw new EvalError("percent div number");
         return qty(q.value.div(p.div(100)), q.unit);
-      case "pow": return qty(q.value.pow(p.div(100)), q.unit);
+      case "pow":
+        // which side the percent is on matters: 50% ^ 2 = 0.25, 2 ^ 50% = √2
+        return l.kind === "percent"
+          ? qty(p.div(100).pow(q.value))
+          : qty(q.value.pow(p.div(100)), q.unit);
       default: throw new EvalError("bad percent op");
     }
   }
@@ -247,6 +251,7 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
 
 function evalBit(op: string, l: Value, r: Value): Value {
   if (l.kind !== "quantity" || r.kind !== "quantity") throw new EvalError("bitwise needs integers");
+  if (!l.value.isFinite() || !r.value.isFinite()) throw new EvalError("bitwise needs finite integers");
   const a = BigInt(l.value.toDecimalPlaces(0).toFixed(0));
   const b = BigInt(r.value.toDecimalPlaces(0).toFixed(0));
   if ((op === "shl" || op === "shr") && (b < 0n || b > 256n)) throw new EvalError("bad shift");
@@ -271,11 +276,13 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
 
   if (op === "of" || op === "off" || op === "on") {
     const p = l.kind === "percent" ? l.value : asScalar(l).mul(100);
-    switch (op) {
-      case "of": return qty(rv.mul(p).div(100), unit);
-      case "off": return qty(rv.mul(new Decimal(1).sub(p.div(100))), unit);
-      case "on": return qty(rv.mul(new Decimal(1).add(p.div(100))), unit);
-    }
+    const factor =
+      op === "of" ? p.div(100)
+      : op === "off" ? new Decimal(1).sub(p.div(100))
+      : new Decimal(1).add(p.div(100));
+    // a percent of a percent stays a percent: 50% of 50% = 25%
+    if (r.kind === "percent") return pct(r.value.mul(factor));
+    return qty(rv.mul(factor), unit);
   }
   if (op === "as_pct_of" || op === "as_pct_off" || op === "as_pct_on") {
     const lv = l.kind === "quantity" ? l.value : asScalar(l);
@@ -356,7 +363,10 @@ function evalDateWord(word: string): Value {
 function evalDateArith(op: string, l: Value, r: Value): Value {
   if (l.kind === "date" && r.kind === "date") {
     if (op !== "minus") throw new EvalError("dates only subtract");
-    const days = new Decimal(l.ms - r.ms).div(86400_000);
+    // midnight-to-midnight differences count calendar days (robust across DST)
+    const days = !l.hasTime && !r.hasTime
+      ? new Decimal(Math.round((l.ms - r.ms) / 86400_000))
+      : new Decimal(l.ms - r.ms).div(86400_000);
     return qty(days, { id: "day", dimension: "time", ratio: new Decimal(86400), format: "day" });
   }
   const date = (l.kind === "date" ? l : r) as Extract<Value, { kind: "date" }>;
@@ -368,12 +378,16 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   if (op === "minus" && l.kind !== "date") throw new EvalError("cannot subtract date from number");
   const amount = span.value.toNumber() * (op === "minus" ? -1 : 1);
   let ms: number;
+  let hasTime = date.hasTime;
   if (isCalendarUnit(span.unit.id, amount)) {
     ms = addToDate(date.ms, amount, span.unit.id);
   } else {
-    ms = date.ms + span.value.mul(span.unit.ratio).mul(1000).toNumber() * (op === "minus" ? -1 : 1);
+    const seconds = span.value.mul(span.unit.ratio);
+    ms = date.ms + seconds.mul(1000).toNumber() * (op === "minus" ? -1 : 1);
+    // "today + 2 hours" must show the time part to be visible at all
+    if (!seconds.mod(86400).isZero()) hasTime = true;
   }
-  return { ...date, ms };
+  return { ...date, ms, hasTime };
 }
 
 function evalAgg(name: "sum" | "avg" | "prev", ctx: EvalCtx): Value {
@@ -398,15 +412,17 @@ function evalAgg(name: "sum" | "avg" | "prev", ctx: EvalCtx): Value {
   if (block.length === 0) throw new EvalError("nothing to aggregate");
   block.reverse();
   let acc = block[0];
+  let counted = 1;
   for (let i = 1; i < block.length; i++) {
     const item = block[i];
     try {
       acc = numericAdd(acc, item, 1);
+      counted++;
     } catch {
       // skip lines with incompatible dimensions, as Numi does
     }
   }
-  if (name === "avg") return qty(acc.value.div(block.length), acc.unit);
+  if (name === "avg") return qty(acc.value.div(counted), acc.unit);
   return acc;
 }
 

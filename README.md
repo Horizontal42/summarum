@@ -75,7 +75,8 @@ the sheet total; select a few lines to see just their sum.
 - **Click a result** to copy it. Copying a line copies it *with* the answer
   (`rent * 3 = $1,500`). **Ctrl+Shift+C** copies the whole sheet with answers.
 - **Drag the divider** to resize the results column.
-- **Drop a `.numi` or `.txt` file** into the window to open it as a sheet.
+- **Drop a `.numi`, `.sum`, `.txt` or `.md` file** into the window to open it
+  as a sheet.
 - **Backups are automatic**: a daily snapshot of all sheets (last 14 kept), and
   deleted sheets sit in a bin for 14 days (configurable) — restore one by
   dragging the file back in. Settings → Backups opens the folder.
@@ -116,7 +117,8 @@ npm run tauri build    # build the installer
 
 To build from source you need:
 
-- [Node.js](https://nodejs.org/) 20 or newer
+- [Node.js](https://nodejs.org/) 22.6 or newer (`npm run icons` relies on
+  Node's built-in TypeScript support)
 - [Rust](https://rustup.rs/) (stable, MSVC toolchain)
 - [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
   with the "Desktop development with C++" workload (the MSVC linker)

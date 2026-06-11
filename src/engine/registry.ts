@@ -3,7 +3,7 @@
 // for the tokenizer. Longest phrase wins; case-sensitive entries (symbols
 // like "m"/"M", "kB") are tried before the case-insensitive ones.
 import { Decimal, Dimension, NumeralRepr, Unit, Value } from "./types";
-import { lexPhrase } from "./lexer";
+import { Lex, lexLine } from "./lexer";
 import * as vocab from "./vocab";
 import { UNIT_DATA, SI_PREFIXES, DATA_SI_PREFIXES, IEC_PREFIXES, SCALE_DATA } from "./unitdata";
 import { EXTRA_UNITS, CRYPTO } from "./extraunits";
@@ -38,6 +38,11 @@ interface PhraseEntry {
   lexemes: string[]; // raw, as in the phrase
   lower: string[];
   caseSensitive: boolean;
+  /**
+   * per-gap flag: word/number lexemes glued together in the phrase ("log2")
+   * must also be glued in the input — otherwise "log 2" matches log2
+   */
+  mustTouch: boolean[];
   payload: Payload;
 }
 
@@ -68,10 +73,16 @@ export class Registry {
   completions: Completion[] = [];
 
   addPhrase(phrase: string, payload: Payload, opts: { caseSensitive?: boolean } = {}): void {
-    const lexemes = lexPhrase(phrase);
-    if (lexemes.length === 0) return;
+    const lexs = lexLine(phrase);
+    if (lexs.length === 0) return;
+    const lexemes = lexs.map((l) => l.raw);
     const caseSensitive = opts.caseSensitive ?? lexemes.every((l) => l.length <= 2);
-    const entry: PhraseEntry = { lexemes, lower: lexemes.map((l) => l.toLowerCase()), caseSensitive, payload };
+    const wordOrNum = (t: Lex["type"]) => t === "word" || t === "num";
+    const mustTouch: boolean[] = [];
+    for (let k = 1; k < lexs.length; k++) {
+      mustTouch.push(lexs[k].start === lexs[k - 1].end && wordOrNum(lexs[k].type) && wordOrNum(lexs[k - 1].type));
+    }
+    const entry: PhraseEntry = { lexemes, lower: lexemes.map((l) => l.toLowerCase()), caseSensitive, mustTouch, payload };
     const key = entry.lower[0];
     const list = this.byFirst.get(key);
     if (list) {
@@ -88,16 +99,20 @@ export class Registry {
 
   /**
    * Match the longest phrase at position i of the lexeme stream.
-   * rawAt/lowerAt give the lexemes of the input line.
+   * lexes are the lexemes of the input line, lowers their lowercased raws.
    */
-  match(raws: string[], lowers: string[], i: number): { payload: Payload; length: number } | null {
+  match(lexes: Lex[], lowers: string[], i: number): { payload: Payload; length: number } | null {
     const list = this.byFirst.get(lowers[i]);
     if (!list) return null;
     for (const e of list) {
-      if (i + e.lexemes.length > raws.length) continue;
+      if (i + e.lexemes.length > lexes.length) continue;
       let ok = true;
       for (let k = 0; k < e.lexemes.length; k++) {
-        if (e.caseSensitive ? raws[i + k] !== e.lexemes[k] : lowers[i + k] !== e.lower[k]) {
+        if (e.caseSensitive ? lexes[i + k].raw !== e.lexemes[k] : lowers[i + k] !== e.lower[k]) {
+          ok = false;
+          break;
+        }
+        if (k > 0 && e.mustTouch[k - 1] && lexes[i + k].start !== lexes[i + k - 1].end) {
           ok = false;
           break;
         }
@@ -222,6 +237,8 @@ export function buildRegistry(): Registry {
   // units, SI/IEC prefixes, area/volume templates
   interface LengthPhrase { phrase: string; unit: Unit; caseSensitive?: boolean }
   const lengthPhrases: LengthPhrase[] = [];
+  /** lowercased composed symbol -> unit; null = ambiguous (mm vs Mm) */
+  const lenientSym = new Map<string, Unit | null>();
 
   for (const d of UNIT_DATA) {
     const variants = vocab.variants(d.category, `${d.id}.variants`);
@@ -276,12 +293,24 @@ export function buildRegistry(): Registry {
         reg.unitsById.set(pUnit.id, pUnit);
         for (const ph of csPhrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });
         for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
+        // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
+        // while "mm"/"Mm" stay strict (milli vs mega)
+        for (const ph of csPhrases) {
+          const lower = ph.toLowerCase();
+          const prev = lenientSym.get(lower);
+          if (prev === undefined) lenientSym.set(lower, pUnit);
+          else if (prev && prev.id !== pUnit.id) lenientSym.set(lower, null);
+        }
         if (d.dimension === "length") {
           for (const ph of csPhrases) lengthPhrases.push({ phrase: ph, unit: pUnit, caseSensitive: true });
           for (const pw of pWords) for (const wv of wordVariants) lengthPhrases.push({ phrase: pw + wv, unit: pUnit, caseSensitive: false });
         }
       }
     }
+  }
+
+  for (const [lower, unit] of lenientSym) {
+    if (unit) reg.addPhrase(lower, { t: "unit", unit }, { caseSensitive: false });
   }
 
   // Area/volume from templates: "square %@" / "cubic %@" applied to every length phrase

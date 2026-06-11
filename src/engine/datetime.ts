@@ -88,22 +88,40 @@ export function startOfToday(): number {
   return d.getTime();
 }
 
-/** Calendar-aware add: months/years via Date methods, the rest via ms. */
+/**
+ * Calendar-aware add. Days/weeks go through setDate so the wall-clock time
+ * survives DST transitions; months/years clamp to the end of the target
+ * month (Jan 31 + 1 month = Feb 28, not Mar 3).
+ */
 export function addToDate(ms: number, amount: number, unitId: string): number {
   const baseId = unitId.includes(":") ? unitId.split(":")[1] : unitId;
   const d = new Date(ms);
+  if ((baseId === "day" || baseId === "week") && Number.isInteger(amount)) {
+    d.setDate(d.getDate() + amount * (baseId === "week" ? 7 : 1));
+    return d.getTime();
+  }
   if (baseId === "month" && Number.isInteger(amount)) {
+    const day = d.getDate();
+    d.setDate(1);
     d.setMonth(d.getMonth() + amount);
+    d.setDate(Math.min(day, lastDayOfMonth(d)));
     return d.getTime();
   }
   if (baseId === "year" && Number.isInteger(amount)) {
+    const day = d.getDate();
+    d.setDate(1);
     d.setFullYear(d.getFullYear() + amount);
+    d.setDate(Math.min(day, lastDayOfMonth(d)));
     return d.getTime();
   }
   return ms; // caller falls back to ms math for everything else
 }
 
+function lastDayOfMonth(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
 export function isCalendarUnit(unitId: string, amount: number): boolean {
   const baseId = unitId.includes(":") ? unitId.split(":")[1] : unitId;
-  return (baseId === "month" || baseId === "year") && Number.isInteger(amount);
+  return (baseId === "day" || baseId === "week" || baseId === "month" || baseId === "year") && Number.isInteger(amount);
 }

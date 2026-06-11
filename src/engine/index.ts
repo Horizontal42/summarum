@@ -90,7 +90,7 @@ export class SumEngine {
 
       const tokens = tokenize(line, this.reg);
       const knownVars = new Set(vars.keys());
-      const parsed = parseLine(tokens, knownVars);
+      const parsed = parseLine(tokens, knownVars, line);
 
       let value: Value | null = null;
       if (parsed.expr) {
@@ -101,11 +101,14 @@ export class SumEngine {
         };
         try {
           value = evaluate(parsed.expr, ctx);
-          if (parsed.assign) vars.set(parsed.assign, value);
+          // a line without a result beats a dead sheet — swallow everything,
+          // including extension bugs and BigInt conversion errors
         } catch (e) {
-          if (!(e instanceof EvalError)) throw e;
+          if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
           value = null;
         }
+        if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
+        if (value && parsed.assign) vars.set(parsed.assign, value);
       }
 
       lineValues.push(value);

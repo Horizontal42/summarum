@@ -12,7 +12,12 @@ function group(intPart: string, sep: string): string {
 }
 
 export function formatNumber(v: Decimal, s: EngineSettings): string {
-  const rounded = v.toDecimalPlaces(s.precision);
+  let rounded = v.toDecimalPlaces(s.precision);
+  if (rounded.isZero() && !v.isZero() && v.abs().gte("1e-12")) {
+    // 1 mm in km must not show "0 km" — fall back to significant digits
+    // (anything below 1e-12 is conversion noise, e.g. 32 F in C)
+    rounded = v.toSignificantDigits(Math.max(s.precision, 1));
+  }
   const str = rounded.toString();
   if (str.includes("e") || str.includes("E")) return str;
   const [int, frac] = str.split(".");

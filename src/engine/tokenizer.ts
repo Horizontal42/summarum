@@ -32,8 +32,7 @@ const SYM_OPS: Record<string, Token["t"] | "plus" | "minus" | "mul" | "div" | "p
 export function tokenize(line: string, reg: Registry): Token[] {
   void SYM_OPS;
   const lexes = lexLine(line);
-  const raws = lexes.map((l) => l.raw);
-  const lowers = raws.map((r) => r.toLowerCase());
+  const lowers = lexes.map((l) => l.raw.toLowerCase());
   const tokens: Token[] = [];
   let i = 0;
   while (i < lexes.length) {
@@ -46,7 +45,7 @@ export function tokenize(line: string, reg: Registry): Token[] {
       continue;
     }
 
-    const m = reg.match(raws, lowers, i);
+    const m = reg.match(lexes, lowers, i);
     if (m) {
       const end = lexes[i + m.length - 1].end;
       const s = { start: lx.start, end };

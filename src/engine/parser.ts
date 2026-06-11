@@ -38,14 +38,24 @@ export interface ParsedLine {
   expr: Node | null;
 }
 
-export function parseLine(tokens: Token[], knownVars: Set<string>): ParsedLine {
-  let assign: string | undefined;
-  let toks = tokens;
+const VAR_NAME_RE = /^[\p{L}_][\p{L}\d_]*$/u;
 
-  // `x = expr` / `x is expr`
-  if (toks.length >= 2 && toks[0].t === "word" && toks[1].t === "assign") {
-    assign = toks[0].raw;
-    toks = toks.slice(2);
+export function parseLine(tokens: Token[], knownVars: Set<string>, line: string): ParsedLine {
+  let assign: string | undefined;
+  // a defined variable shadows whatever its name tokenized as (unit "m", agg "sum"...)
+  let toks: Token[] = tokens.map((tk) => {
+    if (tk.t === "word" || tk.t === "num" || tk.t === "junk") return tk;
+    const raw = line.slice(tk.start, tk.end);
+    return knownVars.has(raw) ? { t: "word", raw, start: tk.start, end: tk.end } : tk;
+  });
+
+  // `x = expr` / `x is expr` — the name may have tokenized as a unit (`m = 5`)
+  if (toks.length >= 2 && toks[1].t === "assign") {
+    const raw = toks[0].t === "word" ? toks[0].raw : line.slice(toks[0].start, toks[0].end);
+    if (VAR_NAME_RE.test(raw)) {
+      assign = raw;
+      toks = toks.slice(2);
+    }
   }
 
   // Noise filtering: drop junk and unknown words, but keep words that follow
@@ -104,6 +114,29 @@ class Parser {
           items = [{ k: "pctop", op: tk.op, l: mk(), r }];
           continue;
         }
+        continue;
+      }
+      // an operator after a finished item continues it: "100 USD in EUR + 20"
+      if (tk.t === "op" && items.length > 0) {
+        const save = this.i;
+        this.i++;
+        const r = tk.op === "plus" || tk.op === "minus" ? this.parseMul() : this.parseUnary();
+        if (r) {
+          items = [{ k: "bin", op: tk.op, l: mk(), r }];
+          continue;
+        }
+        this.i = save + 1; // dangling operator is noise
+        continue;
+      }
+      if (tk.t === "bitop" && items.length > 0) {
+        const save = this.i;
+        this.i++;
+        const r = this.parseAdd();
+        if (r) {
+          items = [{ k: "bit", op: tk.op, l: mk(), r }];
+          continue;
+        }
+        this.i = save + 1;
         continue;
       }
       const before = this.i;

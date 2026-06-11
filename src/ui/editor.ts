@@ -118,19 +118,22 @@ export class SumEditor {
   ) {
     this.resultsEl = resultsEl;
 
+    let engineOptions: { label: string; type: string; detail?: string }[] | null = null;
     const completionSource = (ctx: CompletionContext): CompletionResult | null => {
       const word = ctx.matchBefore(/[\p{L}_]+$/u);
       if (!word || (word.from === word.to && !ctx.explicit)) return null;
       if (word.to - word.from < 2 && !ctx.explicit) return null;
-      const options = this.engine.completions().map((c) => ({
+      // the engine's phrase list is fixed after boot — map it once
+      engineOptions ??= this.engine.completions().map((c) => ({
         label: c.label,
         type: c.type === "function" ? "function" : c.type === "keyword" ? "keyword" : "constant",
         detail: c.detail,
       }));
+      const options = [...engineOptions];
       // document variables
       const text = ctx.state.doc.toString();
       for (const m of text.matchAll(/^\s*([\p{L}_][\p{L}\d_]*)\s*=/gmu)) {
-        options.push({ label: m[1], type: "variable", detail: undefined as unknown as string });
+        options.push({ label: m[1], type: "variable" });
       }
       return { from: word.from, options, validFor: /^[\p{L}_]*$/u };
     };
