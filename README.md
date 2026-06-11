@@ -1,5 +1,7 @@
 # Summarum
 
+[Русский](README.ru.md)
+
 **A calculator that works like a notepad.** Type what you're thinking — every line
 gets a live answer in the right column. No buttons, no formula syntax, just text.
 
