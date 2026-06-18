@@ -537,8 +537,12 @@ async function boot(): Promise<void> {
   $("#new-doc").addEventListener("click", () => newDoc());
 
   document.addEventListener("mousedown", (e) => {
-    if (!settings.sidebarVisible) return;
     const target = e.target as HTMLElement;
+    const panel = $("#settings-panel");
+    if (!panel.classList.contains("hidden") && !target.closest("#settings-panel") && !target.closest("#open-settings")) {
+      panel.classList.add("hidden");
+    }
+    if (!settings.sidebarVisible) return;
     if (target.closest("#sidebar") || target.closest("#toggle-sidebar")) return;
     settings.sidebarVisible = false;
     $("#sidebar").classList.add("hidden");
