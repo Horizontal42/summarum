@@ -88,6 +88,8 @@ the sheet total; select a few lines to see just their sum.
 
 ## Extensions
 
+> **Note:** extensions run as trusted local scripts with access to your files. Only load code you wrote or fully trust.
+
 Drop a `.js` file into the extensions folder (Settings → Extensions folder)
 and restart. The API is compatible with Numi extensions:
 
