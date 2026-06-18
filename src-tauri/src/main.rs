@@ -15,10 +15,7 @@ const RATES_TTL_SECS: u64 = 3600;
 const SAMPLE_JS: &str = include_str!("../extension-sample.js");
 
 fn data_dir(app: &AppHandle) -> PathBuf {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .expect("no app data dir");
+    let dir = app.path().app_data_dir().expect("no app data dir");
     fs::create_dir_all(&dir).ok();
     dir
 }
@@ -64,7 +61,9 @@ fn load_file(app: AppHandle, name: String) -> Result<Option<String>, String> {
     if !path.exists() {
         return Ok(None);
     }
-    fs::read_to_string(path).map(Some).map_err(|e| e.to_string())
+    fs::read_to_string(path)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -77,12 +76,27 @@ struct RatesPayload {
 
 /// top cryptocurrencies fetched from CoinGecko (code, gecko id)
 const CRYPTO: &[(&str, &str)] = &[
-    ("BTC", "bitcoin"), ("ETH", "ethereum"), ("SOL", "solana"), ("BNB", "binancecoin"),
-    ("XRP", "ripple"), ("ADA", "cardano"), ("DOGE", "dogecoin"), ("TRX", "tron"),
-    ("TON", "the-open-network"), ("DOT", "polkadot"), ("LTC", "litecoin"),
-    ("AVAX", "avalanche-2"), ("LINK", "chainlink"), ("UNI", "uniswap"), ("XLM", "stellar"),
-    ("XMR", "monero"), ("ATOM", "cosmos"), ("BCH", "bitcoin-cash"), ("NEAR", "near"),
-    ("USDT", "tether"), ("USDC", "usd-coin"),
+    ("BTC", "bitcoin"),
+    ("ETH", "ethereum"),
+    ("SOL", "solana"),
+    ("BNB", "binancecoin"),
+    ("XRP", "ripple"),
+    ("ADA", "cardano"),
+    ("DOGE", "dogecoin"),
+    ("TRX", "tron"),
+    ("TON", "the-open-network"),
+    ("DOT", "polkadot"),
+    ("LTC", "litecoin"),
+    ("AVAX", "avalanche-2"),
+    ("LINK", "chainlink"),
+    ("UNI", "uniswap"),
+    ("XLM", "stellar"),
+    ("XMR", "monero"),
+    ("ATOM", "cosmos"),
+    ("BCH", "bitcoin-cash"),
+    ("NEAR", "near"),
+    ("USDT", "tether"),
+    ("USDC", "usd-coin"),
 ];
 
 #[derive(Serialize, Deserialize)]
@@ -92,7 +106,10 @@ struct RatesCache {
 }
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
@@ -139,7 +156,10 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
     }
 
     Ok(RatesPayload {
-        date: body["time_last_update_utc"].as_str().unwrap_or("").to_string(),
+        date: body["time_last_update_utc"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
         rates,
         fetched_at: now_secs(),
     })
@@ -158,7 +178,10 @@ async fn fetch_rates(app: AppHandle, force: bool) -> Result<RatesPayload, String
     }
     match fetch_rates_online().await {
         Ok(payload) => {
-            let cache = RatesCache { fetched_at: now_secs(), payload: payload.clone() };
+            let cache = RatesCache {
+                fetched_at: now_secs(),
+                payload: payload.clone(),
+            };
             if let Ok(raw) = serde_json::to_string(&cache) {
                 write_atomic(&data_dir(&app).join("rates.json"), &raw).ok();
             }
@@ -182,7 +205,9 @@ fn load_documents(app: AppHandle, dir: Option<String>) -> Result<Option<String>,
     if !path.exists() {
         return Ok(None);
     }
-    fs::read_to_string(path).map(Some).map_err(|e| e.to_string())
+    fs::read_to_string(path)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -231,7 +256,8 @@ fn run_backups(app: AppHandle, dir: Option<String>, retention_days: u32) -> Resu
     }
 
     // prune the deleted-sheets bin by age
-    let cutoff = SystemTime::now() - std::time::Duration::from_secs(u64::from(retention_days) * 86400);
+    let cutoff =
+        SystemTime::now() - std::time::Duration::from_secs(u64::from(retention_days) * 86400);
     if let Ok(entries) = fs::read_dir(bdir.join("deleted")) {
         for entry in entries.flatten() {
             if let Ok(meta) = entry.metadata() {
@@ -246,7 +272,12 @@ fn run_backups(app: AppHandle, dir: Option<String>, retention_days: u32) -> Resu
 
 /// A deleted sheet goes to the bin as a .numi file (restore = drag it back).
 #[tauri::command]
-fn backup_deleted_sheet(app: AppHandle, dir: Option<String>, title: String, contents: String) -> Result<(), String> {
+fn backup_deleted_sheet(
+    app: AppHandle,
+    dir: Option<String>,
+    title: String,
+    contents: String,
+) -> Result<(), String> {
     let bin = docs_dir(&app, &dir).join("backups").join("deleted");
     fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
     let safe: String = title
@@ -254,8 +285,16 @@ fn backup_deleted_sheet(app: AppHandle, dir: Option<String>, title: String, cont
         .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
         .take(40)
         .collect();
-    let safe = if safe.trim().is_empty() { "sheet".to_string() } else { safe.trim().to_string() };
-    let name = format!("{}-{}.numi", safe, chrono::Local::now().format("%Y-%m-%d-%H%M%S"));
+    let safe = if safe.trim().is_empty() {
+        "sheet".to_string()
+    } else {
+        safe.trim().to_string()
+    };
+    let name = format!(
+        "{}-{}.numi",
+        safe,
+        chrono::Local::now().format("%Y-%m-%d-%H%M%S")
+    );
     fs::write(bin.join(name), contents).map_err(|e| e.to_string())
 }
 
@@ -278,7 +317,12 @@ fn data_dir_has_documents(dir: String) -> bool {
 /// strategy: "move" (copy mine, delete originals), "overwrite" (same, target
 /// had documents), "use_existing" (just switch — keep the target's files)
 #[tauri::command]
-fn migrate_data_dir(app: AppHandle, old_dir: Option<String>, new_dir: String, strategy: String) -> Result<(), String> {
+fn migrate_data_dir(
+    app: AppHandle,
+    old_dir: Option<String>,
+    new_dir: String,
+    strategy: String,
+) -> Result<(), String> {
     let old = docs_dir(&app, &old_dir);
     let new = PathBuf::from(&new_dir);
     fs::create_dir_all(&new).map_err(|e| e.to_string())?;
@@ -304,7 +348,8 @@ fn migrate_data_dir(app: AppHandle, old_dir: Option<String>, new_dir: String, st
         if let Ok(entries) = fs::read_dir(&from) {
             for entry in entries.flatten() {
                 let dest = to.join(entry.file_name());
-                if entry.path().is_file() && !dest.exists() && fs::copy(entry.path(), dest).is_err() {
+                if entry.path().is_file() && !dest.exists() && fs::copy(entry.path(), dest).is_err()
+                {
                     all_copied = false;
                 }
             }
