@@ -1,4 +1,4 @@
-// JS extensions runtime (Numi-compatible API): numi.setVariable,
+// JS extensions runtime: numi.setVariable,
 // numi.addUnit, numi.addFunction. Scripts share the engine's JS runtime.
 import { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
 

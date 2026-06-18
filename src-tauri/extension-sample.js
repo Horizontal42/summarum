@@ -1,7 +1,6 @@
 // Summarum extension example.
 // Drop .js files into this folder and restart the app.
-// The API is compatible with Numi extensions: numi.setVariable,
-// numi.addUnit, numi.addFunction.
+// API: numi.setVariable, numi.addUnit, numi.addFunction.
 
 // A global variable usable on any sheet, e.g. `salary * vat`
 // numi.setVariable("vat", { "double": 20 });

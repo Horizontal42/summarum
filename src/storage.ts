@@ -66,7 +66,7 @@ export async function loadSettings(): Promise<SettingsData> {
   try {
     const raw = isTauri()
       ? await invoke<string | null>("load_file", { name: "settings.json" })
-      : localStorage.getItem("numi.settings");
+      : localStorage.getItem("summarum.settings");
     if (raw) return { ...defaultSettingsData, ...JSON.parse(raw) };
   } catch (e) {
     console.warn("loadSettings failed", e);
@@ -77,7 +77,7 @@ export async function loadSettings(): Promise<SettingsData> {
 export async function saveSettings(s: SettingsData): Promise<void> {
   const raw = JSON.stringify(s, null, 2);
   if (isTauri()) await invoke("save_file", { name: "settings.json", contents: raw });
-  else localStorage.setItem("numi.settings", raw);
+  else localStorage.setItem("summarum.settings", raw);
 }
 
 // ---------- documents
@@ -86,7 +86,7 @@ export async function loadAppData(dataDir: string): Promise<AppData | null> {
   try {
     const raw = isTauri()
       ? await invoke<string | null>("load_documents", { dir: dirArg(dataDir) })
-      : localStorage.getItem("numi.documents");
+      : localStorage.getItem("summarum.documents");
     if (raw) return JSON.parse(raw);
   } catch (e) {
     console.warn("loadAppData failed", e);
@@ -120,7 +120,7 @@ export async function flushAppData(): Promise<void> {
   pendingData = null;
   try {
     if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
-    else localStorage.setItem("numi.documents", raw);
+    else localStorage.setItem("summarum.documents", raw);
   } catch (e) {
     console.warn("saveAppData failed", e);
   }
