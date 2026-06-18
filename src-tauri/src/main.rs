@@ -509,3 +509,51 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running Summarum");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // safe_name
+    #[test]
+    fn safe_name_rejects_empty() {
+        assert!(!safe_name(""));
+    }
+    #[test]
+    fn safe_name_rejects_slashes() {
+        assert!(!safe_name("foo/bar"));
+        assert!(!safe_name("foo\\bar"));
+    }
+    #[test]
+    fn safe_name_rejects_colon() {
+        assert!(!safe_name("C:file"));
+    }
+    #[test]
+    fn safe_name_rejects_dotdot() {
+        assert!(!safe_name("../secret"));
+        assert!(!safe_name(".."));
+    }
+    #[test]
+    fn safe_name_accepts_valid() {
+        assert!(safe_name("settings.json"));
+        assert!(safe_name("documents.json"));
+        assert!(safe_name("rates.json"));
+    }
+
+    // is_sheet_path
+    #[test]
+    fn is_sheet_path_matches_extensions() {
+        assert!(is_sheet_path("my-calc.numi"));
+        assert!(is_sheet_path("budget.sum"));
+        assert!(is_sheet_path("MY-CALC.NUMI"));
+        assert!(is_sheet_path("BUDGET.SUM"));
+    }
+    #[test]
+    fn is_sheet_path_rejects_others() {
+        assert!(!is_sheet_path("notes.txt"));
+        assert!(!is_sheet_path("doc.md"));
+        assert!(!is_sheet_path("script.js"));
+        assert!(!is_sheet_path("numi"));
+        assert!(!is_sheet_path(""));
+    }
+}
