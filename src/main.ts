@@ -433,9 +433,9 @@ function toast(msg: string): void {
 
 async function boot(): Promise<void> {
   settings = await loadSettings();
-  if (!localStorage.getItem("numi.langInit") && settings.language === "en") {
+  if (!localStorage.getItem("summarum.langInit") && settings.language === "en") {
     settings.language = detectLang();
-    localStorage.setItem("numi.langInit", "1");
+    localStorage.setItem("summarum.langInit", "1");
   }
 
   engine = new SumEngine({ precision: settings.precision, groupSeparator: settings.groupSeparator });

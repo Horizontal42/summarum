@@ -175,7 +175,7 @@ export function buildRegistry(): Registry {
   reg.addPhrase("mod", { t: "op", op: "mod" }, { caseSensitive: false });
   reg.addPhrase("modulo", { t: "op", op: "mod" }, { caseSensitive: false });
 
-  // bitwise: "and" stays an addition word (original Numi), so & | xor shl shr
+  // bitwise: "and" stays an addition word, so & | xor shl shr
   reg.addPhrase("xor", { t: "bitop", op: "bxor" }, { caseSensitive: false });
   reg.addPhrase("or", { t: "bitop", op: "bor" }, { caseSensitive: false });
   reg.addPhrase("shl", { t: "bitop", op: "shl" }, { caseSensitive: false });

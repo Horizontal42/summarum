@@ -4,7 +4,7 @@ src-tauri/target/
 src-tauri/gen/
 *.log
 
-# local reference copy of the original macOS Numi bundle — not ours to ship
+# local reference copy of a third-party macOS bundle — not ours to ship
 Contents/
 
 # one-off debugging artifacts

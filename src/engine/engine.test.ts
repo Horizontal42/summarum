@@ -49,7 +49,7 @@ describe("arithmetic", () => {
   it("scales", () => {
     expect(calc("1.5 million")).toBe("1,500,000");
     expect(calc("5k")).toBe("5,000");
-    expect(calc("2 dozen")).toBe("2"); // dozen is not in Numi vocab — noise
+    expect(calc("2 dozen")).toBe("2"); // dozen is not in the vocab — noise
   });
   it("free text around math is ignored", () => {
     expect(calc("I spent 20 on pizza plus 5 on coffee")).toBe("25");

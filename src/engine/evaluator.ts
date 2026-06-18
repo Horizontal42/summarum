@@ -419,7 +419,7 @@ function evalAgg(name: "sum" | "avg" | "prev", ctx: EvalCtx): Value {
       acc = numericAdd(acc, item, 1);
       counted++;
     } catch {
-      // skip lines with incompatible dimensions, as Numi does
+      // skip lines with incompatible dimensions
     }
   }
   if (name === "avg") return qty(acc.value.div(counted), acc.unit);

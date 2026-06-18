@@ -81,7 +81,7 @@ describe("edge cases", () => {
   });
 });
 
-describe("extra units (beyond original Numi)", () => {
+describe("extra units", () => {
   it("speed", () => {
     expect(calc("100 km/h in mph")).toBe("62.14 mph");
     expect(calc("60 mph in km/h")).toBe("96.56 km/h");
