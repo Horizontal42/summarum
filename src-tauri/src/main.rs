@@ -452,6 +452,13 @@ fn exit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// True when the app was launched by autostart (passes --hidden arg).
+/// The frontend uses this to stay in the tray instead of showing the window.
+#[tauri::command]
+fn is_hidden_launch() -> bool {
+    std::env::args().any(|a| a == "--hidden")
+}
+
 /// Quit via the frontend so the debounced autosave gets flushed first;
 /// a watchdog exits anyway in case the webview is unresponsive.
 fn request_quit(app: &AppHandle) {
@@ -494,7 +501,7 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec!["--hidden"]),
         ))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -513,7 +520,8 @@ fn main() {
             open_extensions_folder,
             get_launch_file,
             read_text_file,
-            exit_app
+            exit_app,
+            is_hidden_launch
         ])
         .setup(|app| {
             let handle = app.handle().clone();

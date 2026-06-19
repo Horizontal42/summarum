@@ -308,8 +308,13 @@ async function registerHotkey(old: string | null, combo: string): Promise<boolea
       if (e.state !== "Pressed") return;
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const win = getCurrentWindow();
-      if (await win.isVisible() && await win.isFocused()) {
-        await win.hide();
+      if (await win.isVisible()) {
+        if (document.hasFocus()) {
+          await win.hide();
+        } else {
+          await win.show();
+          await win.setFocus();
+        }
       } else {
         await win.show();
         await win.setFocus();
@@ -605,6 +610,15 @@ async function boot(): Promise<void> {
   void onOpenFile((content) => newDoc(content));
 
   editor.focus();
+
+  if (isTauri()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const hidden = await invoke<boolean>("is_hidden_launch");
+    if (!hidden) {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().show();
+    }
+  }
 }
 
 void boot();
