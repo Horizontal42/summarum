@@ -16,7 +16,7 @@ export type ConvTarget =
 
 export type Node =
   | { k: "num"; v: Decimal; repr: NumeralRepr }
-  | { k: "const"; name: "pi" | "e" }
+  | { k: "const"; name: "pi" | "e" | "half" | "onehalf" }
   | { k: "var"; name: string }
   | { k: "date"; word: DateWord }
   | { k: "agg"; name: "sum" | "avg" | "prev" }

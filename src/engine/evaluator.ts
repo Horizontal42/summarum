@@ -27,7 +27,12 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
     case "num":
       return qty(node.v, null, node.repr);
     case "const":
-      return qty(node.name === "pi" ? PI : E);
+      switch (node.name) {
+        case "pi": return qty(PI);
+        case "e": return qty(E);
+        case "half": return qty(new Decimal("0.5"));
+        case "onehalf": return qty(new Decimal("1.5"));
+      }
     case "var": {
       const v = ctx.vars.get(node.name);
       if (!v) throw new EvalError(`unknown variable ${node.name}`);

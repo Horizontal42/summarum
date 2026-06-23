@@ -32,7 +32,7 @@ export type Payload =
   | { t: "repr"; repr: NumeralRepr }
   | { t: "special"; name: "unix" | "todate" }
   | { t: "date"; word: DateWord }
-  | { t: "const"; name: "pi" | "e" };
+  | { t: "const"; name: "pi" | "e" | "half" | "onehalf" };
 
 interface PhraseEntry {
   lexemes: string[]; // raw, as in the phrase
@@ -172,6 +172,10 @@ export function buildRegistry(): Registry {
   for (const v of vocab.variants("Operations", "prev.variants")) reg.addPhrase(v, { t: "agg", name: "prev" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "sqrt.variants")) reg.addPhrase(v, { t: "func", name: "sqrt" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "cbrt.variants")) reg.addPhrase(v, { t: "func", name: "cbrt" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "abs.variants")) reg.addPhrase(v, { t: "func", name: "abs" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "ln.variants")) reg.addPhrase(v, { t: "func", name: "ln" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "log.variants")) reg.addPhrase(v, { t: "func", name: "log" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "round.variants")) reg.addPhrase(v, { t: "func", name: "round" }, { caseSensitive: false });
   reg.addPhrase("mod", { t: "op", op: "mod" }, { caseSensitive: false });
   reg.addPhrase("modulo", { t: "op", op: "mod" }, { caseSensitive: false });
 
@@ -231,6 +235,12 @@ export function buildRegistry(): Registry {
   reg.addPhrase("π", { t: "const", name: "pi" });
   reg.addPhrase("пи", { t: "const", name: "pi" }, { caseSensitive: false });
   reg.addPhrase("e", { t: "const", name: "e" }, { caseSensitive: true });
+  reg.addPhrase("a half", { t: "const", name: "half" }, { caseSensitive: false });
+  reg.addPhrase("one half", { t: "const", name: "half" }, { caseSensitive: false });
+  reg.addPhrase("половина", { t: "const", name: "half" }, { caseSensitive: false });
+  reg.addPhrase("one and a half", { t: "const", name: "onehalf" }, { caseSensitive: false });
+  reg.addPhrase("полтора", { t: "const", name: "onehalf" }, { caseSensitive: false });
+  reg.addPhrase("полторы", { t: "const", name: "onehalf" }, { caseSensitive: false });
 
   for (const f of BUILTIN_FUNCS) reg.addPhrase(f, { t: "func", name: f }, { caseSensitive: false });
 

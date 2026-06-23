@@ -71,6 +71,23 @@ describe("arithmetic", () => {
     expect(calc("round(2.6)")).toBe("3");
     expect(calc("log(1000)")).toBe("3");
     expect(calc("ln(1)")).toBe("0");
+    // russian aliases
+    expect(calc("квадратный корень из 16")).toBe("4");
+    expect(calc("кубический корень из 27")).toBe("3");
+    expect(calc("модуль(-5)")).toBe("5");
+    expect(calc("логарифм(1000)")).toBe("3");
+    expect(calc("натуральный логарифм(1)")).toBe("0");
+    expect(calc("округлить(2.6)")).toBe("3");
+  });
+  it("fraction constants", () => {
+    expect(calc("a half")).toBe("0.5");
+    expect(calc("one half")).toBe("0.5");
+    expect(calc("половина")).toBe("0.5");
+    expect(calc("a half million")).toBe("500,000");
+    expect(calc("one and a half")).toBe("1.5");
+    expect(calc("полтора")).toBe("1.5");
+    expect(calc("полтора миллиона")).toBe("1,500,000");
+    expect(calc("полторы тысячи")).toBe("1,500");
   });
 });
 

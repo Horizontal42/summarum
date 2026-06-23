@@ -42,6 +42,11 @@ const dict: Record<string, Record<string, string>> = {
     folderError: "Could not change the data folder",
     hotkeyFailed: "Hotkey is taken by another app",
     decimalsep: "Decimal separator",
+    exportCopy: "Copy sheet",
+    exportSum: "Save as .sum",
+    exportTxt: "Export as text",
+    exportPrint: "Print / PDF",
+    saved: "Saved",
   },
   ru: {
     settings: "Настройки",
@@ -84,6 +89,11 @@ const dict: Record<string, Record<string, string>> = {
     folderError: "Не удалось сменить папку данных",
     hotkeyFailed: "Хоткей занят другой программой",
     decimalsep: "Десятичный разделитель",
+    exportCopy: "Скопировать лист",
+    exportSum: "Сохранить как .sum",
+    exportTxt: "Экспорт в текст",
+    exportPrint: "Печать / PDF",
+    saved: "Сохранено",
   },
 };
 
