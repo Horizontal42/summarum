@@ -132,4 +132,5 @@ export const SCALE_DATA: Record<string, string> = {
   thousand: "1e3",
   million: "1e6",
   billion: "1e9",
+  trillion: "1e12",
 };
