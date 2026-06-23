@@ -52,6 +52,8 @@ describe("arithmetic", () => {
     expect(calc("2 trillion")).toBe("2,000,000,000,000");
     expect(calc("1.5 трлн")).toBe("1,500,000,000,000");
     expect(calc("5к")).toBe("5,000");
+    expect(calc("5кк")).toBe("5,000,000");
+    expect(calc("2ккк")).toBe("2,000,000,000");
     expect(calc("2 dozen")).toBe("2"); // dozen is not in the vocab — noise
   });
   it("free text around math is ignored", () => {
