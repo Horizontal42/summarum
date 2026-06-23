@@ -1,7 +1,7 @@
 {
   "name": "summarum",
   "private": true,
-  "version": "1.1.3",
+  "version": "1.2.0",
   "description": "Summarum — natural language calculator notebook for Windows",
   "type": "module",
   "scripts": {
