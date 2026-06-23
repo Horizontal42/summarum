@@ -484,6 +484,7 @@ export const EN: VocabLocale = {
     "sample.welcome": "# Summarum\n8 / (45 - 20%)\n5 inches in cm\n$9 in euro\n100 km/h in mph"
   },
   "Scales": {
+    "trillion.variants": "trillion,Trillion,trillions,Trillions,tn",
     "billion.variants": "billion,Billion,milliard,Milliard,billions,Billions,milliards,Milliards",
     "million.variants": "million,Million,millions,Millions,M",
     "thousand.variants": "thousand,Thousand,thousands,Thousands,th.,th,k"
@@ -948,9 +949,10 @@ export const RU: VocabLocale = {
     "sample.welcome": "# Summarum\n8 / (45 - 20%)\n5 дюймов в см\n$9 в евро\n100 км/ч в милях"
   },
   "Scales": {
+    "trillion.variants": "триллион,триллиона,триллиону,триллионом,триллионе,триллионы,триллионов,триллионам,триллионами,триллионах,трлн,трлн.",
     "billion.variants": "миллиард,миллиарда,миллиарду,миллиардом,миллиарде,миллиарды,миллиардов,миллиардам,миллиардами,миллиардах,млрд,млрд.",
     "million.variants": "миллион,миллиона,миллиону,миллионом,миллионе,миллионы,миллионов,миллионам,миллионами,миллионах,мил.,мил,милл.,милл,М,млн,млн.",
-    "thousand.variants": "тысяча,тысячи,тысяче,тысячу,тысячей,тысячам,тысячами,тысячах,тысяч,тыс.,тыс,т,т."
+    "thousand.variants": "тысяча,тысячи,тысяче,тысячу,тысячей,тысячам,тысячами,тысячах,тысяч,тыс.,тыс,к,т,т."
   },
   "Temperature": {
     "celsius.variants": "цельсий,цельсия,цельсиев,цельсиях,цельсиями,градусов цельсия",
