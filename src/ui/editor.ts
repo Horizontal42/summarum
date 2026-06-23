@@ -3,7 +3,7 @@
 import { EditorView, ViewUpdate, Decoration, DecorationSet, keymap, drawSelection } from "@codemirror/view";
 import { EditorState, StateEffect, StateField, RangeSetBuilder } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { autocompletion, CompletionContext, CompletionResult, completionKeymap } from "@codemirror/autocomplete";
+import { autocompletion, CompletionContext, CompletionResult, acceptCompletion } from "@codemirror/autocomplete";
 import { SumEngine, LineResult } from "../engine";
 
 export interface EditorCallbacks {
@@ -144,8 +144,9 @@ export class SumEditor {
         doc: initialText,
         extensions: [
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
-          autocompletion({ override: [completionSource], activateOnTyping: true }),
+          keymap.of([...defaultKeymap, ...historyKeymap]),
+          autocompletion({ override: [completionSource], activateOnTyping: true, defaultKeymap: false }),
+          keymap.of([{ key: "Tab", run: acceptCompletion }]),
           resultsField,
           highlightField,
           varHighlightField,
