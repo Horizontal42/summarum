@@ -594,6 +594,41 @@ async function boot(): Promise<void> {
     }
   });
 
+  // export button + dropdown
+  const exportBtn = $("#export-btn");
+  const exportMenu = $("#export-menu");
+  exportBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exportMenu.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => exportMenu.classList.add("hidden"));
+  exportMenu.addEventListener("click", async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+    if (!btn) return;
+    exportMenu.classList.add("hidden");
+    const action = btn.dataset.action;
+    if (action === "copy") {
+      void navigator.clipboard.writeText(editor.getSheetWithResults());
+      toast(t("copied"));
+    } else if (action === "print") {
+      window.print();
+    } else if (isTauri()) {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { invoke } = await import("@tauri-apps/api/core");
+      const isSum = action === "save-sum";
+      const path = await save({
+        filters: isSum
+          ? [{ name: "Summarum Sheet", extensions: ["sum"] }]
+          : [{ name: "Text file", extensions: ["txt"] }],
+      });
+      if (path) {
+        const content = isSum ? editor.getText() : editor.getSheetWithResults();
+        await invoke("write_text_file", { path, contents: content });
+        toast(t("saved"));
+      }
+    }
+  });
+
   $("#rates-info").addEventListener("click", () => void refreshRates(true));
   setInterval(renderRatesInfo, 60_000);
 

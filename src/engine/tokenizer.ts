@@ -19,7 +19,7 @@ export type Token =
   | { t: "scale"; mult: Decimal; start: number; end: number }
   | { t: "repr"; repr: NumeralRepr; start: number; end: number }
   | { t: "date"; word: DateWord; start: number; end: number }
-  | { t: "const"; name: "pi" | "e"; start: number; end: number }
+  | { t: "const"; name: "pi" | "e" | "half" | "onehalf"; start: number; end: number }
   | { t: "lparen"; start: number; end: number }
   | { t: "rparen"; start: number; end: number }
   | { t: "semicolon"; start: number; end: number }

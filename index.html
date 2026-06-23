@@ -30,6 +30,15 @@
         <div id="statusbar">
           <span id="rates-info" title=""></span>
           <span class="spacer"></span>
+          <div id="export-wrap">
+            <button id="export-btn" title="Export">⤓</button>
+            <div id="export-menu" class="hidden">
+              <button data-action="copy" data-i18n="exportCopy">Copy sheet</button>
+              <button data-action="save-sum" data-i18n="exportSum">Save as .sum</button>
+              <button data-action="export-txt" data-i18n="exportTxt">Export as text</button>
+              <button data-action="print" data-i18n="exportPrint">Print / PDF</button>
+            </div>
+          </div>
           <span id="total-line" title=""></span>
         </div>
       </main>

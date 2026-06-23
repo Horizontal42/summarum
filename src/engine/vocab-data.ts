@@ -423,6 +423,10 @@ export const EN: VocabLocale = {
     "plus.variants": "with,plus,and",
     "prev.variants": "prev",
     "sqrt.variants": "sqrt,square root",
+    "abs.variants": "absolute value,absolute",
+    "ln.variants": "natural log,natural logarithm",
+    "log.variants": "logarithm",
+    "round.variants": "rounded",
     "sum.variants": "sum,total"
   },
   "Percent": {
@@ -889,6 +893,10 @@ export const RU: VocabLocale = {
     "plus.variants": "и,плюс,вместе с",
     "prev.variants": "пред.,пред",
     "sqrt.variants": "квадратный корень,кв корень,кв. корень",
+    "abs.variants": "модуль,абсолютное значение",
+    "ln.variants": "натуральный логарифм,нат. логарифм",
+    "log.variants": "логарифм",
+    "round.variants": "округлить,округление",
     "sum.variants": "всего,сумма,итог,итого"
   },
   "Percent": {

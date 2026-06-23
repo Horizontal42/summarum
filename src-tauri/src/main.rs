@@ -37,6 +37,11 @@ fn safe_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")
 }
 
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    write_atomic(std::path::Path::new(&path), &contents)
+}
+
 /// write via a temp file + rename so a crash mid-write cannot corrupt the target
 fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
     let tmp = path.with_extension("tmp");
@@ -521,7 +526,8 @@ fn main() {
             get_launch_file,
             read_text_file,
             exit_app,
-            is_hidden_launch
+            is_hidden_launch,
+            write_text_file
         ])
         .setup(|app| {
             let handle = app.handle().clone();
