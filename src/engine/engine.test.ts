@@ -162,6 +162,16 @@ describe("currency", () => {
     expect(calc("$10 + $5")).toBe("$15");
     expect(calc("$10 + 20%")).toBe("$12");
   });
+  it("GBP↔RUB via natural phrases", () => {
+    // "sterling" and "quid" as English shortcuts (bare "pounds" is weight, not GBP)
+    expect(calc("100 sterling in RUB")).toBe("40,000 ₽");
+    expect(calc("100 quid in rubles")).toBe("40,000 ₽");
+    // Russian: "стерлинг" (bare "фунт" is weight unit, not GBP)
+    expect(calc("100 стерлингов в рублях")).toBe("40,000 ₽");
+    // existing multi-word forms still work
+    expect(calc("100 GBP in RUB")).toBe("40,000 ₽");
+    expect(calc("£100 in RUB")).toBe("40,000 ₽");
+  });
 });
 
 describe("numeral systems", () => {
