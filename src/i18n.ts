@@ -47,6 +47,11 @@ const dict: Record<string, Record<string, string>> = {
     exportTxt: "Export as text",
     exportPrint: "Print / PDF",
     saved: "Saved",
+    updateAvailable: "Version {} is available. Install and restart now?",
+    updateInstall: "Install",
+    updateLater: "Later",
+    updateInstalling: "Installing update…",
+    updateFailed: "Update failed",
   },
   ru: {
     settings: "Настройки",
@@ -94,6 +99,11 @@ const dict: Record<string, Record<string, string>> = {
     exportTxt: "Экспорт в текст",
     exportPrint: "Печать / PDF",
     saved: "Сохранено",
+    updateAvailable: "Доступна версия {}. Установить и перезапустить сейчас?",
+    updateInstall: "Установить",
+    updateLater: "Позже",
+    updateInstalling: "Установка обновления…",
+    updateFailed: "Не удалось обновить",
   },
 };
 

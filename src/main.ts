@@ -13,6 +13,7 @@ import {
 import type { LineResult } from "./engine";
 import { setLang, detectLang, t } from "./i18n";
 import { runExtensions } from "./extensions";
+import { checkForUpdate } from "./updater";
 import { EN, RU } from "./engine/vocab-data";
 
 function welcomeText(lang: string): string {
@@ -653,6 +654,21 @@ async function boot(): Promise<void> {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       await getCurrentWindow().show();
     }
+  }
+
+  void checkUpdate();
+}
+
+async function checkUpdate(): Promise<void> {
+  const update = await checkForUpdate();
+  if (!update) return;
+  const choice = await askModal(t("updateAvailable").replace("{}", update.version), t("updateInstall"), t("updateLater"));
+  if (choice !== "a") return;
+  toast(t("updateInstalling"));
+  try {
+    await update.install();
+  } catch {
+    toast(t("updateFailed"));
   }
 }
 

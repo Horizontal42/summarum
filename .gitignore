@@ -10,3 +10,6 @@ numi-master/
 
 # one-off debugging artifacts
 scripts/smoke-*
+
+# updater signing key — private, never publish (see .tauri-signing/README.txt)
+.tauri-signing/
