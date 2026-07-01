@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -49,3 +49,27 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  notes:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prev=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+          {
+            echo "## What's new"
+            if [ -n "$prev" ]; then
+              git log "$prev..${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | grep -v "^- bump version"
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$prev...${{ github.ref_name }}"
+            else
+              git log "${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | grep -v "^- bump version"
+            fi
+          } > notes.md
+          gh release edit "${{ github.ref_name }}" --notes-file notes.md
