@@ -246,6 +246,18 @@ describe("variables and document context", () => {
   it("product", () => {
     expect(calcDoc("2\n3\n4\nproduct")).toEqual(["2", "3", "4", "24"]);
   });
+  it("random — deterministic per line text", () => {
+    const [a] = calcDoc("random(1, 6)");
+    const [b] = calcDoc("random(1, 6)");
+    expect(a).toBe(b); // same text → same seed → same result
+    const [c] = calcDoc("random(1, 6) ");
+    expect(c).not.toBe(a); // different text → different seed
+  });
+  it("random — stays in range", () => {
+    const v = Number(calc("random(1, 100)"));
+    expect(v).toBeGreaterThanOrEqual(1);
+    expect(v).toBeLessThanOrEqual(100);
+  });
   it("headers split blocks and produce no result", () => {
     expect(calcDoc("# Food\n10\n20\nsum")).toEqual([null, "10", "20", "30"]);
   });

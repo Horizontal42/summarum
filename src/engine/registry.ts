@@ -58,7 +58,7 @@ const BUILTIN_FUNCS = [
   "sqrt", "cbrt", "sin", "cos", "tan", "cot", "asin", "acos", "atan",
   "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh",
   "ln", "lg", "log", "log2", "exp", "abs", "round", "ceil", "floor",
-  "fact", "factorial",
+  "fact", "factorial", "random",
 ];
 
 export class Registry {

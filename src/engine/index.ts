@@ -97,7 +97,7 @@ export class SumEngine {
         const ctx: EvalCtx = {
           reg: this.reg,
           vars,
-          line: { lineValues, lineKinds, index: i },
+          line: { lineValues, lineKinds, index: i, lineText: rawLine },
         };
         try {
           value = evaluate(parsed.expr, ctx);

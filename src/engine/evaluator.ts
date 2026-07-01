@@ -11,6 +11,8 @@ export interface LineCtx {
   /** per-line flags for block boundaries */
   lineKinds: ("empty" | "header" | "normal")[];
   index: number;
+  /** raw line text — used to seed random() deterministically */
+  lineText: string;
 }
 
 export interface EvalCtx {
@@ -490,8 +492,33 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
     case "ceil": return x.kind === "quantity" ? { ...x, value: x.value.ceil() } : qty(n().ceil());
     case "floor": return x.kind === "quantity" ? { ...x, value: x.value.floor() } : qty(n().floor());
     case "fact": case "factorial": return qty(factorial(n()));
+    case "random": {
+      const seed = strHash(ctx.line.lineText) ^ (ctx.line.index * 0x9e3779b9);
+      const rand = mulberry32(seed);
+      if (args.length === 0) return qty(new Decimal(rand));
+      const toNum = (v: Value) => v.kind === "quantity" ? v.value.toNumber() : 0;
+      const [lo, hi] = args.length === 1 ? [0, toNum(args[0]!)] : [toNum(args[0]!), toNum(args[1]!)];
+      const isInt = Number.isInteger(lo) && Number.isInteger(hi);
+      const raw = isInt ? Math.floor(rand * (hi - lo + 1)) + lo : rand * (hi - lo) + lo;
+      return qty(new Decimal(raw));
+    }
     default: throw new EvalError(`unknown function ${name}`);
   }
+}
+
+function strHash(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number): number {
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 function factorial(n: Decimal): Decimal {
