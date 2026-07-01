@@ -181,16 +181,55 @@ interface SearchHit {
   docTitle: string;
   line: number;
   text: string;
+  result?: string;
+}
+
+function parseResultQuery(q: string): { op: string; threshold: import("./engine").Value } | null {
+  const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
+  if (!m) return null;
+  const v = engine.evaluateExpression(m[2].trim());
+  if (!v || v.kind !== "quantity") return null;
+  return { op: m[1], threshold: v };
 }
 
 function searchAllSheets(query: string): SearchHit[] {
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
   if (!q) return [];
+  const rq = parseResultQuery(q);
+  if (rq && rq.threshold.kind === "quantity") {
+    const th = rq.threshold.value;
+    const hits: SearchHit[] = [];
+    for (const doc of data.docs) {
+      const contents = data.contents[doc.id] ?? "";
+      const results = engine.evaluateDocument(contents);
+      const lines = contents.split("\n");
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        if (!r.value || r.value.kind !== "quantity") continue;
+        const v = r.value.value;
+        let match = false;
+        switch (rq.op) {
+          case ">":  match = v.gt(th); break;
+          case ">=": match = v.gte(th); break;
+          case "<":  match = v.lt(th); break;
+          case "<=": match = v.lte(th); break;
+          case "=":  match = v.eq(th); break;
+          case "~":  match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01); break;
+        }
+        if (match) {
+          hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] ?? "", result: r.text ?? undefined });
+          if (hits.length >= 200) return hits;
+        }
+      }
+    }
+    return hits;
+  }
+  const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
   for (const doc of data.docs) {
     const lines = (data.contents[doc.id] ?? "").split("\n");
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(q)) {
+      if (lines[i].toLowerCase().includes(ql)) {
         hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
         if (hits.length >= 200) return hits;
       }
@@ -218,7 +257,7 @@ function renderSearchResults(query: string, hits: SearchHit[]): void {
     docEl.textContent = hit.docTitle;
     const lineEl = document.createElement("div");
     lineEl.className = "line";
-    lineEl.textContent = hit.text;
+    lineEl.textContent = hit.result ? `${hit.text} = ${hit.result}` : hit.text;
     item.append(docEl, lineEl);
     item.addEventListener("click", () => {
       if (hit.docId !== data.activeId) switchDoc(hit.docId);
