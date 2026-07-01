@@ -62,7 +62,13 @@ export interface DateVal {
   timeZone?: string;
 }
 
-export type Value = Quantity | PercentVal | DateVal;
+export interface ChartValue {
+  kind: "chart";
+  points: Decimal[];
+  unitLabel: string | null;
+}
+
+export type Value = Quantity | PercentVal | DateVal | ChartValue;
 
 export function qty(value: Decimal.Value, unit: Unit | null = null, repr: NumeralRepr = "decimal"): Quantity {
   return { kind: "quantity", value: new Decimal(value), unit, repr };

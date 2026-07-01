@@ -114,7 +114,7 @@ export class SumEngine {
       lineValues.push(value);
       lineKinds.push("normal");
       results.push({
-        text: value ? formatValue(value, this.settings) : null,
+        text: (value && value.kind !== "chart") ? formatValue(value, this.settings) : null,
         value,
         kind: "normal",
         tokens,

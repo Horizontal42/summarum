@@ -397,7 +397,7 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   return { ...date, ms, hasTime };
 }
 
-function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product", ctx: EvalCtx): Value {
+function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart", ctx: EvalCtx): Value {
   const { lineValues, lineKinds, index } = ctx.line;
   if (name === "prev") {
     for (let i = index - 1; i >= 0; i--) {
@@ -420,6 +420,17 @@ function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "produ
   block.reverse();
 
   if (name === "count") return qty(new Decimal(block.length));
+
+  if (name === "chart") {
+    const refDim = block[0].unit?.dimension ?? null;
+    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    if (compatible.length < 2) throw new EvalError("need at least 2 values for chart");
+    return {
+      kind: "chart",
+      points: compatible.map((q) => toBase(q)),
+      unitLabel: block[0].unit?.format ?? null,
+    };
+  }
 
   if (name === "min" || name === "max") {
     const refDim = block[0].unit?.dimension ?? null;

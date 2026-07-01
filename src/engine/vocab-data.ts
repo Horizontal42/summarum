@@ -432,7 +432,8 @@ export const EN: VocabLocale = {
     "min.variants": "min,minimum,smallest",
     "max.variants": "max,maximum,largest",
     "product.variants": "product",
-    "random.variants": "random,rand"
+    "random.variants": "random,rand",
+    "chart.variants": "chart,spark,sparkline,graph"
   },
   "Percent": {
     "as_a_percent_of.variants": "as a % of,as a percent of",
@@ -909,7 +910,8 @@ export const RU: VocabLocale = {
     "min.variants": "минимум,мин,наименьшее",
     "max.variants": "максимум,макс,наибольшее",
     "product.variants": "произведение,произв",
-    "random.variants": "случайное,случайно,рандом"
+    "random.variants": "случайное,случайно,рандом",
+    "chart.variants": "график,спарклайн,диаграмма"
   },
   "Percent": {
     "as_a_percent_of.variants": "как процент от,как процент",

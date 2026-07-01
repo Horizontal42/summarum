@@ -321,6 +321,12 @@ body {
   text-overflow: ellipsis;
 }
 .result-line:hover { text-decoration: underline; }
+.result-sparkline {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+  opacity: 0.85;
+}
 
 /* ---------- settings */
 #settings-panel {
