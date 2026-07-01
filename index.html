@@ -16,6 +16,7 @@
           <button id="toggle-sidebar" title="Documents (Ctrl+B)">☰</button>
           <input id="doc-title" spellcheck="false" autocomplete="off" />
           <span class="spacer" data-tauri-drag-region></span>
+          <button id="open-search" title="Search all sheets (Ctrl+F)">🔍</button>
           <button id="open-settings" title="Settings">⚙</button>
           <div id="win-controls">
             <button id="win-min" title="Minimize">─</button>
@@ -79,6 +80,9 @@
         <label class="row"><input id="set-autostart" type="checkbox" />
           <span data-i18n="autostart">Launch at startup</span>
         </label>
+        <label class="row"><input id="set-alwaysontop" type="checkbox" />
+          <span data-i18n="alwaysontop">Always on top</span>
+        </label>
         <label><span data-i18n="fontsize">Font size</span>
           <input id="set-fontsize" type="number" min="10" max="32" />
         </label>
@@ -105,6 +109,12 @@
             <button id="modal-a"></button>
             <button id="modal-b"></button>
           </div>
+        </div>
+      </div>
+      <div id="search-overlay" class="hidden">
+        <div class="search-box">
+          <input id="search-input" type="text" autocomplete="off" spellcheck="false" />
+          <div id="search-results"></div>
         </div>
       </div>
     </div>

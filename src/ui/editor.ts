@@ -252,6 +252,17 @@ export class SumEditor {
     this.view.focus();
   }
 
+  /** put the caret on line n (1-based) and scroll it into view */
+  goToLine(n: number): void {
+    const doc = this.view.state.doc;
+    const line = doc.line(Math.min(Math.max(n, 1), doc.lines));
+    this.view.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      scrollIntoView: true,
+    });
+    this.view.focus();
+  }
+
   private evaluate(text: string): void {
     this.results = this.engine.evaluateDocument(text);
     this.view.dispatch({ effects: setResults.of(this.results) });

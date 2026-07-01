@@ -29,6 +29,8 @@ export interface SettingsData {
   dataDir: string;
   /** how long deleted sheets stay in backups/deleted */
   deletedRetentionDays: number;
+  /** keep the window above others */
+  alwaysOnTop: boolean;
 }
 
 export const defaultSettingsData: SettingsData = {
@@ -44,6 +46,7 @@ export const defaultSettingsData: SettingsData = {
   resultsWidth: 42,
   dataDir: "",
   deletedRetentionDays: 14,
+  alwaysOnTop: false,
 };
 
 /** "" -> undefined for the Rust side (default app data dir) */

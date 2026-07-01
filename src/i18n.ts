@@ -12,6 +12,7 @@ const dict: Record<string, Record<string, string>> = {
     language: "Language",
     hotkey: "Global hotkey",
     autostart: "Launch at startup",
+    alwaysontop: "Always on top",
     fontsize: "Font size",
     extensions: "Extensions folder",
     done: "Done",
@@ -52,6 +53,8 @@ const dict: Record<string, Record<string, string>> = {
     updateLater: "Later",
     updateInstalling: "Installing update…",
     updateFailed: "Update failed",
+    searchPlaceholder: "Search all sheets…",
+    searchEmpty: "No matches",
   },
   ru: {
     settings: "Настройки",
@@ -64,6 +67,7 @@ const dict: Record<string, Record<string, string>> = {
     language: "Язык",
     hotkey: "Глобальный хоткей",
     autostart: "Запуск при старте Windows",
+    alwaysontop: "Поверх всех окон",
     fontsize: "Размер шрифта",
     extensions: "Папка расширений",
     done: "Готово",
@@ -104,6 +108,8 @@ const dict: Record<string, Record<string, string>> = {
     updateLater: "Позже",
     updateInstalling: "Установка обновления…",
     updateFailed: "Не удалось обновить",
+    searchPlaceholder: "Поиск по всем листам…",
+    searchEmpty: "Ничего не найдено",
   },
 };
 

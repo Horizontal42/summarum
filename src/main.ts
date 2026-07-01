@@ -111,6 +111,74 @@ function newDoc(content = ""): void {
   switchDoc(id);
 }
 
+// ---------- search all sheets
+
+interface SearchHit {
+  docId: string;
+  docTitle: string;
+  line: number;
+  text: string;
+}
+
+function searchAllSheets(query: string): SearchHit[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const hits: SearchHit[] = [];
+  for (const doc of data.docs) {
+    const lines = (data.contents[doc.id] ?? "").split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(q)) {
+        hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
+        if (hits.length >= 200) return hits;
+      }
+    }
+  }
+  return hits;
+}
+
+function renderSearchResults(query: string, hits: SearchHit[]): void {
+  const el = $("#search-results");
+  el.replaceChildren();
+  if (query.trim() && hits.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "search-empty";
+    empty.textContent = t("searchEmpty");
+    el.appendChild(empty);
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (const hit of hits) {
+    const item = document.createElement("div");
+    item.className = "search-item";
+    const docEl = document.createElement("div");
+    docEl.className = "doc";
+    docEl.textContent = hit.docTitle;
+    const lineEl = document.createElement("div");
+    lineEl.className = "line";
+    lineEl.textContent = hit.text;
+    item.append(docEl, lineEl);
+    item.addEventListener("click", () => {
+      if (hit.docId !== data.activeId) switchDoc(hit.docId);
+      editor.goToLine(hit.line);
+      closeSearch();
+    });
+    frag.appendChild(item);
+  }
+  el.appendChild(frag);
+}
+
+function openSearch(): void {
+  const input = $<HTMLInputElement>("#search-input");
+  $("#search-overlay").classList.remove("hidden");
+  input.value = "";
+  renderSearchResults("", []);
+  input.focus();
+}
+
+function closeSearch(): void {
+  $("#search-overlay").classList.add("hidden");
+}
+
 // ---------- settings
 
 function applySettings(): void {
@@ -121,6 +189,7 @@ function applySettings(): void {
   document.documentElement.style.setProperty("--editor-font-size", `${settings.fontSize}px`);
   $("#editor-wrap").style.setProperty("--results-width", `${settings.resultsWidth}%`);
   setLang(settings.language);
+  $<HTMLInputElement>("#search-input").placeholder = t("searchPlaceholder");
   engine.updateSettings({
     precision: settings.precision,
     groupSeparator: settings.groupSeparator,
@@ -139,6 +208,7 @@ function bindSettingsUI(): void {
   const langSel = $<HTMLSelectElement>("#set-lang");
   const hotkey = $<HTMLInputElement>("#set-hotkey");
   const autostart = $<HTMLInputElement>("#set-autostart");
+  const alwaysOnTop = $<HTMLInputElement>("#set-alwaysontop");
   const fontSize = $<HTMLInputElement>("#set-fontsize");
   const resultsWidth = $<HTMLInputElement>("#set-resultswidth");
 
@@ -149,6 +219,7 @@ function bindSettingsUI(): void {
   langSel.value = settings.language;
   hotkey.value = settings.hotkey;
   autostart.checked = settings.autostart;
+  alwaysOnTop.checked = settings.alwaysOnTop;
   fontSize.value = String(settings.fontSize);
   resultsWidth.value = String(settings.resultsWidth);
 
@@ -218,6 +289,11 @@ function bindSettingsUI(): void {
   autostart.addEventListener("change", async () => {
     settings.autostart = autostart.checked;
     await applyAutostart(settings.autostart);
+    void saveSettings(settings);
+  });
+  alwaysOnTop.addEventListener("change", async () => {
+    settings.alwaysOnTop = alwaysOnTop.checked;
+    await applyAlwaysOnTop(settings.alwaysOnTop);
     void saveSettings(settings);
   });
 
@@ -337,6 +413,12 @@ async function applyAutostart(enabled: boolean): Promise<void> {
   } catch (e) {
     console.warn("autostart failed", e);
   }
+}
+
+async function applyAlwaysOnTop(enabled: boolean): Promise<void> {
+  if (!isTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().setAlwaysOnTop(enabled).catch((e) => console.warn("always-on-top failed", e));
 }
 
 async function refreshRates(force = false): Promise<void> {
@@ -526,6 +608,22 @@ async function boot(): Promise<void> {
     }
   });
 
+  $("#open-search").addEventListener("click", () => openSearch());
+  const searchInput = $<HTMLInputElement>("#search-input");
+  searchInput.addEventListener("input", () => {
+    renderSearchResults(searchInput.value, searchAllSheets(searchInput.value));
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeSearch();
+    } else if (e.key === "Enter") {
+      $("#search-results").querySelector<HTMLElement>(".search-item")?.click();
+    }
+  });
+  $("#search-overlay").addEventListener("mousedown", (e) => {
+    if (e.target === $("#search-overlay")) closeSearch();
+  });
+
   if (isTauri()) {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
@@ -588,6 +686,10 @@ async function boot(): Promise<void> {
       e.preventDefault();
       $("#toggle-sidebar").click();
     }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      openSearch();
+    }
       if (e.ctrlKey && e.shiftKey && e.code === "KeyC") {
       e.preventDefault();
       void navigator.clipboard.writeText(editor.getSheetWithResults());
@@ -637,6 +739,7 @@ async function boot(): Promise<void> {
 
   await registerHotkey(null, settings.hotkey);
   if (settings.autostart) await applyAutostart(true);
+  if (settings.alwaysOnTop) await applyAlwaysOnTop(true);
   void onAppQuit(() => flushAppData());
   void refreshRates();
   setInterval(() => void refreshRates(), 60 * 60 * 1000);
