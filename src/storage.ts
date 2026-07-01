@@ -205,6 +205,27 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
   return null;
 }
 
+// ---------- historical rates
+
+export async function fetchHistoricalRates(date: string): Promise<Record<string, number> | null> {
+  try {
+    if (isTauri()) {
+      return await invoke<Record<string, number>>("fetch_historical_rates", { date });
+    }
+    const res = await fetch(`https://api.frankfurter.app/${date}?from=USD`);
+    const json = await res.json();
+    if (!json?.rates) return null;
+    const out: Record<string, number> = { USD: 1 };
+    for (const [k, v] of Object.entries(json.rates as Record<string, number>)) {
+      if (v > 0) out[k.toUpperCase()] = v;
+    }
+    return out;
+  } catch (e) {
+    console.warn("fetchHistoricalRates failed", date, e);
+    return null;
+  }
+}
+
 // ---------- image export
 
 export async function writeImageFile(path: string, dataBase64: string): Promise<void> {

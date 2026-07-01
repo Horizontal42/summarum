@@ -302,6 +302,16 @@ describe("dates", () => {
   });
 });
 
+describe("historical rates", () => {
+  it("in EUR on date uses injected historical rate", () => {
+    eng.setHistoricalRates("2024-01-01", { EUR: 0.9, USD: 1 });
+    expect(calc("1000 USD in EUR on 2024-01-01")).toBe("€ 900");
+  });
+  it("missing historical date returns null", () => {
+    expect(calc("500 USD in EUR on 1800-01-01")).toBeNull();
+  });
+});
+
 describe("goal seek", () => {
   it("? * 1.2 = 1000", () => expect(calc("? * 1.2 = 1000")).toBe("833.33"));
   it("? + 50 = 200", () => expect(calc("? + 50 = 200")).toBe("150"));

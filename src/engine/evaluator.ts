@@ -19,6 +19,8 @@ export interface EvalCtx {
   reg: Registry;
   vars: Map<string, Value>;
   line: LineCtx;
+  /** date → { code → rate-per-usd } */
+  historicalRates?: Map<string, Map<string, number>>;
 }
 
 const PI = new Decimal("3.14159265358979323846264338327950288419716939937510");
@@ -332,8 +334,16 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
       return convertQ(v, target.unit);
     }
     case "currency": {
-      const unit = ctx.reg.makeCurrencyUnit(target.code);
-      if (!unit) throw new EvalError(`no rate for ${target.code}`);
+      let unit;
+      if (target.onDate) {
+        const dateRates = ctx.historicalRates?.get(target.onDate);
+        const rate = dateRates?.get(target.code);
+        if (rate === undefined) throw new EvalError(`no historical rate for ${target.code} on ${target.onDate}`);
+        unit = ctx.reg.makeCurrencyUnitFromRate(target.code, new Decimal(rate));
+      } else {
+        unit = ctx.reg.makeCurrencyUnit(target.code);
+        if (!unit) throw new EvalError(`no rate for ${target.code}`);
+      }
       if (v.kind !== "quantity") throw new EvalError("cannot convert to currency");
       if (!v.unit) return qty(v.value, unit);
       return convertQ(v, unit);

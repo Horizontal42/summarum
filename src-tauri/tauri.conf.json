@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost https://open.er-api.com https://api.coingecko.com https://query1.finance.yahoo.com https://query2.finance.yahoo.com"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost https://open.er-api.com https://api.coingecko.com https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://api.frankfurter.app"
     }
   },
   "bundle": {

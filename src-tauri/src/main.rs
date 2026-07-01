@@ -315,6 +315,60 @@ async fn fetch_market_data(
     Ok(prices)
 }
 
+// ---------- historical rates (frankfurter.app, cached permanently per date)
+
+fn valid_date_str(date: &str) -> bool {
+    let parts: Vec<&str> = date.split('-').collect();
+    parts.len() == 3
+        && parts[0].len() == 4
+        && parts[1].len() == 2
+        && parts[2].len() == 2
+        && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()))
+}
+
+#[tauri::command]
+async fn fetch_historical_rates(
+    app: AppHandle,
+    date: String,
+) -> Result<std::collections::HashMap<String, f64>, String> {
+    if !valid_date_str(&date) {
+        return Err("invalid date format".into());
+    }
+    let cache_path = data_dir(&app).join(format!("rates-{}.json", date));
+    if let Ok(raw) = fs::read_to_string(&cache_path) {
+        if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw) {
+            return Ok(cached);
+        }
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let url = format!("https://api.frankfurter.app/{}?from=USD", date);
+    let body: serde_json::Value = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    let raw_rates = body["rates"].as_object().ok_or("no rates in response")?;
+    let mut rates = std::collections::HashMap::new();
+    rates.insert("USD".to_string(), 1.0_f64);
+    for (code, val) in raw_rates {
+        if let Some(v) = val.as_f64() {
+            if v > 0.0 {
+                rates.insert(code.to_uppercase(), v);
+            }
+        }
+    }
+    if let Ok(serialized) = serde_json::to_string(&rates) {
+        write_atomic(&cache_path, &serialized).ok();
+    }
+    Ok(rates)
+}
+
 // ---------- documents in the (possibly custom) data folder
 
 #[tauri::command]
@@ -636,6 +690,7 @@ fn main() {
             data_dir_has_documents,
             migrate_data_dir,
             fetch_rates,
+            fetch_historical_rates,
             fetch_market_data,
             load_extensions,
             open_extensions_folder,

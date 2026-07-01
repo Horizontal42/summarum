@@ -39,8 +39,8 @@ export interface ExtensionValue {
 export class SumEngine {
   reg: Registry;
   settings: EngineSettings;
-  /** variables defined by extensions, persist across evaluations */
   private globals = new Map<string, Value>();
+  private historicalRates = new Map<string, Map<string, number>>();
 
   constructor(settings: Partial<EngineSettings> = {}) {
     this.settings = { ...defaultSettings, ...settings };
@@ -49,8 +49,17 @@ export class SumEngine {
   }
 
   setRates(rates: Record<string, number | string>): void {
-    // snapshot fills codes the live API doesn't return (e.g. crypto when CoinGecko fails)
     this.reg.setRates({ ...snapshot.rates, ...cryptoSnapshot, ...rates });
+  }
+
+  setHistoricalRates(date: string, rates: Record<string, number>): void {
+    const m = new Map<string, number>();
+    for (const [k, v] of Object.entries(rates)) m.set(k.toUpperCase(), v);
+    this.historicalRates.set(date, m);
+  }
+
+  hasHistoricalRates(date: string): boolean {
+    return this.historicalRates.has(date);
   }
 
   updateSettings(patch: Partial<EngineSettings>): void {
@@ -98,6 +107,7 @@ export class SumEngine {
           reg: this.reg,
           vars,
           line: { lineValues, lineKinds, index: i, lineText: rawLine },
+          historicalRates: this.historicalRates,
         };
         try {
           value = evaluate(parsed.expr, ctx);

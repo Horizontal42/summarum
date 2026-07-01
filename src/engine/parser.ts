@@ -7,7 +7,7 @@ import { PctOp, DateWord, BitOp } from "./registry";
 
 export type ConvTarget =
   | { type: "unit"; unit: Unit }
-  | { type: "currency"; code: string }
+  | { type: "currency"; code: string; onDate?: string }
   | { type: "repr"; repr: NumeralRepr }
   | { type: "tz"; words: string[] }
   | { type: "scale"; mult: Decimal; label: string }
@@ -115,7 +115,7 @@ class Parser {
         this.i++;
         const target = this.parseTarget();
         if (target) {
-          items = [{ k: "conv", x: mk(), target }];
+          items = [{ k: "conv", x: mk(), target: this.tryHistoricalDate(target) }];
           continue;
         }
         this.i = save + 1; // drop the conversion word, it was noise
@@ -195,7 +195,7 @@ class Parser {
           this.i = save;
           break;
         }
-        l = { k: "conv", x: l, target };
+        l = { k: "conv", x: l, target: this.tryHistoricalDate(target) };
       } else if (tk?.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is"))) {
         this.i++;
         const r = this.parseAdd();
@@ -206,6 +206,24 @@ class Parser {
       }
     }
     return l;
+  }
+
+  /** If the current token is `pctop(on)` + `datelit`, consume them and attach `onDate`. */
+  private tryHistoricalDate(target: ConvTarget): ConvTarget {
+    if (target.type !== "currency") return target;
+    const nx = this.peek();
+    if (nx?.t !== "pctop" || nx.op !== "on") return target;
+    const save = this.i;
+    this.i++;
+    const dk = this.peek();
+    if (dk?.t === "datelit") {
+      this.i++;
+      const d = new Date(dk.ms);
+      const onDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return { ...target, onDate };
+    }
+    this.i = save;
+    return target;
   }
 
   private parseTarget(): ConvTarget | null {

@@ -134,10 +134,14 @@ export class Registry {
   makeCurrencyUnit(code: string): Unit | null {
     const rate = this.rates.get(code);
     if (!rate) return null;
+    return this.makeCurrencyUnitFromRate(code, rate);
+  }
+
+  makeCurrencyUnitFromRate(code: string, ratePerUsd: Decimal): Unit {
     return {
       id: code,
       dimension: "currency",
-      ratio: new Decimal(1).div(rate), // USD per 1 unit
+      ratio: new Decimal(1).div(ratePerUsd), // USD per 1 unit
       format: this.currencyFormat.get(code) ?? `{} ${code}`,
     };
   }

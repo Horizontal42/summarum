@@ -5,7 +5,7 @@ import { SumEditor } from "./ui/editor";
 import {
   AppData, DocMeta, SettingsData, defaultSettingsData,
   loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
-  fetchRates, fetchMarketData, writeImageFile, loadExtensionScripts, openExtensionsFolder, isTauri,
+  fetchRates, fetchMarketData, fetchHistoricalRates, writeImageFile, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
   chooseFolder, dataDirHasDocuments, migrateDataDir,
@@ -143,11 +143,13 @@ function renderDocList(): void {
 
 function switchDoc(id: string): void {
   data.activeId = id;
-  editor.setText(data.contents[id] ?? "");
+  const text = data.contents[id] ?? "";
+  editor.setText(text);
   syncTitleField();
   renderDocList();
   saveAppData(data);
   editor.focus();
+  void fetchNeededHistoricalRates(text);
 }
 
 function newDoc(content = ""): void {
@@ -572,6 +574,23 @@ async function refreshMarket(force = false): Promise<void> {
   renderMarketInfo();
 }
 
+// ---------- historical rates
+
+const HIST_DATE_RE = /(?:on|на)\s+(\d{4}-\d{2}-\d{2})/gi;
+
+async function fetchNeededHistoricalRates(text: string): Promise<void> {
+  const dates = new Set<string>();
+  for (const m of text.matchAll(HIST_DATE_RE)) dates.add(m[1]!);
+  let fetched = false;
+  for (const date of dates) {
+    if (!engine.hasHistoricalRates(date)) {
+      const rates = await fetchHistoricalRates(date);
+      if (rates) { engine.setHistoricalRates(date, rates); fetched = true; }
+    }
+  }
+  if (fetched) editor.refresh();
+}
+
 function renderMarketInfo(): void {
   const el = $("#market-info") as HTMLElement;
   if (marketFetchedAt === 0) { el.style.display = "none"; return; }
@@ -770,6 +789,7 @@ async function boot(): Promise<void> {
         }
         renderDocList();
         saveAppData(data);
+        void fetchNeededHistoricalRates(text);
       },
       onCopy(text) {
         void navigator.clipboard.writeText(text);
