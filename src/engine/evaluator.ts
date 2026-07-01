@@ -395,7 +395,7 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   return { ...date, ms, hasTime };
 }
 
-function evalAgg(name: "sum" | "avg" | "prev", ctx: EvalCtx): Value {
+function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product", ctx: EvalCtx): Value {
   const { lineValues, lineKinds, index } = ctx.line;
   if (name === "prev") {
     for (let i = index - 1; i >= 0; i--) {
@@ -416,6 +416,21 @@ function evalAgg(name: "sum" | "avg" | "prev", ctx: EvalCtx): Value {
   }
   if (block.length === 0) throw new EvalError("nothing to aggregate");
   block.reverse();
+
+  if (name === "count") return qty(new Decimal(block.length));
+
+  if (name === "min" || name === "max") {
+    const refDim = block[0].unit?.dimension ?? null;
+    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    return compatible.reduce((best, q) =>
+      (name === "min" ? toBase(q).lt(toBase(best)) : toBase(q).gt(toBase(best))) ? q : best
+    );
+  }
+
+  if (name === "product") {
+    return qty(block.reduce((acc, q) => acc.mul(q.value), new Decimal(1)));
+  }
+
   let acc = block[0];
   let counted = 1;
   for (let i = 1; i < block.length; i++) {

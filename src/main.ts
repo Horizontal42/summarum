@@ -111,6 +111,24 @@ function newDoc(content = ""): void {
   switchDoc(id);
 }
 
+async function closeActiveDoc(): Promise<void> {
+  if (data.docs.length <= 1) return;
+  const doc = data.docs.find((d) => d.id === data.activeId);
+  if (!doc) return;
+  const content = data.contents[doc.id] ?? "";
+  if (content.trim()) {
+    const ans = await askModal(t("closeSheet"), t("close"), t("cancel"));
+    if (ans !== "a") return;
+  }
+  const idx = data.docs.findIndex((d) => d.id === doc.id);
+  void backupDeletedSheet(settings.dataDir, doc.title, content);
+  delete data.contents[doc.id];
+  data.docs = data.docs.filter((d) => d.id !== doc.id);
+  const nextId = data.docs[idx] ? data.docs[idx].id : data.docs[idx - 1]?.id ?? data.docs[0].id;
+  switchDoc(nextId);
+  saveAppData(data);
+}
+
 // ---------- search all sheets
 
 interface SearchHit {
@@ -681,6 +699,10 @@ async function boot(): Promise<void> {
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault();
       newDoc();
+    }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "w") {
+      e.preventDefault();
+      void closeActiveDoc();
     }
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") {
       e.preventDefault();

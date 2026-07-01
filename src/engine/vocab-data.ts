@@ -427,7 +427,11 @@ export const EN: VocabLocale = {
     "ln.variants": "natural log,natural logarithm",
     "log.variants": "logarithm",
     "round.variants": "rounded",
-    "sum.variants": "sum,total"
+    "sum.variants": "sum,total",
+    "count.variants": "count,how many",
+    "min.variants": "min,minimum,smallest",
+    "max.variants": "max,maximum,largest",
+    "product.variants": "product"
   },
   "Percent": {
     "as_a_percent_of.variants": "as a % of,as a percent of",
@@ -899,7 +903,11 @@ export const RU: VocabLocale = {
     "ln.variants": "натуральный логарифм,нат. логарифм",
     "log.variants": "логарифм",
     "round.variants": "округлить,округление",
-    "sum.variants": "всего,сумма,итог,итого"
+    "sum.variants": "всего,сумма,итог,итого",
+    "count.variants": "количество,кол-во,счёт,число строк",
+    "min.variants": "минимум,мин,наименьшее",
+    "max.variants": "максимум,макс,наибольшее",
+    "product.variants": "произведение,произв"
   },
   "Percent": {
     "as_a_percent_of.variants": "как процент от,как процент",

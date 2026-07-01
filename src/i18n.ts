@@ -55,6 +55,9 @@ const dict: Record<string, Record<string, string>> = {
     updateFailed: "Update failed",
     searchPlaceholder: "Search all sheets…",
     searchEmpty: "No matches",
+    closeSheet: "Close this sheet?",
+    close: "Close",
+    cancel: "Cancel",
   },
   ru: {
     settings: "Настройки",
@@ -110,6 +113,9 @@ const dict: Record<string, Record<string, string>> = {
     updateFailed: "Не удалось обновить",
     searchPlaceholder: "Поиск по всем листам…",
     searchEmpty: "Ничего не найдено",
+    closeSheet: "Закрыть этот лист?",
+    close: "Закрыть",
+    cancel: "Отмена",
   },
 };
 

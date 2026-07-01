@@ -27,7 +27,7 @@ export type Payload =
   | { t: "pctop"; op: PctOp }
   | { t: "percent" }
   | { t: "func"; name: string }
-  | { t: "agg"; name: "sum" | "avg" | "prev" }
+  | { t: "agg"; name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" }
   | { t: "scale"; mult: Decimal }
   | { t: "repr"; repr: NumeralRepr }
   | { t: "special"; name: "unix" | "todate" }
@@ -170,6 +170,10 @@ export function buildRegistry(): Registry {
   for (const v of vocab.variants("Operations", "sum.variants")) reg.addPhrase(v, { t: "agg", name: "sum" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "avg.variants")) reg.addPhrase(v, { t: "agg", name: "avg" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "prev.variants")) reg.addPhrase(v, { t: "agg", name: "prev" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "count.variants")) reg.addPhrase(v, { t: "agg", name: "count" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "min.variants")) reg.addPhrase(v, { t: "agg", name: "min" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "max.variants")) reg.addPhrase(v, { t: "agg", name: "max" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "product.variants")) reg.addPhrase(v, { t: "agg", name: "product" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "sqrt.variants")) reg.addPhrase(v, { t: "func", name: "sqrt" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "cbrt.variants")) reg.addPhrase(v, { t: "func", name: "cbrt" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "abs.variants")) reg.addPhrase(v, { t: "func", name: "abs" }, { caseSensitive: false });

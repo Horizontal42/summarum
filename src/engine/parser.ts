@@ -19,7 +19,7 @@ export type Node =
   | { k: "const"; name: "pi" | "e" | "half" | "onehalf" }
   | { k: "var"; name: string }
   | { k: "date"; word: DateWord }
-  | { k: "agg"; name: "sum" | "avg" | "prev" }
+  | { k: "agg"; name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" }
   | { k: "bin"; op: "plus" | "minus" | "mul" | "div" | "mod" | "pow"; l: Node; r: Node }
   | { k: "bit"; op: BitOp; l: Node; r: Node }
   | { k: "pctop"; op: PctOp; l: Node; r: Node }

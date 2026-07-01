@@ -231,6 +231,21 @@ describe("variables and document context", () => {
   it("prev", () => {
     expect(calcDoc("42\nprev + 1")).toEqual(["42", "43"]);
   });
+  it("count", () => {
+    expect(calcDoc("10\n20\n30\ncount")).toEqual(["10", "20", "30", "3"]);
+    expect(calcDoc("10\n20\n\n30\ncount")).toEqual(["10", "20", null, "30", "1"]);
+  });
+  it("min / max", () => {
+    expect(calcDoc("10\n20\n5\nmin")).toEqual(["10", "20", "5", "5"]);
+    expect(calcDoc("10\n20\n5\nmax")).toEqual(["10", "20", "5", "20"]);
+  });
+  it("min / max with units", () => {
+    expect(calcDoc("10 m\n5 m\n20 m\nmin")).toEqual(["10 m", "5 m", "20 m", "5 m"]);
+    expect(calcDoc("10 m\n5 m\n20 m\nmax")).toEqual(["10 m", "5 m", "20 m", "20 m"]);
+  });
+  it("product", () => {
+    expect(calcDoc("2\n3\n4\nproduct")).toEqual(["2", "3", "4", "24"]);
+  });
   it("headers split blocks and produce no result", () => {
     expect(calcDoc("# Food\n10\n20\nsum")).toEqual([null, "10", "20", "30"]);
   });
