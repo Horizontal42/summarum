@@ -302,6 +302,14 @@ describe("dates", () => {
   });
 });
 
+describe("goal seek", () => {
+  it("? * 1.2 = 1000", () => expect(calc("? * 1.2 = 1000")).toBe("833.33"));
+  it("? + 50 = 200", () => expect(calc("? + 50 = 200")).toBe("150"));
+  it("100 - ? = 30", () => expect(calc("100 - ? = 30")).toBe("70"));
+  it("? / 4 = 5", () => expect(calc("? / 4 = 5")).toBe("20"));
+  it("? - ? = 5 has no solution", () => expect(calc("? - ? = 5")).toBeNull());
+});
+
 describe("extension API", () => {
   it("addUnit (horse from Sample.js)", () => {
     eng.addUnit({ id: "horse", phrases: "horse, horses, hrs", baseUnitId: "meter", format: "hrs", ratio: 2.4 });

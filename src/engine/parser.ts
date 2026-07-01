@@ -32,7 +32,9 @@ export type Node =
   | { k: "scale"; x: Node; mult: Decimal; label: string }
   | { k: "conv"; x: Node; target: ConvTarget }
   | { k: "call"; name: string; args: Node[] }
-  | { k: "seq"; items: Node[] };
+  | { k: "seq"; items: Node[] }
+  | { k: "unknown" }
+  | { k: "goalseek"; lhs: Node; rhs: Node };
 
 export interface ParsedLine {
   assign?: string;
@@ -71,6 +73,17 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
     }
     afterConv = tk.t === "conv";
     filtered.push(tk);
+  }
+
+  // Goal seek: `? * 1.2 = 1000` → find x where lhs(x) = rhs(x)
+  const hasUnknown = filtered.some((tk) => tk.t === "unknown");
+  if (hasUnknown) {
+    const assignIdx = filtered.findIndex((tk) => tk.t === "assign");
+    if (assignIdx >= 0) {
+      const lhs = new Parser(filtered.slice(0, assignIdx), knownVars).parseSeq();
+      const rhs = new Parser(filtered.slice(assignIdx + 1), knownVars).parseSeq();
+      if (lhs && rhs) return { expr: { k: "goalseek", lhs, rhs } };
+    }
   }
 
   const p = new Parser(filtered, knownVars);
@@ -419,6 +432,9 @@ class Parser {
         }
         return null;
       }
+      case "unknown":
+        this.i++;
+        return { k: "unknown" };
       default:
         return null;
     }

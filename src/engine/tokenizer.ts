@@ -26,6 +26,7 @@ export type Token =
   | { t: "semicolon"; start: number; end: number }
   | { t: "bang"; start: number; end: number }
   | { t: "word"; raw: string; start: number; end: number }
+  | { t: "unknown"; start: number; end: number }
   | { t: "junk"; raw: string; start: number; end: number };
 
 const SYM_OPS: Record<string, Token["t"] | "plus" | "minus" | "mul" | "div" | "pow"> = {};
@@ -100,6 +101,7 @@ export function tokenize(line: string, reg: Registry): Token[] {
         case "=": tokens.push({ t: "assign", ...span }); break;
         case ";": tokens.push({ t: "semicolon", ...span }); break;
         case "!": tokens.push({ t: "bang", ...span }); break;
+        case "?": tokens.push({ t: "unknown", ...span }); break;
         default: tokens.push({ t: "junk", raw: lx.raw, ...span });
       }
       i++;

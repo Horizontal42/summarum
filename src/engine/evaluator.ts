@@ -44,6 +44,13 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
       return evalDateWord(node.word);
     case "datelit":
       return { kind: "date", ms: node.ms, hasTime: false };
+    case "unknown": {
+      const xv = ctx.vars.get("__x__");
+      if (!xv) throw new EvalError("? used outside goal seek");
+      return xv;
+    }
+    case "goalseek":
+      return evalGoalSeek(node.lhs, node.rhs, ctx);
     case "agg":
       return evalAgg(node.name, ctx);
     case "neg": {
@@ -397,6 +404,42 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
     if (!seconds.mod(86400).isZero()) hasTime = true;
   }
   return { ...date, ms, hasTime };
+}
+
+function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
+  const evalF = (x: Decimal): Decimal => {
+    const vars = new Map(ctx.vars);
+    vars.set("__x__", qty(x));
+    const innerCtx: EvalCtx = { ...ctx, vars };
+    const lv = evaluate(lhsNode, innerCtx);
+    const rv = evaluate(rhsNode, innerCtx);
+    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : new Decimal(0);
+    return toD(lv).minus(toD(rv));
+  };
+
+  // Linear probe: f(0) and f(1) give slope → exact root for linear expressions
+  const f0 = evalF(new Decimal(0));
+  const f1 = evalF(new Decimal(1));
+  const slope = f1.minus(f0);
+  if (!slope.isZero()) {
+    const root = f0.neg().div(slope);
+    if (evalF(root).abs().lt(new Decimal("1e-9"))) return qty(root);
+  }
+
+  // Bisection fallback for nonlinear cases
+  let lo = new Decimal(-1e9);
+  let hi = new Decimal(1e9);
+  let flo = evalF(lo);
+  let fhi = evalF(hi);
+  if (flo.mul(fhi).gt(0)) throw new EvalError("no solution");
+  for (let i = 0; i < 100; i++) {
+    const mid = lo.plus(hi).div(2);
+    if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return qty(mid);
+    const fm = evalF(mid);
+    if (flo.mul(fm).lte(0)) { hi = mid; fhi = fm; }
+    else { lo = mid; flo = fm; }
+  }
+  return qty(lo.plus(hi).div(2));
 }
 
 function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart", ctx: EvalCtx): Value {
