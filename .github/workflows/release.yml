@@ -12,6 +12,10 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # tauri-action's find-or-create-release check races across parallel
+      # matrix jobs and can create two separate release objects for the
+      # same tag, each missing the other's assets — force serial builds
+      max-parallel: 1
       matrix:
         include:
           - target: x86_64-pc-windows-msvc
