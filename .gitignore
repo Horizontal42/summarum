@@ -4,8 +4,9 @@ src-tauri/target/
 src-tauri/gen/
 *.log
 
-# local reference copy of a third-party macOS bundle — not ours to ship
+# local reference copies of third-party sources — not ours to ship
 Contents/
+numi-master/
 
 # one-off debugging artifacts
 scripts/smoke-*

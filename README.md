@@ -139,4 +139,4 @@ scratch for Windows.
 
 ## License
 
-[MIT](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE) — free for personal, educational, and other noncommercial use. Commercial use (including resale or repackaging) is not permitted.
