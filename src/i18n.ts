@@ -63,6 +63,9 @@ const dict: Record<string, Record<string, string>> = {
     moveUp: "Move up",
     moveDown: "Move down",
     marketUpdated: "Market data updated",
+    exportImage: "Copy as image",
+    imageCopied: "Image copied",
+    imageFailed: "Could not copy image",
   },
   ru: {
     settings: "Настройки",
@@ -126,6 +129,9 @@ const dict: Record<string, Record<string, string>> = {
     moveUp: "Выше",
     moveDown: "Ниже",
     marketUpdated: "Рыночные данные обновлены",
+    exportImage: "Скопировать картинкой",
+    imageCopied: "Картинка скопирована",
+    imageFailed: "Не удалось скопировать картинку",
   },
 };
 

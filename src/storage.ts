@@ -205,6 +205,13 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
   return null;
 }
 
+// ---------- image export
+
+export async function writeImageFile(path: string, dataBase64: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("write_image_file", { path, dataBase64 });
+}
+
 // ---------- market data
 
 export async function fetchMarketData(symbols: string[]): Promise<Record<string, number>> {

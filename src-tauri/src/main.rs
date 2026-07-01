@@ -42,6 +42,38 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
     write_atomic(std::path::Path::new(&path), &contents)
 }
 
+#[tauri::command]
+fn write_image_file(path: String, data_base64: String) -> Result<(), String> {
+    use std::io::Write;
+    let bytes = base64_decode(&data_base64)?;
+    let p = std::path::Path::new(&path);
+    let tmp = p.with_extension("tmp");
+    std::fs::File::create(&tmp)
+        .and_then(|mut f| f.write_all(&bytes))
+        .map_err(|e| e.to_string())?;
+    fs::rename(&tmp, p).map_err(|e| e.to_string())
+}
+
+fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
+    use std::collections::HashMap;
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut map = HashMap::new();
+    for (i, c) in alphabet.chars().enumerate() { map.insert(c, i as u8); }
+    let s: String = s.chars().filter(|c| *c != '=').collect();
+    let mut out = Vec::with_capacity(s.len() * 3 / 4);
+    let bytes: Vec<u8> = s.chars().map(|c| map.get(&c).copied().ok_or_else(|| format!("bad base64 char {}", c))).collect::<Result<_, _>>()?;
+    for chunk in bytes.chunks(4) {
+        let b0 = chunk[0];
+        let b1 = *chunk.get(1).unwrap_or(&0);
+        let b2 = *chunk.get(2).unwrap_or(&0);
+        let b3 = *chunk.get(3).unwrap_or(&0);
+        out.push((b0 << 2) | (b1 >> 4));
+        if chunk.len() > 2 { out.push((b1 << 4) | (b2 >> 2)); }
+        if chunk.len() > 3 { out.push((b2 << 6) | b3); }
+    }
+    Ok(out)
+}
+
 /// write via a temp file + rename so a crash mid-write cannot corrupt the target
 fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
     let tmp = path.with_extension("tmp");
@@ -611,7 +643,8 @@ fn main() {
             read_text_file,
             exit_app,
             is_hidden_launch,
-            write_text_file
+            write_text_file,
+            write_image_file
         ])
         .setup(|app| {
             let handle = app.handle().clone();
