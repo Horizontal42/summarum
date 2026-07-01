@@ -44,6 +44,7 @@ export const UNIT_DATA: UnitData[] = [
   // Volume (base: m³)
   { id: "litre", category: "Volume", dimension: "volume", ratio: "0.001", prefixes: "si" },
   { id: "cup", category: "Volume", dimension: "volume", ratio: "0.0002365882365" },
+  { id: "floz", category: "Volume", dimension: "volume", ratio: "0.0000295735295625" },
   { id: "tablespoon", category: "Volume", dimension: "volume", ratio: "0.0000147867647825" },
   { id: "teaspoon", category: "Volume", dimension: "volume", ratio: "0.00000492892159375" },
   { id: "quart", category: "Volume", dimension: "volume", ratio: "0.000946352946" },
