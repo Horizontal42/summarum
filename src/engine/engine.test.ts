@@ -282,6 +282,24 @@ describe("dates", () => {
     const t = calc("time in Tokyo");
     expect(t).toMatch(/^\d{2}:\d{2}$/);
   });
+  it("ISO date literal produces a formatted date", () => {
+    const r = calc("2024-01-01");
+    expect(r).not.toBeNull();
+    expect(typeof r).toBe("string");
+  });
+  it("ISO date subtraction: 2026-01-01 - 2024-01-01 = 731 days", () => {
+    expect(calc("2026-01-01 - 2024-01-01")).toBe("731 day");
+  });
+  it("days until future date returns positive days", () => {
+    const r = calc("days until 2099-01-01");
+    expect(r).not.toBeNull();
+    expect(Number(r!.replace(/[^\d.-]/g, ""))).toBeGreaterThan(0);
+  });
+  it("days since past date returns positive days", () => {
+    const r = calc("days since 2000-01-01");
+    expect(r).not.toBeNull();
+    expect(Number(r!.replace(/[^\d.-]/g, ""))).toBeGreaterThan(0);
+  });
 });
 
 describe("extension API", () => {

@@ -26,6 +26,8 @@ export function formatNumber(v: Decimal, s: EngineSettings): string {
 }
 
 export function formatValue(v: Value, s: EngineSettings): string {
+  if (v.kind === "chart") return "";
+
   if (v.kind === "percent") {
     return formatNumber(v.value, s) + "%";
   }

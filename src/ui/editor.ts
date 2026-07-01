@@ -40,7 +40,7 @@ function buildDecorations(state: EditorState): DecorationSet {
       let cls: string | null = null;
       switch (tk.t) {
         case "num": case "const": case "scale": cls = "tok-number"; break;
-        case "unit": case "currency": case "repr": case "date": cls = "tok-unit"; break;
+        case "unit": case "currency": case "repr": case "date": case "datelit": cls = "tok-unit"; break;
         case "op": case "conv": case "assign": case "pctop": case "percent": case "bang": cls = "tok-op"; break;
         case "func": case "agg": cls = "tok-var"; break;
         default: cls = null;

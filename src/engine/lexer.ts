@@ -3,12 +3,13 @@
 import { Decimal, NumeralRepr } from "./types";
 
 export interface Lex {
-  type: "num" | "word" | "sym";
+  type: "num" | "word" | "sym" | "date";
   raw: string;
   start: number;
   end: number;
   value?: Decimal;
   repr?: NumeralRepr;
+  dateMs?: number;
 }
 
 const WORD_RE = /^[\p{L}_]+/u;
@@ -32,6 +33,18 @@ export function lexLine(text: string): Lex[] {
     }
     const rest = text.slice(i);
 
+    if (ch >= "0" && ch <= "9") {
+      const iso = /^\d{4}-\d{2}-\d{2}(?!\d)/.exec(rest);
+      if (iso) {
+        const [y, mo, d] = iso[0].split("-").map(Number);
+        const dt = new Date(y, mo - 1, d);
+        if (!isNaN(dt.getTime())) {
+          out.push({ type: "date", raw: iso[0], start: i, end: i + iso[0].length, dateMs: dt.getTime() });
+          i += iso[0].length;
+          continue;
+        }
+      }
+    }
     if (ch >= "0" && ch <= "9") {
       const hex = /^0[xX][0-9a-fA-F]+/.exec(rest);
       if (hex) {

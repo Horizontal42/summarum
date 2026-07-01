@@ -42,6 +42,8 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
     }
     case "date":
       return evalDateWord(node.word);
+    case "datelit":
+      return { kind: "date", ms: node.ms, hasTime: false };
     case "agg":
       return evalAgg(node.name, ctx);
     case "neg": {
@@ -192,7 +194,7 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
       }
     }
     const q = (l.kind === "quantity" ? l : r) as Quantity;
-    const p = (l.kind === "percent" ? l : r).value;
+    const p = (l.kind === "percent" ? l : r as { kind: "percent"; value: Decimal }).value;
     switch (op) {
       case "plus": return qty(q.value.mul(new Decimal(1).add(p.div(100))), q.unit);
       case "minus":
@@ -512,6 +514,14 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
       const isInt = Number.isInteger(lo) && Number.isInteger(hi);
       const raw = isInt ? Math.floor(rand * (hi - lo + 1)) + lo : rand * (hi - lo) + lo;
       return qty(new Decimal(raw));
+    }
+    case "until": {
+      if (x.kind !== "date") throw new EvalError("until needs a date");
+      return evalDateArith("minus", x, { kind: "date", ms: startOfToday(), hasTime: false });
+    }
+    case "since": {
+      if (x.kind !== "date") throw new EvalError("since needs a date");
+      return evalDateArith("minus", { kind: "date", ms: startOfToday(), hasTime: false }, x);
     }
     default: throw new EvalError(`unknown function ${name}`);
   }

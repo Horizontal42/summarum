@@ -58,7 +58,7 @@ const BUILTIN_FUNCS = [
   "sqrt", "cbrt", "sin", "cos", "tan", "cot", "asin", "acos", "atan",
   "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh",
   "ln", "lg", "log", "log2", "exp", "abs", "round", "ceil", "floor",
-  "fact", "factorial", "random",
+  "fact", "factorial", "random", "until", "since",
 ];
 
 export class Registry {
@@ -181,6 +181,9 @@ export function buildRegistry(): Registry {
   for (const v of vocab.variants("Operations", "ln.variants")) reg.addPhrase(v, { t: "func", name: "ln" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "log.variants")) reg.addPhrase(v, { t: "func", name: "log" }, { caseSensitive: false });
   for (const v of vocab.variants("Operations", "round.variants")) reg.addPhrase(v, { t: "func", name: "round" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "random.variants")) reg.addPhrase(v, { t: "func", name: "random" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "until.variants")) reg.addPhrase(v, { t: "func", name: "until" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "since.variants")) reg.addPhrase(v, { t: "func", name: "since" }, { caseSensitive: false });
   reg.addPhrase("mod", { t: "op", op: "mod" }, { caseSensitive: false });
   reg.addPhrase("modulo", { t: "op", op: "mod" }, { caseSensitive: false });
 

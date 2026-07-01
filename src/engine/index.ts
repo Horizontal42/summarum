@@ -211,7 +211,8 @@ export class SumEngine {
       return { double: v.value.toNumber(), ...(v.unit ? { unitId: v.unit.id } : {}) };
     }
     if (v.kind === "percent") return { double: v.value.div(100).toNumber() };
-    return { double: v.ms };
+    if (v.kind === "date") return { double: v.ms };
+    return { double: 0 }; // chart — not representable as ExtensionValue
   }
 }
 

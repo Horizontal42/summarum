@@ -15,10 +15,11 @@ export type Token =
   | { t: "pctop"; op: PctOp; start: number; end: number }
   | { t: "percent"; start: number; end: number }
   | { t: "func"; name: string; start: number; end: number }
-  | { t: "agg"; name: "sum" | "avg" | "prev"; start: number; end: number }
+  | { t: "agg"; name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart"; start: number; end: number }
   | { t: "scale"; mult: Decimal; start: number; end: number }
   | { t: "repr"; repr: NumeralRepr; start: number; end: number }
   | { t: "date"; word: DateWord; start: number; end: number }
+  | { t: "datelit"; ms: number; start: number; end: number }
   | { t: "const"; name: "pi" | "e" | "half" | "onehalf"; start: number; end: number }
   | { t: "lparen"; start: number; end: number }
   | { t: "rparen"; start: number; end: number }
@@ -41,6 +42,12 @@ export function tokenize(line: string, reg: Registry): Token[] {
 
     if (lx.type === "num") {
       tokens.push({ t: "num", v: lx.value!, repr: lx.repr!, ...span });
+      i++;
+      continue;
+    }
+
+    if (lx.type === "date") {
+      tokens.push({ t: "datelit", ms: lx.dateMs!, ...span });
       i++;
       continue;
     }

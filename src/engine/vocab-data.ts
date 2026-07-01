@@ -433,7 +433,9 @@ export const EN: VocabLocale = {
     "max.variants": "max,maximum,largest",
     "product.variants": "product",
     "random.variants": "random,rand",
-    "chart.variants": "chart,spark,sparkline,graph"
+    "chart.variants": "chart,spark,sparkline,graph",
+    "until.variants": "until,days until,day until",
+    "since.variants": "since,days since,day since"
   },
   "Percent": {
     "as_a_percent_of.variants": "as a % of,as a percent of",
@@ -911,7 +913,9 @@ export const RU: VocabLocale = {
     "max.variants": "максимум,макс,наибольшее",
     "product.variants": "произведение,произв",
     "random.variants": "случайное,случайно,рандом",
-    "chart.variants": "график,спарклайн,диаграмма"
+    "chart.variants": "график,спарклайн,диаграмма",
+    "until.variants": "осталось до,дней до,дней до даты",
+    "since.variants": "прошло с,дней с,дней прошло с"
   },
   "Percent": {
     "as_a_percent_of.variants": "как процент от,как процент",

@@ -19,6 +19,7 @@ export type Node =
   | { k: "const"; name: "pi" | "e" | "half" | "onehalf" }
   | { k: "var"; name: string }
   | { k: "date"; word: DateWord }
+  | { k: "datelit"; ms: number }
   | { k: "agg"; name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart" }
   | { k: "bin"; op: "plus" | "minus" | "mul" | "div" | "mod" | "pow"; l: Node; r: Node }
   | { k: "bit"; op: BitOp; l: Node; r: Node }
@@ -360,6 +361,9 @@ class Parser {
       case "date":
         this.i++;
         return { k: "date", word: tk.word };
+      case "datelit":
+        this.i++;
+        return { k: "datelit", ms: tk.ms };
       case "agg":
         this.i++;
         return { k: "agg", name: tk.name };
