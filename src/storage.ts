@@ -205,6 +205,18 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
   return null;
 }
 
+// ---------- market data
+
+export async function fetchMarketData(symbols: string[]): Promise<Record<string, number>> {
+  if (!isTauri() || symbols.length === 0) return {};
+  try {
+    return await invoke<Record<string, number>>("fetch_market_data", { symbols });
+  } catch (e) {
+    console.warn("fetchMarketData failed", e);
+    return {};
+  }
+}
+
 // ---------- extensions
 
 export async function loadExtensionScripts(): Promise<{ name: string; code: string }[]> {

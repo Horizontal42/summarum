@@ -202,6 +202,87 @@ async fn fetch_rates(app: AppHandle, force: bool) -> Result<RatesPayload, String
     }
 }
 
+// ---------- market data (stocks, commodities via Yahoo Finance)
+
+const MARKET_TTL_SECS: u64 = 900; // 15 minutes
+
+#[derive(Serialize, Deserialize, Clone)]
+struct MarketCache {
+    fetched_at: u64,
+    prices: std::collections::HashMap<String, f64>,
+}
+
+#[tauri::command]
+async fn fetch_market_data(
+    app: AppHandle,
+    symbols: Vec<String>,
+) -> Result<std::collections::HashMap<String, f64>, String> {
+    let cache_path = data_dir(&app).join("market.json");
+
+    // try cache first
+    if let Ok(raw) = fs::read_to_string(&cache_path) {
+        if let Ok(cache) = serde_json::from_str::<MarketCache>(&raw) {
+            if now_secs().saturating_sub(cache.fetched_at) < MARKET_TTL_SECS {
+                let syms: std::collections::HashSet<&str> = symbols.iter().map(|s| s.as_str()).collect();
+                let hit: std::collections::HashMap<String, f64> = cache
+                    .prices
+                    .into_iter()
+                    .filter(|(k, _)| syms.contains(k.as_str()))
+                    .collect();
+                if !hit.is_empty() {
+                    return Ok(hit);
+                }
+            }
+        }
+    }
+
+    if symbols.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("Mozilla/5.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let joined = symbols.join(",");
+    let url = format!(
+        "https://query1.finance.yahoo.com/v7/finance/quote?symbols={}",
+        joined
+    );
+    let body: serde_json::Value = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut prices = std::collections::HashMap::new();
+    if let Some(results) = body["quoteResponse"]["result"].as_array() {
+        for item in results {
+            let sym = item["symbol"].as_str().unwrap_or("").to_string();
+            // regularMarketPrice is in the quote currency (USD for US stocks)
+            if let Some(price) = item["regularMarketPrice"].as_f64() {
+                if price > 0.0 && !sym.is_empty() {
+                    prices.insert(sym, price);
+                }
+            }
+        }
+    }
+
+    if !prices.is_empty() {
+        let cache = MarketCache { fetched_at: now_secs(), prices: prices.clone() };
+        if let Ok(raw) = serde_json::to_string(&cache) {
+            write_atomic(&cache_path, &raw).ok();
+        }
+    }
+
+    Ok(prices)
+}
+
 // ---------- documents in the (possibly custom) data folder
 
 #[tauri::command]
@@ -523,6 +604,7 @@ fn main() {
             data_dir_has_documents,
             migrate_data_dir,
             fetch_rates,
+            fetch_market_data,
             load_extensions,
             open_extensions_folder,
             get_launch_file,

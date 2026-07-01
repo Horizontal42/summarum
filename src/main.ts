@@ -5,7 +5,7 @@ import { SumEditor } from "./ui/editor";
 import {
   AppData, DocMeta, SettingsData, defaultSettingsData,
   loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
-  fetchRates, loadExtensionScripts, openExtensionsFolder, isTauri,
+  fetchRates, fetchMarketData, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
   chooseFolder, dataDirHasDocuments, migrateDataDir,
@@ -30,6 +30,7 @@ let data: AppData;
 let lastResults: LineResult[] = [];
 let selectedRange: [number, number] | null = null;
 let ratesFetchedAt = 0;
+let liveRates: Record<string, number> = {};
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -529,12 +530,54 @@ async function refreshRates(force = false): Promise<void> {
   const payload = await fetchRates(force);
   info.classList.remove("spin");
   if (payload) {
-    engine.setRates(payload.rates);
+    liveRates = Object.fromEntries(
+      Object.entries(payload.rates).map(([k, v]) => [k, Number(v)])
+    );
+    applyAllRates();
     editor.refresh();
     ratesFetchedAt = payload.fetchedAt;
     if (force) toast(t("ratesUpdated"));
   }
   renderRatesInfo();
+}
+
+// ---------- market data
+
+const MARKET_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "SBER", "GAZP"];
+
+let marketPrices: Record<string, number> = {};
+let marketFetchedAt = 0;
+
+function applyAllRates(): void {
+  const marketRates: Record<string, number> = {};
+  for (const [sym, price] of Object.entries(marketPrices)) {
+    if (price > 0) marketRates[sym] = 1 / price;
+  }
+  engine.setRates({ ...liveRates, ...marketRates });
+}
+
+async function refreshMarket(force = false): Promise<void> {
+  if (!isTauri()) return;
+  const info = $("#market-info") as HTMLElement;
+  info.style.display = "";
+  info.textContent = "Market…";
+  const prices = await fetchMarketData(MARKET_SYMBOLS);
+  if (Object.keys(prices).length > 0) {
+    marketPrices = prices;
+    marketFetchedAt = Math.floor(Date.now() / 1000);
+    applyAllRates();
+    editor.refresh();
+    if (force) toast(t("marketUpdated"));
+  }
+  renderMarketInfo();
+}
+
+function renderMarketInfo(): void {
+  const el = $("#market-info") as HTMLElement;
+  if (marketFetchedAt === 0) { el.style.display = "none"; return; }
+  el.style.display = "";
+  el.textContent = `Market: ${agoText(marketFetchedAt)} ↺`;
+  el.title = t("refreshRates");
 }
 
 // ---------- status bar
@@ -839,7 +882,9 @@ async function boot(): Promise<void> {
   });
 
   $("#rates-info").addEventListener("click", () => void refreshRates(true));
+  $("#market-info").addEventListener("click", () => void refreshMarket(true));
   setInterval(renderRatesInfo, 60_000);
+  setInterval(renderMarketInfo, 60_000);
 
   void onFileDrop((content) => newDoc(content));
 
@@ -849,6 +894,8 @@ async function boot(): Promise<void> {
   void onAppQuit(() => flushAppData());
   void refreshRates();
   setInterval(() => void refreshRates(), 60 * 60 * 1000);
+  void refreshMarket();
+  setInterval(() => void refreshMarket(), 15 * 60 * 1000);
 
   const launched = await getLaunchFile();
   if (launched) newDoc(launched);

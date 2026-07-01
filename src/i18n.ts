@@ -62,6 +62,7 @@ const dict: Record<string, Record<string, string>> = {
     unpin: "Unpin",
     moveUp: "Move up",
     moveDown: "Move down",
+    marketUpdated: "Market data updated",
   },
   ru: {
     settings: "Настройки",
@@ -124,6 +125,7 @@ const dict: Record<string, Record<string, string>> = {
     unpin: "Открепить",
     moveUp: "Выше",
     moveDown: "Ниже",
+    marketUpdated: "Рыночные данные обновлены",
   },
 };
 
