@@ -29,10 +29,12 @@ src/
   updater.ts         checks tauri-plugin-updater, installs + relaunches
 src-tauri/
   src/main.rs        tray, hide-to-tray, storage commands, rates fetching
-                     (open.er-api.com + CoinGecko) with cache, backups,
-                     data-folder migration, file drops, plugin registration
-                     (autostart, global-shortcut, single-instance, opener,
-                     dialog, updater, process)
+                     (open.er-api.com + CoinGecko + Yahoo Finance) with
+                     cache, historical rates (frankfurter.app, permanent
+                     per-date cache), backups, data-folder migration,
+                     file drops, plugin registration (autostart,
+                     global-shortcut, single-instance, opener, dialog,
+                     updater, process)
 ```
 
 ## How a line becomes a result
@@ -89,9 +91,25 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
   because an "attosecond" symbol would shadow the word `as`.
 - `and`/`or` are dual-purpose: `and` adds (`5 and 3` = 8), `or` is bitwise.
   `of/off/on` only act on a percent left-hand side; otherwise they're prose.
+  The same `on` token doubles as the historical-rate date separator (`in EUR on
+  2024-01-01`) — `parseSeq` checks for `pctop(on)` + `datelit` right after a
+  currency conv target and consumes both when present.
 - Currency rates are "units per USD"; a currency Unit's ratio is computed at
-  tokenization time from the current rate map, so re-setting rates re-prices
-  everything on the next evaluation.
+  evaluation time from the current rate map, so re-setting rates re-prices
+  everything on the next evaluation. Historical rates live in a separate
+  `historicalRates: Map<date, Map<code, number>>` on `SumEngine` and are
+  passed through `EvalCtx` to `evalConv`.
+- Live market data (stocks, commodities via Yahoo Finance) is merged into the
+  same rate map as exchange rates via `applyAllRates()` in `main.ts` to avoid
+  one `setRates()` call overwriting the other.
+- Goal seek (`? * 1.2 = 1000`) tokenizes `?` as `{ t: "unknown" }`, parsed
+  into `{ k: "unknown" }` nodes. `parseLine` detects the presence of `unknown`
+  + `assign` and builds a `{ k: "goalseek", lhs, rhs }` node. The solver
+  tries a linear probe (f(0), f(1) → exact root for affine expressions) and
+  falls back to bisection for nonlinear ones.
+- `ChartValue` (`kind: "chart"`) is returned by `evalAgg("chart", …)` and
+  bypasses `formatValue` — the results overlay renders an SVG sparkline
+  instead of a text string.
 - The registry is rebuilt never; extensions mutate it (add phrases/functions)
   at startup.
 
@@ -131,9 +149,24 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
   (write-only — there is no durable copy in the repo). Losing that key means
   already-installed copies can never trust a future signed release again.
 
+## Storage (cache files)
+
+All files below live in `%APPDATA%/app.summarum.calc` (or the user-chosen folder):
+
+| File | Contents | TTL |
+|------|----------|-----|
+| `settings.json` | app settings | persisted |
+| `documents.json` | all sheets | persisted (400 ms debounce) |
+| `rates.json` | live exchange rates | 1 hour |
+| `market.json` | stock/commodity prices | 15 minutes |
+| `rates-YYYY-MM-DD.json` | historical ECB rates for one date | permanent |
+| `backups/documents-YYYY-MM-DD.json` | daily snapshots | 14 days |
+| `backups/deleted/*.numi` | soft-deleted sheets | configurable |
+
 ## Tests
 
-`npm test` runs ~96 vitest cases over the engine (`src/engine/*.test.ts`):
+`npm test` runs 113 vitest cases over the engine (`src/engine/*.test.ts`):
 every expression class, both languages, deterministic injected rates,
-plus a regression suite covering all known-fixed bugs.
-UI is exercised manually; the engine is where the complexity lives.
+goal seek, historical rates (injected), plus a regression suite covering
+all known-fixed bugs. UI is exercised manually; the engine is where the
+complexity lives.

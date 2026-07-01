@@ -17,7 +17,11 @@ total                          → $1,066.97
 $2000 in rubles                → 144,060 ₽
 20% off 1500                   → 1,200
 today + 6 weeks                → 22 July 2026
-time in Tokyo                  → 14:25
+1000 USD in EUR on 2024-01-01  → € 917.30
+? * 1.2 = 1000                 → 833.33
+AAPL in USD                    → $213.55
+days until 2027-01-01          → 183 day
+chart                          → ▂▄▇█▆
 ```
 
 Works in **English and Russian** at the same time: `5 метров в см`, `20$ в евро`,
@@ -35,13 +39,14 @@ Requirements:
 - **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** —
   already part of Windows 11 and most updated Windows 10 systems; if it's
   missing, the installer downloads it automatically.
-- Internet connection is only needed for live currency rates — everything
+- Internet connection is only needed for live rates and market data — everything
   else works offline (rates fall back to a cached/bundled snapshot).
 
 ## What it understands
 
 **Plain math** — `2 + 2`, `8 / (45 - 20%)`, parentheses, `^`, `sqrt`, `sin`,
-factorials. Decimal-exact: `0.1 + 0.2` is `0.3`, not `0.30000000000000004`.
+factorials, `random()`, `random(1; 6)`. Decimal-exact: `0.1 + 0.2` is `0.3`,
+not `0.30000000000000004`.
 
 **Words as operators** — `12 plus 4`, `20 divided by 4`, `5 и 3`. Text around
 the math is ignored, so `spent 20 on pizza and 5 on coffee` just gives 25.
@@ -58,30 +63,48 @@ the math is ignored, so `spent 20 on pizza and 5 on coffee` just gives 25.
 (refreshed hourly, cached for offline). `$100 + 20%`, `5 eth in USD`,
 `9800 рублей в долларах`.
 
+**Live market data** — stock and commodity prices refreshed every 15 minutes:
+`100 AAPL in USD`, `2 GC=F in USD` (gold futures), `MSFT + GOOGL`.
+
+**Historical exchange rates** — `1000 USD in EUR on 2024-01-01` looks up the
+ECB rate for that exact date (via frankfurter.app) and caches it permanently.
+
 **Percents the human way** — `20% of 80`, `20% off 1500`, `5 as a % of 25`,
 `20% of what is 30`.
 
 **Dates and time** — `today + 2 weeks`, `tomorrow - today`, `time in New York`,
-`now in unix`, `1750000000 as date`.
+`now in unix`, `1750000000 as date`. ISO date literals: `2024-01-01 + 30 days`,
+`days until 2027-01-01`, `days since 2020-03-15`.
+
+**Goal seek** — put `?` where the unknown is and an `=` with the target:
+`? * 1.2 = 1000` → `833.33`, `100 - ? = 30` → `70`. Works for any expression
+solvable by linear probe or bisection.
 
 **Programmer stuff** — `0xFF & 0x0F`, `1 << 4`, `255 in hex`, `in binary`,
 plus `in fraction` (0.75 → 3/4) and `in roman` (2026 → MMXXVI).
 
 **Sheets that calculate** — variables (`rent = $500`), running totals
-(`sum`, `avg`, `prev`), `#` headers, `//` comments. The status bar always shows
-the sheet total; select a few lines to see just their sum.
+(`sum`, `avg`, `prev`, `count`, `min`, `max`, `product`), `#` headers,
+`//` comments. The status bar always shows the sheet total; select a few lines
+to see just their sum. Add `chart` at the end of a block to draw a sparkline.
 
 ## Handy things
 
 - **Ctrl+Alt+N** (configurable — the settings field records keys you press)
   shows/hides the window from anywhere. Closing hides to tray.
-- **Ctrl+F** (or the 🔍 button) searches every sheet at once, not just the
-  one you're in — click a hit to jump straight to that line.
+- **Ctrl+W** closes the current sheet (asks first if it has content).
+- **Ctrl+F** (or the 🔍 button) searches every sheet at once — by text or by
+  result value: `>1000`, `<50`, `=100`, `~100` (±1%). Click a hit to jump there.
 - **Click a result** to copy it. Copying a line copies it *with* the answer
   (`rent * 3 = $1,500`). **Ctrl+Shift+C** copies the whole sheet with answers.
+- **Export as image** — the ⤓ menu includes "Copy as image": renders the sheet
+  to a PNG and puts it on the clipboard (falls back to file save if the browser
+  blocks clipboard write).
 - **Drag the divider** to resize the results column.
 - **Drop a `.numi`, `.sum`, `.txt` or `.md` file** into the window to open it
   as a sheet.
+- **Pin and reorder sheets** — click the pin icon on any sheet in the sidebar
+  to keep it at the top; use ↑↓ to rearrange.
 - **Backups are automatic**: a daily snapshot of all sheets (last 14 kept), and
   deleted sheets sit in a bin for 14 days (configurable) — restore one by
   dragging the file back in. Settings → Backups opens the folder.
@@ -120,7 +143,7 @@ see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 npm install
-npm test               # engine tests
+npm test               # engine tests (113 cases)
 npm run tauri dev      # run the app
 npm run tauri build    # build the installer
 ```
