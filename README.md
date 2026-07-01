@@ -25,8 +25,9 @@ Works in **English and Russian** at the same time: `5 метров в см`, `20
 
 ## Install
 
-Grab the latest `Summarum_*_x64-setup.exe` from [Releases](../../releases),
-run it, done. The whole app is about 2 MB.
+Grab the latest `Summarum_*_x64-setup.exe` (or `arm64-setup.exe` on Windows
+on ARM) from [Releases](../../releases), run it, done. The whole app is
+about 2 MB. It checks for updates on its own after that.
 
 Requirements:
 
@@ -74,6 +75,8 @@ the sheet total; select a few lines to see just their sum.
 
 - **Ctrl+Alt+N** (configurable — the settings field records keys you press)
   shows/hides the window from anywhere. Closing hides to tray.
+- **Ctrl+F** (or the 🔍 button) searches every sheet at once, not just the
+  one you're in — click a hit to jump straight to that line.
 - **Click a result** to copy it. Copying a line copies it *with* the answer
   (`rent * 3 = $1,500`). **Ctrl+Shift+C** copies the whole sheet with answers.
 - **Drag the divider** to resize the results column.
@@ -84,6 +87,9 @@ the sheet total; select a few lines to see just their sum.
   dragging the file back in. Settings → Backups opens the folder.
 - **Data folder is configurable** — point it at OneDrive/Dropbox and your
   sheets follow you between machines.
+- **Always on top** (Settings) pins the window above everything else.
+- The app checks for updates on launch and offers to install them — no
+  manual download-and-reinstall.
 - Light/dark theme, en/ru interface, configurable precision and separators.
 
 ## Extensions

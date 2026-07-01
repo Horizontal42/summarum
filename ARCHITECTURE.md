@@ -26,10 +26,13 @@ src/
   storage.ts         Tauri commands / localStorage fallback
   extensions.ts      runs user .js files against the engine
   i18n.ts            interface strings (en/ru)
+  updater.ts         checks tauri-plugin-updater, installs + relaunches
 src-tauri/
   src/main.rs        tray, hide-to-tray, storage commands, rates fetching
                      (open.er-api.com + CoinGecko) with cache, backups,
-                     data-folder migration, file drops
+                     data-folder migration, file drops, plugin registration
+                     (autostart, global-shortcut, single-instance, opener,
+                     dialog, updater, process)
 ```
 
 ## How a line becomes a result
@@ -102,6 +105,10 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
   scroll/geometry changes. Click-to-copy reads `data-value`.
 - Engine evaluation is synchronous on every keystroke — a full sheet parse
   is well under a millisecond, so there's no debounce or worker.
+- Search-all-sheets (`Ctrl+F`) is a plain line scan over `data.contents` in
+  `main.ts`, not a CodeMirror search extension — it has to cross documents,
+  so it never touches the active editor until a result is clicked
+  (`editor.goToLine`).
 
 ## Storage
 
@@ -112,9 +119,21 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
   deleted sheets become `.numi` files under `backups/deleted/` and are pruned
   by age. Saving is debounced at 400 ms.
 
+## Auto-update
+
+- `updater.ts` calls `tauri-plugin-updater`'s `check()` on boot; if a signed
+  update is available the user is prompted, then `downloadAndInstall()` +
+  `tauri-plugin-process`'s `relaunch()`.
+- The update endpoint is `latest.json` published alongside each GitHub
+  Release. `release.yml` signs both architectures with a minisign keypair:
+  the public half is embedded in `tauri.conf.json`; the private half + its
+  password live only as `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)` repo secrets
+  (write-only — there is no durable copy in the repo). Losing that key means
+  already-installed copies can never trust a future signed release again.
+
 ## Tests
 
-`npm test` runs ~94 vitest cases over the engine (`src/engine/*.test.ts`):
+`npm test` runs ~96 vitest cases over the engine (`src/engine/*.test.ts`):
 every expression class, both languages, deterministic injected rates,
 plus a regression suite covering all known-fixed bugs.
 UI is exercised manually; the engine is where the complexity lives.
