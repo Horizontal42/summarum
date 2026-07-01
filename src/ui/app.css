@@ -83,23 +83,34 @@ body {
 }
 .doc-item:hover { background: var(--hover); }
 .doc-item.active { background: var(--sel); }
+.doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.doc-item .pin-btn,
+.doc-item .move-btn,
 .doc-item .del {
-  margin-left: auto;
+  flex-shrink: 0;
   opacity: 0;
   color: var(--fg-muted);
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 2px 4px;
+  line-height: 1;
 }
+.doc-item:hover .pin-btn,
+.doc-item:hover .move-btn,
+.doc-item:hover .del { opacity: 0.7; }
+.doc-item .pin-btn.active { opacity: 1; }
+.doc-item:hover .pin-btn.active { opacity: 1; }
+.doc-item .del { font-size: 12px; padding: 2px 6px; }
 .doc-item:hover .del { opacity: 1; }
 .doc-item .del.confirm {
   opacity: 1;
   background: #d63a3a;
   color: #fff;
 }
+.doc-item.pinned .doc-name { font-weight: 500; }
 #new-doc {
   border: 1px dashed var(--border);
   background: none;

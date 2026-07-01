@@ -54,19 +54,65 @@ function syncTitleField(): void {
   if (document.activeElement !== field) field.value = activeDoc()?.title ?? "";
 }
 
+function pinDoc(id: string): void {
+  const doc = data.docs.find((d) => d.id === id);
+  if (!doc) return;
+  doc.pinned = !doc.pinned;
+  if (doc.pinned) {
+    // move to end of pinned group
+    data.docs = data.docs.filter((d) => d.id !== id);
+    let lastPinned = -1;
+    for (let i = data.docs.length - 1; i >= 0; i--) { if (data.docs[i].pinned) { lastPinned = i; break; } }
+    data.docs.splice(lastPinned + 1, 0, doc);
+  } else {
+    // move to start of non-pinned group
+    data.docs = data.docs.filter((d) => d.id !== id);
+    const firstNonPinned = data.docs.findIndex((d) => !d.pinned);
+    data.docs.splice(firstNonPinned === -1 ? data.docs.length : firstNonPinned, 0, doc);
+  }
+  saveAppData(data);
+  renderDocList();
+}
+
+function moveDoc(id: string, dir: -1 | 1): void {
+  const idx = data.docs.findIndex((d) => d.id === id);
+  if (idx < 0) return;
+  const doc = data.docs[idx];
+  const target = data.docs[idx + dir];
+  if (!target || !!target.pinned !== !!doc.pinned) return; // can't cross pin boundary
+  data.docs.splice(idx, 1);
+  data.docs.splice(idx + dir, 0, doc);
+  saveAppData(data);
+  renderDocList();
+}
+
 function renderDocList(): void {
   const list = $("#doc-list");
   list.replaceChildren();
   for (const doc of data.docs) {
     const el = document.createElement("div");
-    el.className = "doc-item" + (doc.id === data.activeId ? " active" : "");
+    el.className = "doc-item" + (doc.id === data.activeId ? " active" : "") + (doc.pinned ? " pinned" : "");
     const name = document.createElement("span");
+    name.className = "doc-name";
     name.textContent = doc.title || t("untitled");
     el.appendChild(name);
+
+    const mkBtn = (cls: string, text: string, title: string, cb: () => void): HTMLButtonElement => {
+      const b = document.createElement("button");
+      b.className = cls;
+      b.textContent = text;
+      b.title = title;
+      b.addEventListener("click", (e) => { e.stopPropagation(); cb(); });
+      return b;
+    };
+
+    el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
+    el.appendChild(mkBtn("move-btn", "↑", t("moveUp"), () => moveDoc(doc.id, -1)));
+    el.appendChild(mkBtn("move-btn", "↓", t("moveDown"), () => moveDoc(doc.id, 1)));
+
     const del = document.createElement("button");
     del.className = "del";
     del.textContent = "✕";
-    // two-step inline confirmation instead of the native dialog
     let confirmTimer: ReturnType<typeof setTimeout> | null = null;
     del.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -81,7 +127,6 @@ function renderDocList(): void {
         return;
       }
       if (confirmTimer) clearTimeout(confirmTimer);
-      // the sheet goes to backups/deleted/ — restore by dragging it back
       void backupDeletedSheet(settings.dataDir, doc.title, data.contents[doc.id] ?? "");
       delete data.contents[doc.id];
       data.docs = data.docs.filter((d) => d.id !== doc.id);

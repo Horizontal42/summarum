@@ -58,6 +58,10 @@ const dict: Record<string, Record<string, string>> = {
     closeSheet: "Close this sheet?",
     close: "Close",
     cancel: "Cancel",
+    pin: "Pin",
+    unpin: "Unpin",
+    moveUp: "Move up",
+    moveDown: "Move down",
   },
   ru: {
     settings: "Настройки",
@@ -116,6 +120,10 @@ const dict: Record<string, Record<string, string>> = {
     closeSheet: "Закрыть этот лист?",
     close: "Закрыть",
     cancel: "Отмена",
+    pin: "Закрепить",
+    unpin: "Открепить",
+    moveUp: "Выше",
+    moveDown: "Ниже",
   },
 };
 

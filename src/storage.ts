@@ -5,6 +5,7 @@ export interface DocMeta {
   title: string;
   /** user renamed the document — stop deriving the title from the first line */
   customTitle?: boolean;
+  pinned?: boolean;
 }
 
 export interface AppData {
