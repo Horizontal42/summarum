@@ -83,18 +83,26 @@ describe("Workspace cycle detection", () => {
     expect(r[1].error).toBe("circular reference");
   });
 
-  it("a two-sheet cycle reports a stable error across repeated queries (no stale cache poisoning)", () => {
-    const { ws } = makeWorkspace({
+  it("does not cache exports for a sheet whose own line hit circular reference", () => {
+    // Resolving @A.z evaluates A -> resolves @B.total -> evaluates B -> resolves
+    // @A.total -> A is already on the resolving stack, so B's own line
+    // (`z = @A.total`) gets the literal error "circular reference". A's own line
+    // only sees the secondary error 'sheet "B" has no total', so A gets cached —
+    // but B must not, since its LineResult[] literally contains "circular reference".
+    const { engine, ws } = makeWorkspace({
       a: { title: "A", text: "z = @B.total" },
       b: { title: "B", text: "z = @A.total" },
     });
     const first = ws.evaluateSheet("dash", "@A.z");
-    const second = ws.evaluateSheet("dash", "@A.z");
-    expect(first[0].value).toBeNull();
-    expect(second[0].value).toBeNull();
-    expect(first[0].error).toBeDefined();
-    expect(second[0].error).toBeDefined();
-    expect(second[0].error).toBe(first[0].error);
+    expect(first[0].error).toBe('no variable "z" in "A"');
+
+    const spy = vi.spyOn(engine, "evaluateDocument");
+    const second = ws.evaluateSheet("dash2", "@B.z");
+    expect(second[0].error).toBe('no variable "z" in "B"');
+    // A is cached from the first pass, so this second call re-evaluates B only.
+    // If exportsFor(B) had cached the poisoned result from the first pass instead,
+    // B's text would never be re-evaluated here.
+    expect(spy.mock.calls.some(([text]) => text === "z = @A.total")).toBe(true);
   });
 });
 
