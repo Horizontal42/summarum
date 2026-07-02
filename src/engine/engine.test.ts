@@ -396,6 +396,10 @@ describe("cross-sheet references", () => {
     expect(r[0].value).toBeNull();
     expect(r[0].error).toBe('no variable "nope" in "Budget"');
   });
+  it("ordinary successful line leaves LineResult.error undefined", () => {
+    const r = eng.evaluateDocument("$100", resolver);
+    expect(r[0].error).toBeUndefined();
+  });
   it("propagates a resolver-reported circular reference", () => {
     const cyc = (): XRefResolution => ({ ok: false, reason: "circular reference" });
     const r = eng.evaluateDocument("@A.total", cyc);

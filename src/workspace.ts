@@ -138,7 +138,12 @@ export class Workspace {
       }
     }
     const exports: SheetExports = { vars, total: this.engine.totalValueOf(results), last };
-    this.cache.set(sheet.id, exports);
+    // A cycle-interrupted pass produces incomplete/wrong exports (dropped
+    // assignments, missing total) — don't let it poison the cache. Re-evaluate
+    // fresh on every query until the cycle is actually broken by an edit.
+    if (!results.some((r) => r.error === "circular reference")) {
+      this.cache.set(sheet.id, exports);
+    }
     return exports;
   }
 }

@@ -82,6 +82,20 @@ describe("Workspace cycle detection", () => {
     expect(r[1].value).toBeNull();
     expect(r[1].error).toBe("circular reference");
   });
+
+  it("a two-sheet cycle reports a stable error across repeated queries (no stale cache poisoning)", () => {
+    const { ws } = makeWorkspace({
+      a: { title: "A", text: "z = @B.total" },
+      b: { title: "B", text: "z = @A.total" },
+    });
+    const first = ws.evaluateSheet("dash", "@A.z");
+    const second = ws.evaluateSheet("dash", "@A.z");
+    expect(first[0].value).toBeNull();
+    expect(second[0].value).toBeNull();
+    expect(first[0].error).toBeDefined();
+    expect(second[0].error).toBeDefined();
+    expect(second[0].error).toBe(first[0].error);
+  });
 });
 
 describe("Workspace.renameSheet", () => {
