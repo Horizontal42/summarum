@@ -21,6 +21,7 @@
   --border: #e4e4e0;
   --sel: #cfe3f7;
   --caret: #d57d2c;
+  --error: #c1443a;
   --toolbar-bg: #fafaf8;
   --hover: #ececea;
 }
@@ -41,6 +42,7 @@
   --border: #333438;
   --sel: #2d4a68;
   --caret: #e8923c;
+  --error: #e2685c;
   --toolbar-bg: #232428;
   --hover: #2f3035;
 }
@@ -332,6 +334,10 @@ body {
   text-overflow: ellipsis;
 }
 .result-line:hover { text-decoration: underline; }
+.result-line.result-error {
+  color: var(--error);
+  font-style: italic;
+}
 .result-sparkline {
   position: absolute;
   right: 14px;

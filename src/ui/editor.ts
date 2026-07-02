@@ -324,7 +324,8 @@ export class SumEditor {
     for (let i = 0; i < Math.min(this.results.length, doc.lines); i++) {
       const r = this.results[i];
       const isChart = r.value?.kind === "chart";
-      if (!r.text && !isChart) continue;
+      const isError = !!r.error;
+      if (!r.text && !isChart && !isError) continue;
       const line = doc.line(i + 1);
       const block = this.view.lineBlockAt(line.from);
       const top = docTop + block.top - overlayTop;
@@ -333,9 +334,10 @@ export class SumEditor {
         frag.appendChild(buildSparkline(r.value.points.map((p) => p.toNumber()), top));
       } else {
         const el = document.createElement("div");
-        el.className = "result-line";
-        el.textContent = r.text;
-        el.dataset.value = r.text!;
+        el.className = "result-line" + (isError ? " result-error" : "");
+        el.textContent = isError ? "#ref?" : r.text;
+        if (!isError) el.dataset.value = r.text!;
+        if (isError) el.title = r.error!;
         el.style.top = `${top}px`;
         frag.appendChild(el);
       }
