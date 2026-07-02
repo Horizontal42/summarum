@@ -20,6 +20,7 @@ export type Token =
   | { t: "repr"; repr: NumeralRepr; start: number; end: number }
   | { t: "date"; word: DateWord; start: number; end: number }
   | { t: "datelit"; ms: number; start: number; end: number }
+  | { t: "xref"; sheet: string; key: string; start: number; end: number }
   | { t: "const"; name: "pi" | "e" | "half" | "onehalf"; start: number; end: number }
   | { t: "lparen"; start: number; end: number }
   | { t: "rparen"; start: number; end: number }
@@ -49,6 +50,12 @@ export function tokenize(line: string, reg: Registry): Token[] {
 
     if (lx.type === "date") {
       tokens.push({ t: "datelit", ms: lx.dateMs!, ...span });
+      i++;
+      continue;
+    }
+
+    if (lx.type === "xref") {
+      tokens.push({ t: "xref", sheet: lx.sheet!, key: lx.key!, ...span });
       i++;
       continue;
     }

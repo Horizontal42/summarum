@@ -20,6 +20,7 @@ export type Node =
   | { k: "var"; name: string }
   | { k: "date"; word: DateWord }
   | { k: "datelit"; ms: number }
+  | { k: "xref"; sheet: string; key: string }
   | { k: "agg"; name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart" }
   | { k: "bin"; op: "plus" | "minus" | "mul" | "div" | "mod" | "pow"; l: Node; r: Node }
   | { k: "bit"; op: BitOp; l: Node; r: Node }
@@ -395,6 +396,9 @@ class Parser {
       case "datelit":
         this.i++;
         return { k: "datelit", ms: tk.ms };
+      case "xref":
+        this.i++;
+        return { k: "xref", sheet: tk.sheet, key: tk.key };
       case "agg":
         this.i++;
         return { k: "agg", name: tk.name };

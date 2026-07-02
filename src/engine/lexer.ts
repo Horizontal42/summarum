@@ -3,13 +3,15 @@
 import { Decimal, NumeralRepr } from "./types";
 
 export interface Lex {
-  type: "num" | "word" | "sym" | "date";
+  type: "num" | "word" | "sym" | "date" | "xref";
   raw: string;
   start: number;
   end: number;
   value?: Decimal;
   repr?: NumeralRepr;
   dateMs?: number;
+  sheet?: string;
+  key?: string;
 }
 
 const WORD_RE = /^[\p{L}_]+/u;
@@ -96,6 +98,21 @@ export function lexLine(text: string): Lex[] {
       out.push({ type: "num", raw: m[0], start: i, end: i + m[0].length, value: new Decimal(m[0]), repr: "decimal" });
       i += m[0].length;
       continue;
+    }
+
+    if (ch === "@") {
+      const bracket = /^@\[([^\]]+)\]\.([\p{L}_][\p{L}\d_]*)/u.exec(rest);
+      if (bracket) {
+        out.push({ type: "xref", raw: bracket[0], start: i, end: i + bracket[0].length, sheet: bracket[1].trim(), key: bracket[2] });
+        i += bracket[0].length;
+        continue;
+      }
+      const bare = /^@([\p{L}_][\p{L}\d_]*)\.([\p{L}_][\p{L}\d_]*)/u.exec(rest);
+      if (bare) {
+        out.push({ type: "xref", raw: bare[0], start: i, end: i + bare[0].length, sheet: bare[1], key: bare[2] });
+        i += bare[0].length;
+        continue;
+      }
     }
 
     const word = WORD_RE.exec(rest);

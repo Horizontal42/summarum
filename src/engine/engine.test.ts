@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { SumEngine } from "./index";
+import { qty } from "./types";
+import type { XRefResolution } from "./evaluator";
+import { formatValue } from "./index";
 
 let eng: SumEngine;
 
@@ -332,5 +335,81 @@ describe("extension API", () => {
   it("setVariable", () => {
     eng.setVariable("myvar", { double: 5, unitId: "USD" });
     expect(calc("myvar * 2")).toBe("$10");
+  });
+});
+
+function calcWithResolver(
+  expr: string,
+  resolver: (sheet: string, key: string) => XRefResolution,
+): string | null {
+  const r = eng.evaluateDocument(expr, resolver);
+  return r[r.length - 1].text;
+}
+
+describe("grand total", () => {
+  it("totalValueOf's raw value formats identically to totalOf's string", () => {
+    const results = eng.evaluateDocument("$100\n$50");
+    const raw = eng.totalValueOf(results);
+    expect(raw).not.toBeNull();
+    expect(formatValue(raw!, eng.settings)).toBe(eng.totalOf(results));
+  });
+});
+
+describe("cross-sheet references", () => {
+  function resolver(sheet: string, key: string): XRefResolution {
+    const s = sheet.toLowerCase();
+    if (s === "budget") {
+      if (key === "total") return { ok: true, value: qty(150) };
+      if (key === "rent") return { ok: true, value: qty(500, eng.reg.unitsById.get("meter")!) };
+      if (key === "last") return { ok: true, value: qty(7) };
+      return { ok: false, reason: `no variable "${key}" in "${sheet}"` };
+    }
+    if (s === "trip to lisbon") {
+      if (key === "food") return { ok: true, value: qty(25) };
+      return { ok: false, reason: `no variable "${key}" in "${sheet}"` };
+    }
+    return { ok: false, reason: `sheet "${sheet}" not found` };
+  }
+
+  it("resolves @Sheet.total", () => {
+    expect(calcWithResolver("@Budget.total", resolver)).toBe("150");
+  });
+  it("resolves @Sheet.var and participates in arithmetic", () => {
+    expect(calcWithResolver("@Budget.rent + 1 m", resolver)).toBe("501 m");
+  });
+  it("resolves @Sheet.last", () => {
+    expect(calcWithResolver("@Budget.last", resolver)).toBe("7");
+  });
+  it("unit conversion over a resolved reference", () => {
+    expect(calcWithResolver("@Budget.rent in cm", resolver)).toBe("50,000 cm");
+  });
+  it("bracket form for titles with spaces", () => {
+    expect(calcWithResolver("@[Trip to Lisbon].food", resolver)).toBe("25");
+  });
+  it("unresolved sheet sets a line error instead of crashing", () => {
+    const r = eng.evaluateDocument("@Nope.total", resolver);
+    expect(r[0].value).toBeNull();
+    expect(r[0].error).toBe('sheet "Nope" not found');
+  });
+  it("unresolved key sets a line error", () => {
+    const r = eng.evaluateDocument("@Budget.nope", resolver);
+    expect(r[0].value).toBeNull();
+    expect(r[0].error).toBe('no variable "nope" in "Budget"');
+  });
+  it("propagates a resolver-reported circular reference", () => {
+    const cyc = (): XRefResolution => ({ ok: false, reason: "circular reference" });
+    const r = eng.evaluateDocument("@A.total", cyc);
+    expect(r[0].value).toBeNull();
+    expect(r[0].error).toBe("circular reference");
+  });
+  it("no resolver given: resolves to null without throwing", () => {
+    expect(() => eng.evaluateDocument("@Budget.total")).not.toThrow();
+    const r = eng.evaluateDocument("@Budget.total");
+    expect(r[0].value).toBeNull();
+    expect(r[0].error).toBe('sheet "Budget" not found');
+  });
+  it("an assignment line reports the assigned name via LineResult.assign", () => {
+    const r = eng.evaluateDocument("rent = $500");
+    expect(r[0].assign).toBe("rent");
   });
 });

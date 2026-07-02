@@ -79,6 +79,7 @@ export function pct(value: Decimal.Value): PercentVal {
 }
 
 export class EvalError extends Error {}
+export class XRefError extends EvalError {}
 
 export interface EngineSettings {
   /** max decimal places shown */

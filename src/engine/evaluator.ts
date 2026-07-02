@@ -1,6 +1,6 @@
 // Walks the AST with the document context (variables, line results for
 // sum/avg/prev) and produces unit-aware values.
-import { Decimal, EvalError, Quantity, Unit, Value, qty, pct } from "./types";
+import { Decimal, EvalError, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
 import { Node, ConvTarget } from "./parser";
 import { Registry } from "./registry";
 import { resolveZone, startOfToday, addToDate, isCalendarUnit } from "./datetime";
@@ -21,7 +21,12 @@ export interface EvalCtx {
   line: LineCtx;
   /** date → { code → rate-per-usd } */
   historicalRates?: Map<string, Map<string, number>>;
+  /** cross-sheet `@Sheet.key` lookup; absent outside the app (tests, extensions) */
+  resolveXRef?: XRefResolver;
 }
+
+export type XRefResolution = { ok: true; value: Value } | { ok: false; reason: string };
+export type XRefResolver = (sheet: string, key: string) => XRefResolution;
 
 const PI = new Decimal("3.14159265358979323846264338327950288419716939937510");
 const E = new Decimal("2.71828182845904523536028747135266249775724709369995");
@@ -46,6 +51,13 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
       return evalDateWord(node.word);
     case "datelit":
       return { kind: "date", ms: node.ms, hasTime: false };
+    case "xref": {
+      const res = ctx.resolveXRef?.(node.sheet, node.key);
+      if (!res || !res.ok) {
+        throw new XRefError(res && !res.ok ? res.reason : `sheet "${node.sheet}" not found`);
+      }
+      return res.value;
+    }
     case "unknown": {
       const xv = ctx.vars.get("__x__");
       if (!xv) throw new EvalError("? used outside goal seek");

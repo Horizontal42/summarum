@@ -1,10 +1,10 @@
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { Decimal, EngineSettings, EvalError, Quantity, Unit, Value, defaultSettings, qty } from "./types";
+import { Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine } from "./parser";
-import { evaluate, EvalCtx, toBase, fromBase } from "./evaluator";
+import { evaluate, EvalCtx, XRefResolver, toBase, fromBase } from "./evaluator";
 import { formatValue } from "./formatter";
 import snapshot from "./rates-snapshot.json";
 import { CRYPTO } from "./extraunits";
@@ -21,6 +21,10 @@ export interface LineResult {
   tokens: Token[];
   /** offset of "//" comment start within the line, if any */
   commentStart: number | null;
+  /** name this line assigns, if any (`rent = $500` → "rent") */
+  assign?: string;
+  /** set when the line references an unresolved cross-sheet value */
+  error?: string;
 }
 
 export interface ExtensionUnitSpec {
@@ -70,7 +74,7 @@ export class SumEngine {
     return this.reg.completions;
   }
 
-  evaluateDocument(text: string): LineResult[] {
+  evaluateDocument(text: string, resolveXRef?: XRefResolver): LineResult[] {
     const lines = text.split("\n");
     const results: LineResult[] = [];
     const vars = new Map<string, Value>(this.globals);
@@ -102,19 +106,22 @@ export class SumEngine {
       const parsed = parseLine(tokens, knownVars, line);
 
       let value: Value | null = null;
+      let lineError: string | undefined;
       if (parsed.expr) {
         const ctx: EvalCtx = {
           reg: this.reg,
           vars,
           line: { lineValues, lineKinds, index: i, lineText: rawLine },
           historicalRates: this.historicalRates,
+          resolveXRef,
         };
         try {
           value = evaluate(parsed.expr, ctx);
           // a line without a result beats a dead sheet — swallow everything,
           // including extension bugs and BigInt conversion errors
         } catch (e) {
-          if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
+          if (e instanceof XRefError) lineError = e.message;
+          else if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
           value = null;
         }
         if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
@@ -129,6 +136,8 @@ export class SumEngine {
         kind: "normal",
         tokens,
         commentStart: commentStart >= 0 ? commentStart : null,
+        assign: parsed.assign,
+        error: lineError,
       });
     }
     return results;
@@ -141,11 +150,11 @@ export class SumEngine {
   }
 
   /**
-   * Grand total of the sheet for the status bar: sums every line result
-   * compatible with the first united result's dimension (converted to its
-   * unit). Returns null when fewer than two lines contribute.
+   * Grand total of the sheet: sums every line result compatible with the
+   * first united result's dimension (converted to its unit). Returns null
+   * when fewer than two lines contribute.
    */
-  totalOf(results: LineResult[]): string | null {
+  totalValueOf(results: LineResult[]): Quantity | null {
     const qs = results
       .map((r) => r.value)
       .filter((v): v is Quantity => v !== null && v.kind === "quantity");
@@ -164,7 +173,13 @@ export class SumEngine {
     }
     if (count < 2) return null;
     const value = anchor.unit ? fromBase(acc, anchor.unit) : acc;
-    return formatValue(qty(value, anchor.unit ?? null), this.settings);
+    return qty(value, anchor.unit ?? null);
+  }
+
+  /** Formatted string for the status bar; see totalValueOf for the raw value. */
+  totalOf(results: LineResult[]): string | null {
+    const v = this.totalValueOf(results);
+    return v ? formatValue(v, this.settings) : null;
   }
 
   // ---------- extension API (numi.*)
@@ -229,3 +244,4 @@ export class SumEngine {
 export { formatValue } from "./formatter";
 export type { Value, EngineSettings } from "./types";
 export type { Token } from "./tokenizer";
+export type { XRefResolution, XRefResolver } from "./evaluator";
