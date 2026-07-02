@@ -1,6 +1,6 @@
 [package]
 name = "summarum"
-version = "1.0.1"
+version = "1.1.0"
 description = "Summarum — natural language calculator notebook for Windows"
 edition = "2021"
 
