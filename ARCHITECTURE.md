@@ -113,6 +113,30 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
 - The registry is rebuilt never; extensions mutate it (add phrases/functions)
   at startup.
 
+## Cross-sheet references
+
+`@Sheet.key` is lexed directly in `lexer.ts` (not through the phrase
+registry — sheet titles are arbitrary user text, not vocabulary), producing
+an `xref` lexeme carrying `{ sheet, key }`. The engine only knows how to
+*ask* for a value: `EvalCtx.resolveXRef?.(sheet, key)` returns
+`{ ok: true; value } | { ok: false; reason }`; when no resolver is supplied
+(tests, extensions, `evaluateExpression`) an xref is simply unresolved.
+Unresolved xrefs throw `XRefError` internally, caught in
+`SumEngine.evaluateDocument` and surfaced as `LineResult.error` (rendered as
+`#ref?` in the results column) — every other evaluation error still resolves
+to a silent blank line, unchanged.
+
+The engine has no concept of "other sheets" — that lives entirely in
+`src/workspace.ts`. `Workspace` reads all sheet texts from the app's
+in-memory `data.contents`, caches each sheet's exports (its assigned
+variables, `total`, `last`) after first evaluating it, and invalidates a
+sheet's cache plus every transitive dependent (found via a text scan for
+`@Name.`) when it's edited or rates refresh. `Workspace.evaluateSheet(id,
+text)` pushes `id` onto a resolving-stack for the duration of the call, so a
+sheet that references itself — directly or through another sheet — hits an
+already-on-the-stack check and resolves to `circular reference` instead of
+recursing forever.
+
 ## UI notes
 
 - CodeMirror injects its base theme at runtime *after* `app.css`, so anything

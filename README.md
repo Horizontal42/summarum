@@ -88,6 +88,12 @@ plus `in fraction` (0.75 → 3/4) and `in roman` (2026 → MMXXVI).
 `//` comments. The status bar always shows the sheet total; select a few lines
 to see just their sum. Add `chart` at the end of a block to draw a sparkline.
 
+**Cross-sheet references** — pull a value from another sheet with `@`:
+`@Budget.total`, `@Budget.rent`, `@[Trip to Lisbon].food`. A sheet made of
+nothing but references becomes a live dashboard:
+`@Assets.total - @Debts.total`. Give the source sheet a fixed name (not an
+auto-derived one) so the reference doesn't break when its first line changes.
+
 ## Handy things
 
 - **Ctrl+Alt+N** (configurable — the settings field records keys you press)
