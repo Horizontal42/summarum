@@ -14,6 +14,7 @@ import type { LineResult } from "./engine";
 import { setLang, detectLang, t } from "./i18n";
 import { runExtensions } from "./extensions";
 import { checkForUpdate } from "./updater";
+import { Workspace } from "./workspace";
 import { EN, RU } from "./engine/vocab-data";
 
 function welcomeText(lang: string): string {
@@ -25,6 +26,7 @@ const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel)
 
 let engine: SumEngine;
 let editor: SumEditor;
+let workspace: Workspace;
 let settings: SettingsData;
 let data: AppData;
 let lastResults: LineResult[] = [];
@@ -204,7 +206,7 @@ function searchAllSheets(query: string): SearchHit[] {
     const hits: SearchHit[] = [];
     for (const doc of data.docs) {
       const contents = data.contents[doc.id] ?? "";
-      const results = engine.evaluateDocument(contents);
+      const results = workspace.evaluateSheet(doc.id, contents);
       const lines = contents.split("\n");
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
@@ -536,6 +538,7 @@ async function refreshRates(force = false): Promise<void> {
       Object.entries(payload.rates).map(([k, v]) => [k, Number(v)])
     );
     applyAllRates();
+    workspace.invalidateAll();
     editor.refresh();
     ratesFetchedAt = payload.fetchedAt;
     if (force) toast(t("ratesUpdated"));
@@ -568,6 +571,7 @@ async function refreshMarket(force = false): Promise<void> {
     marketPrices = prices;
     marketFetchedAt = Math.floor(Date.now() / 1000);
     applyAllRates();
+    workspace.invalidateAll();
     editor.refresh();
     if (force) toast(t("marketUpdated"));
   }
@@ -588,7 +592,7 @@ async function fetchNeededHistoricalRates(text: string): Promise<void> {
       if (rates) { engine.setHistoricalRates(date, rates); fetched = true; }
     }
   }
-  if (fetched) editor.refresh();
+  if (fetched) { workspace.invalidateAll(); editor.refresh(); }
 }
 
 function renderMarketInfo(): void {
@@ -657,7 +661,7 @@ async function renderSheetImage(): Promise<void> {
   const lineH = Math.round(fontSize * 1.7);
   const padX = 20, padTop = 16, padBot = 16;
 
-  const doc = engine.evaluateDocument(editor.getText());
+  const doc = workspace.evaluateSheet(activeDoc().id, editor.getText());
   const rawLines = editor.getText().split("\n");
 
   const canvas = document.createElement("canvas");
@@ -775,6 +779,10 @@ async function boot(): Promise<void> {
   const scripts = await loadExtensionScripts();
   runExtensions(engine, scripts);
 
+  workspace = new Workspace(engine, () =>
+    data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),
+  );
+
   editor = new SumEditor(
     $("#editor"),
     $("#results"),
@@ -783,6 +791,7 @@ async function boot(): Promise<void> {
       onChange(text) {
         const doc = activeDoc();
         data.contents[doc.id] = text;
+        workspace.invalidate(doc.id);
         if (!doc.customTitle) {
           doc.title = titleFromContent(text);
           syncTitleField();
@@ -804,6 +813,7 @@ async function boot(): Promise<void> {
         renderTotal();
       },
     },
+    (text) => workspace.evaluateSheet(activeDoc().id, text),
     data.contents[data.activeId] ?? "",
   );
 
@@ -815,13 +825,18 @@ async function boot(): Promise<void> {
   const titleField = $<HTMLInputElement>("#doc-title");
   titleField.addEventListener("change", () => {
     const doc = activeDoc();
+    const oldTitle = doc.title;
     const v = titleField.value.trim();
     if (v) {
       doc.title = v.slice(0, 60);
       doc.customTitle = true;
+      const rewrites = workspace.renameSheet(doc.id, oldTitle, doc.title);
+      for (const r of rewrites) data.contents[r.id] = r.text;
+      workspace.invalidateAll();
     } else {
       doc.customTitle = false;
       doc.title = titleFromContent(data.contents[doc.id] ?? "");
+      workspace.invalidateAll();
     }
     syncTitleField();
     renderDocList();

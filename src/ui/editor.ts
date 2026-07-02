@@ -160,6 +160,7 @@ export class SumEditor {
     resultsEl: HTMLElement,
     private engine: SumEngine,
     private cb: EditorCallbacks,
+    private evaluateDoc: (text: string) => LineResult[],
     initialText: string,
   ) {
     this.resultsEl = resultsEl;
@@ -310,7 +311,7 @@ export class SumEditor {
   }
 
   private evaluate(text: string): void {
-    this.results = this.engine.evaluateDocument(text);
+    this.results = this.evaluateDoc(text);
     this.view.dispatch({ effects: setResults.of(this.results) });
     this.cb.onResults(this.results);
   }
