@@ -548,7 +548,8 @@ async function refreshRates(force = false): Promise<void> {
 
 // ---------- market data
 
-const MARKET_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "SBER", "GAZP"];
+// Yahoo delisted Russian tickers (SBER/GAZP) in 2022 — dropped, they always miss.
+const MARKET_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"];
 
 let marketPrices: Record<string, number> = {};
 let marketFetchedAt = 0;

@@ -292,29 +292,24 @@ async fn fetch_market_data(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let joined = symbols.join(",");
-    let url = format!(
-        "https://query1.finance.yahoo.com/v7/finance/quote?symbols={}",
-        joined
-    );
-    let body: serde_json::Value = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
-        .map_err(|e| e.to_string())?;
-
+    // v7/finance/quote now requires a cookie+crumb pair Yahoo stopped issuing
+    // to plain API clients (returns 401); v8 chart still answers anonymously,
+    // one symbol per request.
     let mut prices = std::collections::HashMap::new();
-    if let Some(results) = body["quoteResponse"]["result"].as_array() {
-        for item in results {
-            let sym = item["symbol"].as_str().unwrap_or("").to_string();
-            // regularMarketPrice is in the quote currency (USD for US stocks)
-            if let Some(price) = item["regularMarketPrice"].as_f64() {
-                if price > 0.0 && !sym.is_empty() {
-                    prices.insert(sym, price);
-                }
+    for sym in &symbols {
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d",
+            sym
+        );
+        let Ok(resp) = client.get(&url).send().await else {
+            continue;
+        };
+        let Ok(body) = resp.json::<serde_json::Value>().await else {
+            continue;
+        };
+        if let Some(price) = body["chart"]["result"][0]["meta"]["regularMarketPrice"].as_f64() {
+            if price > 0.0 {
+                prices.insert(sym.clone(), price);
             }
         }
     }
