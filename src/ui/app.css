@@ -478,8 +478,16 @@ body {
   width: 110px;
   height: 4px;
   border-radius: 2px;
-  background: var(--border);
+  background: transparent;
   cursor: pointer;
+}
+#settings-panel input[type="range"]::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
 }
 #settings-panel input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
