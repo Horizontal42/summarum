@@ -58,18 +58,31 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
     use std::collections::HashMap;
     let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut map = HashMap::new();
-    for (i, c) in alphabet.chars().enumerate() { map.insert(c, i as u8); }
+    for (i, c) in alphabet.chars().enumerate() {
+        map.insert(c, i as u8);
+    }
     let s: String = s.chars().filter(|c| *c != '=').collect();
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
-    let bytes: Vec<u8> = s.chars().map(|c| map.get(&c).copied().ok_or_else(|| format!("bad base64 char {}", c))).collect::<Result<_, _>>()?;
+    let bytes: Vec<u8> = s
+        .chars()
+        .map(|c| {
+            map.get(&c)
+                .copied()
+                .ok_or_else(|| format!("bad base64 char {}", c))
+        })
+        .collect::<Result<_, _>>()?;
     for chunk in bytes.chunks(4) {
         let b0 = chunk[0];
         let b1 = *chunk.get(1).unwrap_or(&0);
         let b2 = *chunk.get(2).unwrap_or(&0);
         let b3 = *chunk.get(3).unwrap_or(&0);
         out.push((b0 << 2) | (b1 >> 4));
-        if chunk.len() > 2 { out.push((b1 << 4) | (b2 >> 2)); }
-        if chunk.len() > 3 { out.push((b2 << 6) | b3); }
+        if chunk.len() > 2 {
+            out.push((b1 << 4) | (b2 >> 2));
+        }
+        if chunk.len() > 3 {
+            out.push((b2 << 6) | b3);
+        }
     }
     Ok(out)
 }
@@ -255,7 +268,8 @@ async fn fetch_market_data(
     if let Ok(raw) = fs::read_to_string(&cache_path) {
         if let Ok(cache) = serde_json::from_str::<MarketCache>(&raw) {
             if now_secs().saturating_sub(cache.fetched_at) < MARKET_TTL_SECS {
-                let syms: std::collections::HashSet<&str> = symbols.iter().map(|s| s.as_str()).collect();
+                let syms: std::collections::HashSet<&str> =
+                    symbols.iter().map(|s| s.as_str()).collect();
                 let hit: std::collections::HashMap<String, f64> = cache
                     .prices
                     .into_iter()
@@ -306,7 +320,10 @@ async fn fetch_market_data(
     }
 
     if !prices.is_empty() {
-        let cache = MarketCache { fetched_at: now_secs(), prices: prices.clone() };
+        let cache = MarketCache {
+            fetched_at: now_secs(),
+            prices: prices.clone(),
+        };
         if let Ok(raw) = serde_json::to_string(&cache) {
             write_atomic(&cache_path, &raw).ok();
         }
