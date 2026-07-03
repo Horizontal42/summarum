@@ -410,7 +410,7 @@ export const EN: VocabLocale = {
     "decimal.variants": "decimal,dec",
     "hex.variants": "hex",
     "octal.variants": "octal",
-    "scientific.variants": "scientific, sci, exp, exponent, exponential"
+    "scientific.variants": "scientific, sci, exponent, exponential"
   },
   "Operations": {
     "assignment.variants": "equal,is",

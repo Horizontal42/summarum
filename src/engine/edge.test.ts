@@ -224,4 +224,12 @@ describe("review fixes", () => {
     expect(calc("$12 * 3")).toBe("$36");
     expect(calc("2 m * 3 m")).toBe("6 m²");
   });
+  it("exp(x) is Euler's number to the power x, not scientific notation", () => {
+    expect(calc("exp(1)")).toBe("2.72");
+    expect(calc("exp(0)")).toBe("1");
+  });
+  it("scientific notation still works via sci/exponent/exponential", () => {
+    expect(calc("123456 in scientific")).toBe("1.23e5");
+    expect(calc("123456 in exponent")).toBe("1.23e5");
+  });
 });
