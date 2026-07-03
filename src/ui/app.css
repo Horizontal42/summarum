@@ -470,6 +470,29 @@ body {
   font-size: 12.5px;
   width: 110px;
 }
+#settings-panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  cursor: pointer;
+}
+#settings-panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: grab;
+  transition: transform 0.1s ease;
+}
+#settings-panel input[type="range"]:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
 .path-btn {
   background: var(--bg);
   color: var(--fg);
