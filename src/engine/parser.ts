@@ -72,6 +72,12 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
       if (knownVars.has(tk.raw) || afterConv) filtered.push(tk);
       continue;
     }
+    // a bare "/" inside a timezone name ("Europe/Berlin") must not break the
+    // word-keeping chain, otherwise the second half gets filtered as noise
+    if (afterConv && tk.t === "op" && tk.op === "div") {
+      filtered.push(tk);
+      continue;
+    }
     afterConv = tk.t === "conv";
     filtered.push(tk);
   }
@@ -256,8 +262,18 @@ class Parser {
     }
     if (tk.t === "word") {
       const words: string[] = [];
-      while (this.peek()?.t === "word" && words.length < 4) {
-        words.push((this.next() as Token & { raw: string }).raw);
+      for (;;) {
+        const w = this.peek();
+        if (w?.t === "word" && words.length < 4) {
+          words.push((this.next() as Token & { raw: string }).raw);
+          continue;
+        }
+        // "Europe/Berlin": a slash between timezone words is part of the name
+        if (w?.t === "op" && w.op === "div" && words.length > 0 && this.toks[this.i + 1]?.t === "word") {
+          this.next();
+          continue;
+        }
+        break;
       }
       if (words.length > 0) return { type: "tz", words };
     }

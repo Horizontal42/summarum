@@ -232,4 +232,7 @@ describe("review fixes", () => {
     expect(calc("123456 in scientific")).toBe("1.23e5");
     expect(calc("123456 in exponent")).toBe("1.23e5");
   });
+  it("timezone names with a slash resolve as IANA ids", () => {
+    expect(calc("time in Europe/Berlin")).toMatch(/^\d{2}:\d{2}$/);
+  });
 });
