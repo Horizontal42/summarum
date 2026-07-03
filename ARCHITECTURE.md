@@ -21,6 +21,8 @@ src/
     index.ts         SumEngine facade + extension API + sheet totals
   ui/
     editor.ts        CodeMirror 6 wiring: highlight, results overlay, copy
+    search.ts        cross-sheet search overlay (text + result-value queries)
+    export.ts        renders the sheet + results to a PNG (clipboard/file)
     app.css          themes (light/dark via CSS variables)
   main.ts            app bootstrap: documents, settings, status bar, dnd
   storage.ts         Tauri commands / localStorage fallback
@@ -29,8 +31,8 @@ src/
   updater.ts         checks tauri-plugin-updater, installs + relaunches
 src-tauri/
   src/main.rs        tray, hide-to-tray, storage commands, rates fetching
-                     (open.er-api.com + CoinGecko + Yahoo Finance) with
-                     cache, historical rates (frankfurter.app, permanent
+                     (open.er-api.com + CoinGecko + Yahoo Finance v8 chart)
+                     with cache, historical rates (frankfurter.dev, permanent
                      per-date cache), backups, data-folder migration,
                      file drops, plugin registration (autostart,
                      global-shortcut, single-instance, opener, dialog,
@@ -111,7 +113,49 @@ snapshot price) plus the mirror list in `src-tauri/src/main.rs`.
   bypasses `formatValue` — the results overlay renders an SVG sparkline
   instead of a text string.
 - The registry is rebuilt never; extensions mutate it (add phrases/functions)
-  at startup.
+  at startup. `buildRegistry()` (`registry.ts`) is a thin orchestrator over
+  `registerCoreVocab` / `registerUnits` / `registerAreaVolume` /
+  `registerCurrencies` / `registerExtraUnits` / `registerCrypto` /
+  `registerCompletions` — **call order matters**, since `Registry.addPhrase`
+  keeps the *first* registration of an identical phrase and drops later ones
+  (core vocab must win over unit/currency phrases that happen to collide).
+- Multiplying two same-dimension quantities (`2 kg * 500 g`) converts the
+  right operand into the left operand's unit before multiplying, so the
+  result keeps a sane unit (`1 kg`, not `1000` in a `kg` label). Cross-dimension
+  multiplication (`$12 * 3`, `5 hours * 2`) is unaffected — the right side is
+  treated as a plain scale factor there.
+- A `//` only starts a comment at the start of a line or after whitespace
+  (`findCommentStart` in `index.ts`), so a URL like `see https://example.com`
+  isn't truncated at the double slash.
+- **Date literals and formats.** Besides ISO (`2024-01-01`), the lexer accepts
+  `D.M.YYYY` / `M/D/YYYY` (`31.12.2024`, `12/31/2024`) with the same separator
+  on both sides and a 4-digit year. Day/month order is disambiguated per
+  literal: a component `>12` fixes which side is the day; if both are `≤12`,
+  the engine's `dateFormat` setting decides. All three literal forms reject
+  out-of-range components via a round-trip check (`validDateMs` in `lexer.ts`
+  — `new Date(y, mo-1, d)` silently *rolls over* invalid dates like
+  `2026-13-45` instead of erroring, so the constructed date's year/month/day
+  are compared back against the input). `SumEngine` resolves `dateFormat:
+  "system"` to an actual day/month order once via `detectDateOrder()`
+  (`datetime.ts`, probes `Intl.DateTimeFormat` on a `2000-12-31` fixture) and
+  passes it into `tokenize()` → `lexLine()` on every call; `"dmy"`/`"mdy"`
+  settings skip detection. Display works the same way in reverse: `formatter.ts`
+  either uses the OS-locale `Intl` formatting (`"system"`) or builds a fixed
+  `YYYY-MM-DD` / `DD.MM.YYYY` / `MM/DD/YYYY` string via
+  `Intl.DateTimeFormat(...).formatToParts()` (needed to respect the value's
+  own IANA timezone, which a hand-rolled `ms`-based formatter can't do).
+  `Intl.DateTimeFormat` instances are cached by options key in `formatter.ts`
+  (`dtf()`) since constructing one is comparatively expensive and every dated
+  line rebuilds its format on every render.
+- Timezone name parsing (`time in Europe/Berlin`) has two independent traps.
+  First, `parseLine`'s noise-filter only keeps word tokens that immediately
+  follow a `conv` token (`in`/`as`/...); any other token type resets that
+  state — a bare `/` between two timezone words would normally drop the
+  second word before the parser ever sees it, so the filter special-cases a
+  `/` that appears while collecting post-conv words. Second, `parseTarget()`'s
+  word-collecting loop mirrors that same allowance so it keeps consuming past
+  the `/` instead of stopping at the first word. Both places need the
+  exception — fixing only one still drops `Europe/Berlin` down to `Europe`.
 
 ## Cross-sheet references
 
@@ -147,10 +191,19 @@ recursing forever.
   scroll/geometry changes. Click-to-copy reads `data-value`.
 - Engine evaluation is synchronous on every keystroke — a full sheet parse
   is well under a millisecond, so there's no debounce or worker.
-- Search-all-sheets (`Ctrl+F`) is a plain line scan over `data.contents` in
-  `main.ts`, not a CodeMirror search extension — it has to cross documents,
-  so it never touches the active editor until a result is clicked
-  (`editor.goToLine`).
+- Search-all-sheets (`Ctrl+F`) is a plain line scan over every open sheet's
+  text, not a CodeMirror search extension — it has to cross documents, so it
+  never touches the active editor until a result is clicked
+  (`editor.goToLine`). It lives in `src/ui/search.ts` (`initSearch()`), which
+  owns the `#search-overlay` DOM and its own 150 ms input debounce — a
+  result-value query (`>1000`) re-evaluates every open sheet, so debouncing
+  matters once there are more than a couple of sheets open.
+- The settings popover is split into four tabs (General / Format / Data /
+  Updates) in `index.html`, each a `.settings-tabpanel` toggled by a
+  `#settings-tabs .tab` button in `bindSettingsUI()` (`main.ts`) — plain
+  `classList.toggle`, no router. Tab styling reuses the sidebar's
+  `doc-item.active` idiom (`background: var(--sel)` for the active pill)
+  rather than introducing a new visual pattern.
 
 ## Storage
 
@@ -165,7 +218,28 @@ recursing forever.
 
 - `updater.ts` calls `tauri-plugin-updater`'s `check()` on boot; if a signed
   update is available the user is prompted, then `downloadAndInstall()` +
-  `tauri-plugin-process`'s `relaunch()`.
+  `tauri-plugin-process`'s `relaunch()`. `checkForUpdate()` returns
+  `AvailableUpdate | null | "error"` — `null` means the check succeeded and
+  found nothing newer, `"error"` means the check itself failed (offline,
+  signature mismatch, etc.); the distinction only matters for the manual path
+  below. Every outcome is now visible in devtools: failures via
+  `console.warn`, and a successful "no update" result logs the running
+  version alongside "that's the latest published release" via `console.info`
+  — the most common false alarm is simply that the installed build already
+  *is* the newest release (e.g. right after installing it), which used to be
+  indistinguishable from a silently broken check.
+- Closing the window hides it to the tray instead of exiting the process (see
+  `on_window_event` in `main.rs`), so a boot-time-only check can go unnoticed
+  for a long time on a machine that isn't restarted often. `main.ts` also
+  reruns `checkUpdate()` on a `setInterval` (every 6 hours) so a long-lived
+  tray process still notices new releases, and Settings → Updates has a
+  manual "Check for updates" button (`checkUpdate(true)`) that reports
+  "up to date" / "check failed" via toast — those toasts are suppressed on
+  the automatic background checks so the app doesn't nag every few hours.
+  A `SettingsData.autoUpdateEnabled` toggle turns off both the boot check and
+  the periodic recheck (re-read from `settings` on every interval tick, so
+  flipping it while the app is running takes effect immediately); the manual
+  button ignores the toggle and always works.
 - The update endpoint is `latest.json` published alongside each GitHub
   Release. `release.yml` signs both architectures with a minisign keypair:
   the public half is embedded in `tauri.conf.json`; the private half + its
@@ -181,16 +255,19 @@ All files below live in `%APPDATA%/app.summarum.calc` (or the user-chosen folder
 |------|----------|-----|
 | `settings.json` | app settings | persisted |
 | `documents.json` | all sheets | persisted (400 ms debounce) |
-| `rates.json` | live exchange rates | 1 hour |
-| `market.json` | stock/commodity prices | 15 minutes |
-| `rates-YYYY-MM-DD.json` | historical ECB rates for one date | permanent |
+| `rates.json` | live exchange rates (open.er-api.com + CoinGecko) | 1 hour |
+| `market.json` | stock/commodity prices (Yahoo Finance v8 chart, one request per symbol) | 15 minutes |
+| `rates-YYYY-MM-DD.json` | historical ECB rates for one date (frankfurter.dev) | permanent |
 | `backups/documents-YYYY-MM-DD.json` | daily snapshots | 14 days |
 | `backups/deleted/*.numi` | soft-deleted sheets | configurable |
 
 ## Tests
 
-`npm test` runs 113 vitest cases over the engine (`src/engine/*.test.ts`):
-every expression class, both languages, deterministic injected rates,
-goal seek, historical rates (injected), plus a regression suite covering
-all known-fixed bugs. UI is exercised manually; the engine is where the
-complexity lives.
+`npm test` runs 152 vitest cases: `src/engine/*.test.ts` covers every
+expression class, both languages, deterministic injected rates, goal seek,
+historical rates (injected), date-format literals/display (dedicated engines
+with an explicit `dateFormat`, since the default "system" format depends on
+the CI machine's locale), plus a regression suite covering all known-fixed
+bugs; `src/workspace.test.ts` covers cross-sheet references, caching and
+cycle detection. UI is exercised manually; the engine is where the complexity
+lives.

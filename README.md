@@ -67,13 +67,16 @@ the math is ignored, so `spent 20 on pizza and 5 on coffee` just gives 25.
 `100 AAPL in USD`, `2 GC=F in USD` (gold futures), `MSFT + GOOGL`.
 
 **Historical exchange rates** — `1000 USD in EUR on 2024-01-01` looks up the
-ECB rate for that exact date (via frankfurter.app) and caches it permanently.
+ECB rate for that exact date (via frankfurter.dev) and caches it permanently.
 
 **Percents the human way** — `20% of 80`, `20% off 1500`, `5 as a % of 25`,
 `20% of what is 30`.
 
-**Dates and time** — `today + 2 weeks`, `tomorrow - today`, `time in New York`,
-`now in unix`, `1750000000 as date`. ISO date literals: `2024-01-01 + 30 days`,
+**Dates and time** — `today + 2 weeks`, `tomorrow - today`, `time in New York`
+(also works with a raw IANA id: `time in Europe/Berlin`), `now in unix`,
+`1750000000 as date`. Date literals: ISO (`2024-01-01 + 30 days`), or
+dot/slash with a 4-digit year — `31.12.2024`, `12/31/2024` — where the
+day/month order for ambiguous cases follows the Date format setting.
 `days until 2027-01-01`, `days since 2020-03-15`.
 
 **Goal seek** — put `?` where the unknown is and an `=` with the target:
@@ -117,9 +120,13 @@ auto-derived one) so the reference doesn't break when its first line changes.
 - **Data folder is configurable** — point it at OneDrive/Dropbox and your
   sheets follow you between machines.
 - **Always on top** (Settings) pins the window above everything else.
-- The app checks for updates on launch and offers to install them — no
-  manual download-and-reinstall.
-- Light/dark theme, en/ru interface, configurable precision and separators.
+- The app checks for updates on launch and every few hours after that, and
+  offers to install them — no manual download-and-reinstall. Settings →
+  Updates → "Check for updates" runs one on demand, or turn automatic
+  checking off entirely with the toggle next to it.
+- Light/dark theme, en/ru interface, configurable precision, separators, and
+  date format (system locale, `31.12.2024`, `12/31/2024`, or `2024-12-31`).
+  Settings is split into General / Format / Data / Updates tabs.
 
 ## Extensions
 
@@ -149,7 +156,7 @@ see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 npm install
-npm test               # engine tests (113 cases)
+npm test               # engine tests (152 cases)
 npm run tauri dev      # run the app
 npm run tauri build    # build the installer
 ```
