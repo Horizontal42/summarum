@@ -76,4 +76,4 @@ jobs:
               git log "${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | grep -v "^- bump version"
             fi
           } > notes.md
-          gh release edit "${{ github.ref_name }}" --notes-file notes.md
+          gh release edit "${{ github.ref_name }}" --notes-file notes.md --draft=false
