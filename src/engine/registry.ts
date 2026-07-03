@@ -156,10 +156,22 @@ function addUnitPhrases(reg: Registry, phrases: string[], unit: Unit, opts: { ca
   for (const p of phrases) reg.addPhrase(p, { t: "unit", unit }, opts);
 }
 
+interface LengthPhrase { phrase: string; unit: Unit; caseSensitive?: boolean }
+
 export function buildRegistry(): Registry {
   const reg = new Registry();
+  registerCoreVocab(reg);
+  const lengthPhrases = registerUnits(reg);
+  registerAreaVolume(reg, lengthPhrases);
+  registerCurrencies(reg);
+  registerExtraUnits(reg);
+  registerCrypto(reg);
+  registerCompletions(reg);
+  return reg;
+}
 
-  // operators, percent, dates, numerals, scales, aggregates
+// operators, percent, dates, numerals, scales, aggregates, built-in functions
+function registerCoreVocab(reg: Registry): void {
   const ops: Array<[string, Payload]> = [
     ["plus", { t: "op", op: "plus" }],
     ["minus", { t: "op", op: "minus" }],
@@ -255,9 +267,11 @@ export function buildRegistry(): Registry {
   reg.addPhrase("полторы", { t: "const", name: "onehalf" }, { caseSensitive: false });
 
   for (const f of BUILTIN_FUNCS) reg.addPhrase(f, { t: "func", name: f }, { caseSensitive: false });
+}
 
-  // units, SI/IEC prefixes, area/volume templates
-  interface LengthPhrase { phrase: string; unit: Unit; caseSensitive?: boolean }
+// UNIT_DATA + SI/IEC prefixes; returns the length-dimension phrases the
+// area/volume templates need to build "square meter" / "cubic foot" etc.
+function registerUnits(reg: Registry): LengthPhrase[] {
   const lengthPhrases: LengthPhrase[] = [];
   /** lowercased composed symbol -> unit; null = ambiguous (mm vs Mm) */
   const lenientSym = new Map<string, Unit | null>();
@@ -335,7 +349,11 @@ export function buildRegistry(): Registry {
     if (unit) reg.addPhrase(lower, { t: "unit", unit }, { caseSensitive: false });
   }
 
-  // Area/volume from templates: "square %@" / "cubic %@" applied to every length phrase
+  return lengthPhrases;
+}
+
+// "square %@" / "cubic %@" applied to every length phrase from registerUnits
+function registerAreaVolume(reg: Registry, lengthPhrases: LengthPhrase[]): void {
   const applyTemplates = (
     templates: string[],
     fmtTemplate: string,
@@ -363,10 +381,11 @@ export function buildRegistry(): Registry {
   };
   applyTemplates(vocab.variants("Area", "area.templates"), vocab.entryEn("Area", "area.format") ?? "%@²", "area", 2, "sq");
   applyTemplates(vocab.variants("Volume", "volume.templates"), vocab.entryEn("Volume", "volume.format") ?? "%@³", "volume", 3, "cb");
+}
 
-  // currencies
-  // Major currencies register first so they win generic phrases
-  // ("доллар" belongs to USD, not TTD which lists it too and sorts earlier).
+// Major currencies register first so they win generic phrases
+// ("доллар" belongs to USD, not TTD which lists it too and sorts earlier).
+function registerCurrencies(reg: Registry): void {
   const PRIORITY = [
     "USD", "EUR", "GBP", "RUB", "JPY", "CNY", "CHF", "CAD", "AUD", "UAH",
     "BYN", "KZT", "PLN", "TRY", "INR", "BRL", "KRW", "NZD", "SEK", "NOK",
@@ -385,8 +404,10 @@ export function buildRegistry(): Registry {
     if (!variants.some((v) => v.toUpperCase() === code)) variants.push(code);
     for (const v of variants) reg.addPhrase(v, { t: "currency", code }, { caseSensitive: false });
   }
+}
 
-  // speed, pressure, energy, power, frequency, fuel
+// speed, pressure, energy, power, frequency, fuel
+function registerExtraUnits(reg: Registry): void {
   for (const d of EXTRA_UNITS) {
     const unit: Unit = {
       id: d.id,
@@ -407,9 +428,11 @@ export function buildRegistry(): Registry {
       }
     }
   }
+}
 
-  // cryptocurrencies (live prices come from the shell)
-  // codes that collide with common words match case-sensitively only
+// live prices come from the shell; codes that collide with common words
+// (TON, NEAR, DOT, ...) match case-sensitively only
+function registerCrypto(reg: Registry): void {
   const CRYPTO_STRICT_CODES = new Set(["TON", "NEAR", "ATOM", "LINK", "UNI", "DOT", "SOL"]);
   for (const c of CRYPTO) {
     reg.currencyCodes.add(c.code);
@@ -420,8 +443,9 @@ export function buildRegistry(): Registry {
       if (ph) reg.addPhrase(ph, { t: "currency", code: c.code }, { caseSensitive: false });
     }
   }
+}
 
-  // autocomplete entries
+function registerCompletions(reg: Registry): void {
   const seen = new Set<string>();
   const addCompletion = (label: string, type: Completion["type"], detail?: string) => {
     const k = `${type}:${label.toLowerCase()}`;
@@ -440,6 +464,4 @@ export function buildRegistry(): Registry {
   for (const k of ["sum", "total", "average", "avg", "prev", "today", "tomorrow", "yesterday", "time", "now", "hex", "binary"]) {
     addCompletion(k, "keyword");
   }
-
-  return reg;
 }
