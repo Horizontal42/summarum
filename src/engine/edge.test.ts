@@ -219,4 +219,9 @@ describe("review fixes", () => {
   it("random() participates in arithmetic", () => {
     expect(calc("random() + 1")).not.toBeNull();
   });
+  it("multiplying same-dimension quantities converts the right operand", () => {
+    expect(calc("2 kg * 500 g")).toBe("1 kg");
+    expect(calc("$12 * 3")).toBe("$36");
+    expect(calc("2 m * 3 m")).toBe("6 m²");
+  });
 });

@@ -252,6 +252,8 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
           const u = ctx.reg.unitsById.get(targetId);
           if (u) return qty(baseProduct.div(u.ratio), u);
         }
+        // same dimension: "2 kg * 500 g" scales in the left unit, not 2*500
+        if (da === db) return qty(a.value.mul(convertQ(b, a.unit).value), a.unit);
         return qty(a.value.mul(b.value), a.unit);
       }
       return qty(a.value.mul(b.value), a.unit ?? b.unit ?? null);
