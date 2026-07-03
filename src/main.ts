@@ -495,8 +495,10 @@ async function refreshMarket(force = false): Promise<void> {
   if (!isTauri()) return;
   const info = $("#market-info") as HTMLElement;
   info.style.display = "";
-  info.textContent = "Market…";
+  info.classList.add("spin");
+  info.textContent = t("market");
   const prices = await fetchMarketData(MARKET_SYMBOLS);
+  info.classList.remove("spin");
   if (Object.keys(prices).length > 0) {
     marketPrices = prices;
     marketFetchedAt = Math.floor(Date.now() / 1000);
@@ -529,7 +531,7 @@ function renderMarketInfo(): void {
   const el = $("#market-info") as HTMLElement;
   if (marketFetchedAt === 0) { el.style.display = "none"; return; }
   el.style.display = "";
-  el.textContent = `Market: ${agoText(marketFetchedAt)} ↺`;
+  el.textContent = `${t("market")}: ${agoText(marketFetchedAt)} ↺`;
   el.title = t("refreshRates");
 }
 
