@@ -48,6 +48,12 @@
 }
 
 * { box-sizing: border-box; }
+/* app-wide: buttons/list items/status text ease their hover and state
+   changes instead of snapping; high-frequency UI (results overlay,
+   autocomplete, drag handles) is deliberately excluded below */
+button, .doc-item, .search-item, #rates-info, #total-line {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
 html, body { margin: 0; height: 100%; }
 body {
   font-family: var(--font);
@@ -68,8 +74,15 @@ body {
   display: flex;
   flex-direction: column;
   padding: 6px;
+  overflow: hidden;
+  transition: width 0.18s ease, min-width 0.18s ease, padding 0.18s ease, border-right-color 0.18s ease;
 }
-#sidebar.hidden { display: none; }
+#sidebar.hidden {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-right-color: transparent;
+}
 #doc-list { flex: 1; overflow-y: auto; }
 .doc-item {
   padding: 7px 10px;
@@ -99,6 +112,7 @@ body {
   border-radius: 4px;
   padding: 2px 4px;
   line-height: 1;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
 }
 .doc-item:hover .pin-btn,
 .doc-item:hover .move-btn,
@@ -224,8 +238,14 @@ body {
   min-width: 160px;
   padding: 4px 0;
   z-index: 100;
+  transform-origin: bottom right;
 }
 #export-menu.hidden { display: none; }
+#export-menu:not(.hidden) { animation: menu-pop-in 0.12s ease; }
+@keyframes menu-pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
 #export-menu button {
   display: block;
   width: 100%;
@@ -451,6 +471,16 @@ body {
 }
 .settings-footer button:hover { background: var(--hover); }
 
+/* shared entrance animations for centered overlays (modal, search) */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* ---------- toast */
 #toast {
   position: fixed;
@@ -479,6 +509,8 @@ body {
   z-index: 200;
 }
 #modal.hidden { display: none; }
+#modal:not(.hidden) { animation: overlay-fade-in 0.15s ease; }
+#modal:not(.hidden) .modal-box { animation: pop-in 0.15s ease; }
 .modal-box {
   background: var(--bg-soft);
   border: 1px solid var(--border);
@@ -513,6 +545,8 @@ body {
   z-index: 200;
 }
 #search-overlay.hidden { display: none; }
+#search-overlay:not(.hidden) { animation: overlay-fade-in 0.15s ease; }
+#search-overlay:not(.hidden) .search-box { animation: pop-in 0.15s ease; }
 .search-box {
   background: var(--bg-soft);
   border: 1px solid var(--border);
