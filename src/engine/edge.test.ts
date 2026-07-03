@@ -235,4 +235,13 @@ describe("review fixes", () => {
   it("timezone names with a slash resolve as IANA ids", () => {
     expect(calc("time in Europe/Berlin")).toMatch(/^\d{2}:\d{2}$/);
   });
+  it("a URL in a line is not mistaken for a comment", () => {
+    const r = eng.evaluateDocument("see https://example.com");
+    expect(r[0].commentStart).toBeNull();
+  });
+  it("an inline comment after whitespace still works", () => {
+    const r = eng.evaluateDocument("5 + 5 // note");
+    expect(r[0].text).toBe("10");
+    expect(r[0].commentStart).toBe(6);
+  });
 });

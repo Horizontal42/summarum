@@ -12,6 +12,14 @@ import { CRYPTO } from "./extraunits";
 const cryptoSnapshot: Record<string, number> = {};
 for (const c of CRYPTO) cryptoSnapshot[c.code] = 1 / c.snapshotUsd;
 
+// "//" only starts a comment at line start or after whitespace, so URLs like
+// "see https://example.com" aren't cut off.
+const COMMENT_RE = /(^|\s)\/\//;
+function findCommentStart(line: string): number {
+  const m = COMMENT_RE.exec(line);
+  return m ? m.index + m[1].length : -1;
+}
+
 export interface LineResult {
   /** formatted result, null when the line has none (text, comment, header, error) */
   text: string | null;
@@ -83,7 +91,7 @@ export class SumEngine {
 
     for (let i = 0; i < lines.length; i++) {
       const rawLine = lines[i];
-      const commentStart = rawLine.indexOf("//");
+      const commentStart = findCommentStart(rawLine);
       const line = commentStart >= 0 ? rawLine.slice(0, commentStart) : rawLine;
       const trimmed = line.trim();
 
