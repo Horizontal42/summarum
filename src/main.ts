@@ -5,7 +5,7 @@ import { SumEditor } from "./ui/editor";
 import {
   AppData, DocMeta, SettingsData, defaultSettingsData,
   loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
-  fetchRates, fetchMarketData, fetchHistoricalRates, writeImageFile, loadExtensionScripts, openExtensionsFolder, isTauri,
+  fetchRates, fetchMarketData, fetchHistoricalRates, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
   chooseFolder, dataDirHasDocuments, migrateDataDir,
@@ -16,6 +16,8 @@ import { runExtensions } from "./extensions";
 import { checkForUpdate } from "./updater";
 import { Workspace } from "./workspace";
 import { EN, RU } from "./engine/vocab-data";
+import { exportSheetImage } from "./ui/export";
+import { initSearch, SearchController } from "./ui/search";
 
 function welcomeText(lang: string): string {
   const sample = (lang === "ru" ? RU : EN).Samples?.["sample.welcome"];
@@ -27,6 +29,7 @@ const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel)
 let engine: SumEngine;
 let editor: SumEditor;
 let workspace: Workspace;
+let search: SearchController;
 let settings: SettingsData;
 let data: AppData;
 let lastResults: LineResult[] = [];
@@ -177,113 +180,6 @@ async function closeActiveDoc(): Promise<void> {
   const nextId = data.docs[idx] ? data.docs[idx].id : data.docs[idx - 1]?.id ?? data.docs[0].id;
   switchDoc(nextId);
   saveAppData(data);
-}
-
-// ---------- search all sheets
-
-interface SearchHit {
-  docId: string;
-  docTitle: string;
-  line: number;
-  text: string;
-  result?: string;
-}
-
-function parseResultQuery(q: string): { op: string; threshold: import("./engine").Value } | null {
-  const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
-  if (!m) return null;
-  const v = engine.evaluateExpression(m[2].trim());
-  if (!v || v.kind !== "quantity") return null;
-  return { op: m[1], threshold: v };
-}
-
-function searchAllSheets(query: string): SearchHit[] {
-  const q = query.trim();
-  if (!q) return [];
-  const rq = parseResultQuery(q);
-  if (rq && rq.threshold.kind === "quantity") {
-    const th = rq.threshold.value;
-    const hits: SearchHit[] = [];
-    for (const doc of data.docs) {
-      const contents = data.contents[doc.id] ?? "";
-      const results = workspace.evaluateSheet(doc.id, contents);
-      const lines = contents.split("\n");
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
-        if (!r.value || r.value.kind !== "quantity") continue;
-        const v = r.value.value;
-        let match = false;
-        switch (rq.op) {
-          case ">":  match = v.gt(th); break;
-          case ">=": match = v.gte(th); break;
-          case "<":  match = v.lt(th); break;
-          case "<=": match = v.lte(th); break;
-          case "=":  match = v.eq(th); break;
-          case "~":  match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01); break;
-        }
-        if (match) {
-          hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] ?? "", result: r.text ?? undefined });
-          if (hits.length >= 200) return hits;
-        }
-      }
-    }
-    return hits;
-  }
-  const ql = q.toLowerCase();
-  const hits: SearchHit[] = [];
-  for (const doc of data.docs) {
-    const lines = (data.contents[doc.id] ?? "").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(ql)) {
-        hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
-        if (hits.length >= 200) return hits;
-      }
-    }
-  }
-  return hits;
-}
-
-function renderSearchResults(query: string, hits: SearchHit[]): void {
-  const el = $("#search-results");
-  el.replaceChildren();
-  if (query.trim() && hits.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "search-empty";
-    empty.textContent = t("searchEmpty");
-    el.appendChild(empty);
-    return;
-  }
-  const frag = document.createDocumentFragment();
-  for (const hit of hits) {
-    const item = document.createElement("div");
-    item.className = "search-item";
-    const docEl = document.createElement("div");
-    docEl.className = "doc";
-    docEl.textContent = hit.docTitle;
-    const lineEl = document.createElement("div");
-    lineEl.className = "line";
-    lineEl.textContent = hit.result ? `${hit.text} = ${hit.result}` : hit.text;
-    item.append(docEl, lineEl);
-    item.addEventListener("click", () => {
-      if (hit.docId !== data.activeId) switchDoc(hit.docId);
-      editor.goToLine(hit.line);
-      closeSearch();
-    });
-    frag.appendChild(item);
-  }
-  el.appendChild(frag);
-}
-
-function openSearch(): void {
-  const input = $<HTMLInputElement>("#search-input");
-  $("#search-overlay").classList.remove("hidden");
-  input.value = "";
-  renderSearchResults("", []);
-  input.focus();
-}
-
-function closeSearch(): void {
-  $("#search-overlay").classList.add("hidden");
 }
 
 // ---------- settings
@@ -649,72 +545,6 @@ function renderRatesInfo(): void {
   }
 }
 
-// ---------- PNG export
-
-async function renderSheetImage(): Promise<void> {
-  const dpr = window.devicePixelRatio || 1;
-  const style = getComputedStyle(document.documentElement);
-  const bgColor = style.getPropertyValue("--bg").trim() || "#ffffff";
-  const fgColor = style.getPropertyValue("--fg").trim() || "#333333";
-  const resultColor = style.getPropertyValue("--result").trim() || "#d57d2c";
-  const monoFont = style.getPropertyValue("--mono").trim() || "monospace";
-  const fontSize = settings.fontSize;
-  const lineH = Math.round(fontSize * 1.7);
-  const padX = 20, padTop = 16, padBot = 16;
-
-  const doc = workspace.evaluateSheet(activeDoc().id, editor.getText());
-  const rawLines = editor.getText().split("\n");
-
-  const canvas = document.createElement("canvas");
-  const ctx2 = canvas.getContext("2d")!;
-  ctx2.font = `${fontSize}px ${monoFont}`;
-  const maxWidth = rawLines.reduce((m, l) => Math.max(m, ctx2.measureText(l).width), 0) + padX * 4 + 150;
-  const w = Math.max(400, maxWidth);
-  const h = padTop + rawLines.length * lineH + padBot;
-
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx2.scale(dpr, dpr);
-
-  ctx2.fillStyle = bgColor;
-  ctx2.fillRect(0, 0, w, h);
-
-  ctx2.font = `${fontSize}px ${monoFont}`;
-  for (let i = 0; i < rawLines.length; i++) {
-    const y = padTop + i * lineH + fontSize;
-    ctx2.fillStyle = fgColor;
-    ctx2.fillText(rawLines[i], padX, y);
-    const res = doc[i]?.text;
-    if (res) {
-      ctx2.fillStyle = resultColor;
-      const rx = w - padX - ctx2.measureText(res).width;
-      ctx2.fillText(res, rx, y);
-    }
-  }
-
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-  if (!blob) { toast(t("imageFailed")); return; }
-
-  try {
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    toast(t("imageCopied"));
-  } catch {
-    // clipboard API failed — save to file
-    try {
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const path = await save({ filters: [{ name: "PNG Image", extensions: ["png"] }] });
-      if (path) {
-        const buf = await blob.arrayBuffer();
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-        await writeImageFile(path, b64);
-        toast(t("saved"));
-      }
-    } catch (e) {
-      toast(t("imageFailed"));
-    }
-  }
-}
-
 // ---------- modal
 
 /** two-button modal; resolves "a" | "b" | null (click outside = cancel) */
@@ -821,6 +651,17 @@ async function boot(): Promise<void> {
   // so a reopened sheet with "on 2024-01-01" needs its own historical-rate fetch
   void fetchNeededHistoricalRates(data.contents[data.activeId] ?? "");
 
+  search = initSearch({
+    engine,
+    workspace,
+    docs: () => data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),
+    t,
+    onOpen: (docId, line) => {
+      if (docId !== data.activeId) switchDoc(docId);
+      editor.goToLine(line);
+    },
+  });
+
   applySettings(); // sets the language before bindSettingsUI renders dynamic labels
   bindSettingsUI();
   renderDocList();
@@ -858,21 +699,7 @@ async function boot(): Promise<void> {
     }
   });
 
-  $("#open-search").addEventListener("click", () => openSearch());
-  const searchInput = $<HTMLInputElement>("#search-input");
-  searchInput.addEventListener("input", () => {
-    renderSearchResults(searchInput.value, searchAllSheets(searchInput.value));
-  });
-  searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeSearch();
-    } else if (e.key === "Enter") {
-      $("#search-results").querySelector<HTMLElement>(".search-item")?.click();
-    }
-  });
-  $("#search-overlay").addEventListener("mousedown", (e) => {
-    if (e.target === $("#search-overlay")) closeSearch();
-  });
+  $("#open-search").addEventListener("click", () => search.open());
 
   if (isTauri()) {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -942,9 +769,9 @@ async function boot(): Promise<void> {
     }
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
-      openSearch();
+      search.open();
     }
-      if (e.ctrlKey && e.shiftKey && e.code === "KeyC") {
+    if (e.ctrlKey && e.shiftKey && e.code === "KeyC") {
       e.preventDefault();
       void navigator.clipboard.writeText(editor.getSheetWithResults());
       toast(t("copied"));
@@ -965,7 +792,13 @@ async function boot(): Promise<void> {
     exportMenu.classList.add("hidden");
     const action = btn.dataset.action;
     if (action === "image") {
-      void renderSheetImage();
+      void exportSheetImage({
+        lines: editor.getText().split("\n"),
+        results: workspace.evaluateSheet(activeDoc().id, editor.getText()),
+        fontSize: settings.fontSize,
+        toast,
+        t,
+      });
     } else if (action === "copy") {
       void navigator.clipboard.writeText(editor.getSheetWithResults());
       toast(t("copied"));
