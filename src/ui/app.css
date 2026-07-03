@@ -258,12 +258,16 @@ body {
   padding: 4px 0;
   z-index: 100;
   transform-origin: bottom right;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.97) translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0s linear 0.12s;
 }
-#export-menu.hidden { display: none; }
-#export-menu:not(.hidden) { animation: menu-pop-in 0.12s ease; }
-@keyframes menu-pop-in {
-  from { opacity: 0; transform: scale(0.97) translateY(4px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+#export-menu:not(.hidden) {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0s linear 0s;
 }
 #export-menu button {
   display: block;
@@ -397,12 +401,16 @@ body {
   padding: 14px;
   z-index: 50;
   transform-origin: top right;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.97) translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
 }
-#settings-panel.hidden { display: none; }
-#settings-panel:not(.hidden) { animation: settings-pop-in 0.15s ease; }
-@keyframes settings-pop-in {
-  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+#settings-panel:not(.hidden) {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0s;
 }
 #settings-panel h2 { margin: 0 0 10px; font-size: 14px; }
 #settings-tabs {
@@ -490,16 +498,6 @@ body {
 }
 .settings-footer button:hover { background: var(--hover); }
 
-/* shared entrance animations for centered overlays (modal, search) */
-@keyframes overlay-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes pop-in {
-  from { opacity: 0; transform: scale(0.96) translateY(-6px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
 /* ---------- toast */
 #toast {
   position: fixed;
@@ -526,10 +524,15 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
-#modal.hidden { display: none; }
-#modal:not(.hidden) { animation: overlay-fade-in 0.15s ease; }
-#modal:not(.hidden) .modal-box { animation: pop-in 0.15s ease; }
+#modal:not(.hidden) {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s ease, visibility 0s linear 0s;
+}
 .modal-box {
   background: var(--bg-soft);
   border: 1px solid var(--border);
@@ -537,7 +540,10 @@ body {
   padding: 16px;
   max-width: 320px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  transform: scale(0.96) translateY(-6px);
+  transition: transform 0.15s ease;
 }
+#modal:not(.hidden) .modal-box { transform: scale(1) translateY(0); }
 .modal-box p { margin: 0 0 14px; font-size: 13px; line-height: 1.5; }
 .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
 .modal-btns button {
@@ -562,21 +568,29 @@ body {
   justify-content: center;
   padding-top: 12%;
   z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
-#search-overlay.hidden { display: none; }
-#search-overlay:not(.hidden) { animation: overlay-fade-in 0.15s ease; }
-#search-overlay:not(.hidden) .search-box { animation: pop-in 0.15s ease; }
+#search-overlay:not(.hidden) {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s ease, visibility 0s linear 0s;
+}
 .search-box {
   background: var(--bg-soft);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  transform: scale(0.96) translateY(-6px);
+  transition: transform 0.15s ease;
   width: min(440px, 90vw);
   max-height: 60vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+#search-overlay:not(.hidden) .search-box { transform: scale(1) translateY(0); }
 #search-input {
   border: none;
   border-bottom: 1px solid var(--border);
