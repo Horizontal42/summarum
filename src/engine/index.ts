@@ -1,11 +1,12 @@
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
+import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine } from "./parser";
 import { evaluate, EvalCtx, XRefResolver, toBase, fromBase } from "./evaluator";
 import { formatValue } from "./formatter";
+import { detectDateOrder } from "./datetime";
 import snapshot from "./rates-snapshot.json";
 import { CRYPTO } from "./extraunits";
 
@@ -18,6 +19,10 @@ const COMMENT_RE = /(^|\s)\/\//;
 function findCommentStart(line: string): number {
   const m = COMMENT_RE.exec(line);
   return m ? m.index + m[1].length : -1;
+}
+
+function resolveDateOrder(fmt: EngineSettings["dateFormat"]): DateOrder {
+  return fmt === "dmy" || fmt === "mdy" ? fmt : detectDateOrder();
 }
 
 export interface LineResult {
@@ -53,9 +58,12 @@ export class SumEngine {
   settings: EngineSettings;
   private globals = new Map<string, Value>();
   private historicalRates = new Map<string, Map<string, number>>();
+  /** resolved day/month order for ambiguous date literals like "01/02/2024" */
+  private dateOrder: DateOrder;
 
   constructor(settings: Partial<EngineSettings> = {}) {
     this.settings = { ...defaultSettings, ...settings };
+    this.dateOrder = resolveDateOrder(this.settings.dateFormat);
     this.reg = buildRegistry();
     this.reg.setRates({ ...snapshot.rates, ...cryptoSnapshot });
   }
@@ -76,6 +84,7 @@ export class SumEngine {
 
   updateSettings(patch: Partial<EngineSettings>): void {
     this.settings = { ...this.settings, ...patch };
+    if (patch.dateFormat) this.dateOrder = resolveDateOrder(this.settings.dateFormat);
   }
 
   completions(): Completion[] {
@@ -109,7 +118,7 @@ export class SumEngine {
         continue;
       }
 
-      const tokens = tokenize(line, this.reg);
+      const tokens = tokenize(line, this.reg, this.dateOrder);
       const knownVars = new Set(vars.keys());
       const parsed = parseLine(tokens, knownVars, line);
 

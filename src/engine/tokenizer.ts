@@ -1,5 +1,5 @@
 // Lexes a line and resolves phrases through the registry into semantic tokens.
-import { Decimal, NumeralRepr, Unit } from "./types";
+import { DateOrder, Decimal, NumeralRepr, Unit } from "./types";
 import { lexLine } from "./lexer";
 import { Registry, PctOp, DateWord, BitOp } from "./registry";
 
@@ -30,11 +30,8 @@ export type Token =
   | { t: "unknown"; start: number; end: number }
   | { t: "junk"; raw: string; start: number; end: number };
 
-const SYM_OPS: Record<string, Token["t"] | "plus" | "minus" | "mul" | "div" | "pow"> = {};
-
-export function tokenize(line: string, reg: Registry): Token[] {
-  void SYM_OPS;
-  const lexes = lexLine(line);
+export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dmy"): Token[] {
+  const lexes = lexLine(line, dateOrder);
   const lowers = lexes.map((l) => l.raw.toLowerCase());
   const tokens: Token[] = [];
   let i = 0;

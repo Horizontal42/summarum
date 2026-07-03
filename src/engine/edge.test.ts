@@ -244,4 +244,41 @@ describe("review fixes", () => {
     expect(r[0].text).toBe("10");
     expect(r[0].commentStart).toBe(6);
   });
+  it("invalid ISO date does not roll over — falls back to arithmetic", () => {
+    expect(calc("2026-13-45")).toBe("1,968");
+  });
+
+  describe("date literal formats", () => {
+    const dmyEng = new SumEngine({ dateFormat: "dmy" });
+    const mdyEng = new SumEngine({ dateFormat: "mdy" });
+    const isoEng = new SumEngine({ dateFormat: "iso" });
+    const calcWith = (e: SumEngine, expr: string) => {
+      const r = e.evaluateDocument(expr);
+      return r[r.length - 1].text;
+    };
+
+    it("dot-separated date respects the configured day/month order", () => {
+      expect(calcWith(dmyEng, "31.12.2024 - 30.12.2024")).toBe("1 day");
+    });
+    it("slash-separated date respects the configured day/month order", () => {
+      expect(calcWith(mdyEng, "12/31/2024 - 12/30/2024")).toBe("1 day");
+    });
+    it("ambiguous date (both parts <=12) follows the engine's dateFormat", () => {
+      // dmy: 01/02/2024 = 1 Feb; mdy: 01/02/2024 = 2 Jan
+      expect(calcWith(dmyEng, "01/02/2024 - 2024-01-01")).toBe("31 day");
+      expect(calcWith(mdyEng, "01/02/2024 - 2024-01-01")).toBe("1 day");
+    });
+    it("an unambiguous component (>12) wins regardless of dateFormat", () => {
+      expect(calcWith(mdyEng, "31.12.2024 - 30.12.2024")).toBe("1 day");
+    });
+    it("an invalid date (both components out of range) is not parsed as a date", () => {
+      const r = dmyEng.evaluateDocument("32.13.2024");
+      expect(r[0].value?.kind).not.toBe("date");
+    });
+    it("display format overrides the OS locale layout", () => {
+      expect(calcWith(isoEng, "2024-01-15")).toBe("2024-01-15");
+      expect(calcWith(dmyEng, "2024-01-15")).toBe("15.01.2024");
+      expect(calcWith(mdyEng, "2024-01-15")).toBe("01/15/2024");
+    });
+  });
 });

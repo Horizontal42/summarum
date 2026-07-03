@@ -1,6 +1,6 @@
 // Splits a line into raw lexemes (numbers, words, symbols). Shared by the
 // tokenizer and the phrase registry so both segment text the same way.
-import { Decimal, NumeralRepr } from "./types";
+import { DateOrder, Decimal, NumeralRepr } from "./types";
 
 export interface Lex {
   type: "num" | "word" | "sym" | "date" | "xref";
@@ -23,8 +23,18 @@ const NUM_SPACE_GROUPED_RE = /^\d{1,3}(?:[   ]\d{3})+(?:[.,]\d+)?(?!\d)/;
 const NUM_COMMA_GROUPED_RE = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)/;
 const NUM_DECIMAL_COMMA_RE = /^\d+,\d+/;
 const NUM_PLAIN_RE = /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
+// 31.12.2024 / 12/31/2024 — same separator on both sides, 4-digit year
+const SLASH_DOT_DATE_RE = /^(\d{1,2})([./])(\d{1,2})\2(\d{4})(?!\d)/;
 
-export function lexLine(text: string): Lex[] {
+/** ms for a real calendar date; null when the components roll over (2026-13-45) */
+function validDateMs(y: number, mo: number, d: number): number | null {
+  const dt = new Date(y, mo - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
+    ? dt.getTime()
+    : null;
+}
+
+export function lexLine(text: string, dateOrder: DateOrder = "dmy"): Lex[] {
   const out: Lex[] = [];
   let i = 0;
   while (i < text.length) {
@@ -36,13 +46,26 @@ export function lexLine(text: string): Lex[] {
     const rest = text.slice(i);
 
     if (ch >= "0" && ch <= "9") {
-      const iso = /^\d{4}-\d{2}-\d{2}(?!\d)/.exec(rest);
+      const iso = /^(\d{4})-(\d{2})-(\d{2})(?!\d)/.exec(rest);
       if (iso) {
-        const [y, mo, d] = iso[0].split("-").map(Number);
-        const dt = new Date(y, mo - 1, d);
-        if (!isNaN(dt.getTime())) {
-          out.push({ type: "date", raw: iso[0], start: i, end: i + iso[0].length, dateMs: dt.getTime() });
+        const ms = validDateMs(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+        if (ms !== null) {
+          out.push({ type: "date", raw: iso[0], start: i, end: i + iso[0].length, dateMs: ms });
           i += iso[0].length;
+          continue;
+        }
+      }
+      const dm = SLASH_DOT_DATE_RE.exec(rest);
+      if (dm) {
+        const a = Number(dm[1]);
+        const b = Number(dm[3]);
+        // a>12 must be the day, b>12 must be the month; both ≤12 → configured order
+        const dayFirst = a > 12 ? true : b > 12 ? false : dateOrder === "dmy";
+        const y = Number(dm[4]);
+        const ms = dayFirst ? validDateMs(y, b, a) : validDateMs(y, a, b);
+        if (ms !== null) {
+          out.push({ type: "date", raw: dm[0], start: i, end: i + dm[0].length, dateMs: ms });
+          i += dm[0].length;
           continue;
         }
       }

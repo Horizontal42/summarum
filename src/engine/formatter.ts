@@ -1,6 +1,31 @@
 // Turns values into display strings: unit/currency formats plus
 // precision and grouping settings.
-import { Decimal, EngineSettings, Value } from "./types";
+import { Decimal, DateVal, EngineSettings, Value } from "./types";
+
+// Intl.DateTimeFormat construction is relatively expensive and every line with
+// a date rebuilds one on each render — cache by locale+options instead.
+const dtfCache = new Map<string, Intl.DateTimeFormat>();
+function dtf(locale: string | undefined, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = (locale ?? "") + JSON.stringify(opts);
+  let f = dtfCache.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, opts);
+    dtfCache.set(key, f);
+  }
+  return f;
+}
+
+/** Fixed-layout date display (iso/dmy/mdy), independent of OS locale. */
+function formatDateFixed(v: DateVal, fmt: "iso" | "dmy" | "mdy"): string {
+  const parts = dtf("en-GB", {
+    timeZone: v.timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(v.ms);
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
+  const [y, mo, d] = [get("year"), get("month"), get("day")];
+  const date = fmt === "iso" ? `${y}-${mo}-${d}` : fmt === "dmy" ? `${d}.${mo}.${y}` : `${mo}/${d}/${y}`;
+  return v.hasTime ? `${date} ${get("hour")}:${get("minute")}` : date;
+}
 
 function group(intPart: string, sep: string): string {
   if (!sep) return intPart;
@@ -35,15 +60,16 @@ export function formatValue(v: Value, s: EngineSettings): string {
   if (v.kind === "date") {
     const opts: Intl.DateTimeFormatOptions = { timeZone: v.timeZone };
     if (v.timeOnly) {
-      return new Intl.DateTimeFormat(undefined, { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).format(v.ms);
+      return dtf(undefined, { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).format(v.ms);
     }
+    if (s.dateFormat !== "system") return formatDateFixed(v, s.dateFormat);
     if (v.hasTime) {
-      return new Intl.DateTimeFormat(undefined, {
+      return dtf(undefined, {
         ...opts, hour: "2-digit", minute: "2-digit", hour12: false,
         day: "numeric", month: "short", year: "numeric",
       }).format(v.ms);
     }
-    return new Intl.DateTimeFormat(undefined, { ...opts, day: "numeric", month: "long", year: "numeric" }).format(v.ms);
+    return dtf(undefined, { ...opts, day: "numeric", month: "long", year: "numeric" }).format(v.ms);
   }
 
   // quantity

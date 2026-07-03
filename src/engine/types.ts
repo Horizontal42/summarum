@@ -24,6 +24,12 @@ export type Dimension =
 
 export type NumeralRepr = "decimal" | "hex" | "binary" | "octal" | "scientific" | "fraction" | "roman" | "plain";
 
+/** day-first (31.12.2024) or month-first (12/31/2024) for ambiguous date literals */
+export type DateOrder = "dmy" | "mdy";
+
+/** "system" renders via the OS locale; the rest force a fixed layout */
+export type DateFormat = "system" | "iso" | "dmy" | "mdy";
+
 /** A resolved unit instance attached to a value. */
 export interface Unit {
   /** canonical id, e.g. "meter", "kilo:meter", "USD", "sq:foot" */
@@ -88,10 +94,13 @@ export interface EngineSettings {
   groupSeparator: string;
   /** decimal separator shown in output */
   decimalSeparator: string;
+  /** date display layout; also disambiguates 01/02/2024 on input */
+  dateFormat: DateFormat;
 }
 
 export const defaultSettings: EngineSettings = {
   precision: 2,
   groupSeparator: ",",
   decimalSeparator: ".",
+  dateFormat: "system",
 };

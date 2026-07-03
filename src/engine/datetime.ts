@@ -1,4 +1,16 @@
 // Date helpers and a city → IANA timezone map for "time in Tokyo".
+import { DateOrder } from "./types";
+
+/** Does the OS locale write the day or the month first? (31.12 vs 12/31) */
+export function detectDateOrder(): DateOrder {
+  const parts = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "numeric", year: "numeric" })
+    .formatToParts(new Date(2000, 11, 31));
+  for (const p of parts) {
+    if (p.type === "day") return "dmy";
+    if (p.type === "month") return "mdy";
+  }
+  return "dmy";
+}
 
 const Z: Record<string, string> = {
   // ---- common abbreviations
