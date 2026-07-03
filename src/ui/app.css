@@ -220,7 +220,11 @@ body {
   white-space: nowrap;
 }
 #rates-info:hover { color: var(--fg); }
-#rates-info.spin { opacity: 0.5; pointer-events: none; }
+#rates-info.spin { pointer-events: none; animation: rates-pulse 1s ease-in-out infinite; }
+@keyframes rates-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}
 #total-line {
   font-family: var(--mono);
   font-size: 13px;
