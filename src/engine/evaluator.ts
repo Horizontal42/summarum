@@ -529,6 +529,7 @@ function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "produ
 function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
   const custom = ctx.reg.customFuncs.get(name);
   if (custom) return custom(args);
+  if (name === "random") return evalRandom(args, ctx); // random() is valid with no args
 
   const x = args[0];
   if (!x) throw new EvalError(`${name} needs an argument`);
@@ -570,16 +571,6 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
     case "ceil": return x.kind === "quantity" ? { ...x, value: x.value.ceil() } : qty(n().ceil());
     case "floor": return x.kind === "quantity" ? { ...x, value: x.value.floor() } : qty(n().floor());
     case "fact": case "factorial": return qty(factorial(n()));
-    case "random": {
-      const seed = strHash(ctx.line.lineText) ^ (ctx.line.index * 0x9e3779b9);
-      const rand = mulberry32(seed);
-      if (args.length === 0) return qty(new Decimal(rand));
-      const toNum = (v: Value) => v.kind === "quantity" ? v.value.toNumber() : 0;
-      const [lo, hi] = args.length === 1 ? [0, toNum(args[0]!)] : [toNum(args[0]!), toNum(args[1]!)];
-      const isInt = Number.isInteger(lo) && Number.isInteger(hi);
-      const raw = isInt ? Math.floor(rand * (hi - lo + 1)) + lo : rand * (hi - lo) + lo;
-      return qty(new Decimal(raw));
-    }
     case "until": {
       if (x.kind !== "date") throw new EvalError("until needs a date");
       return evalDateArith("minus", x, { kind: "date", ms: startOfToday(), hasTime: false });
@@ -590,6 +581,17 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
     }
     default: throw new EvalError(`unknown function ${name}`);
   }
+}
+
+function evalRandom(args: Value[], ctx: EvalCtx): Value {
+  const seed = strHash(ctx.line.lineText) ^ (ctx.line.index * 0x9e3779b9);
+  const rand = mulberry32(seed);
+  if (args.length === 0) return qty(new Decimal(rand));
+  const toNum = (v: Value) => v.kind === "quantity" ? v.value.toNumber() : 0;
+  const [lo, hi] = args.length === 1 ? [0, toNum(args[0]!)] : [toNum(args[0]!), toNum(args[1]!)];
+  const isInt = Number.isInteger(lo) && Number.isInteger(hi);
+  const raw = isInt ? Math.floor(rand * (hi - lo + 1)) + lo : rand * (hi - lo) + lo;
+  return qty(new Decimal(raw));
 }
 
 function strHash(s: string): number {

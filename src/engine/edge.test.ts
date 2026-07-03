@@ -207,3 +207,16 @@ describe("regressions", () => {
     expect(v?.kind).toBe("date");
   });
 });
+
+describe("review fixes", () => {
+  it("random() with no arguments returns a value in [0,1]", () => {
+    const r = calc("random()");
+    expect(r).not.toBeNull();
+    const v = Number(r);
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(1);
+  });
+  it("random() participates in arithmetic", () => {
+    expect(calc("random() + 1")).not.toBeNull();
+  });
+});
