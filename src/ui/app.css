@@ -59,6 +59,16 @@ button, .doc-item, .search-item, #rates-info, #total-line {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+/* keyboard-only focus ring (mouse clicks don't trigger :focus-visible) on the
+   form fields that otherwise zero out — or never set — a visible outline */
+#doc-title:focus-visible,
+#search-input:focus-visible,
+#settings-panel input:focus-visible,
+#settings-panel select:focus-visible,
+.path-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 html, body { margin: 0; height: 100%; }
 body {
   font-family: var(--font);
