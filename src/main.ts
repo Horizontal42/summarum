@@ -81,17 +81,20 @@ function pinDoc(id: string): void {
   renderDocList();
 }
 
-function moveDoc(id: string, dir: -1 | 1): void {
-  const idx = data.docs.findIndex((d) => d.id === id);
-  if (idx < 0) return;
-  const doc = data.docs[idx];
-  const target = data.docs[idx + dir];
-  if (!target || !!target.pinned !== !!doc.pinned) return; // can't cross pin boundary
-  data.docs.splice(idx, 1);
-  data.docs.splice(idx + dir, 0, doc);
+/** drag id -> drop-target id; no-op across the pinned/unpinned boundary */
+function reorderDoc(srcId: string, targetId: string): void {
+  if (srcId === targetId) return;
+  const src = data.docs.find((d) => d.id === srcId);
+  const target = data.docs.find((d) => d.id === targetId);
+  if (!src || !target || !!src.pinned !== !!target.pinned) return;
+  data.docs = data.docs.filter((d) => d.id !== srcId);
+  const targetIdx = data.docs.findIndex((d) => d.id === targetId);
+  data.docs.splice(targetIdx, 0, src);
   saveAppData(data);
   renderDocList();
 }
+
+let dragSrcId: string | null = null;
 
 function renderDocList(): void {
   const list = $("#doc-list");
@@ -99,6 +102,7 @@ function renderDocList(): void {
   for (const doc of data.docs) {
     const el = document.createElement("div");
     el.className = "doc-item" + (doc.id === data.activeId ? " active" : "") + (doc.pinned ? " pinned" : "");
+    el.draggable = true;
     const name = document.createElement("span");
     name.className = "doc-name";
     name.textContent = doc.title || t("untitled");
@@ -114,8 +118,31 @@ function renderDocList(): void {
     };
 
     el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
-    el.appendChild(mkBtn("move-btn", "↑", t("moveUp"), () => moveDoc(doc.id, -1)));
-    el.appendChild(mkBtn("move-btn", "↓", t("moveDown"), () => moveDoc(doc.id, 1)));
+
+    el.addEventListener("dragstart", (e) => {
+      dragSrcId = doc.id;
+      el.classList.add("dragging");
+      e.dataTransfer!.effectAllowed = "move";
+      e.dataTransfer?.setData("text/plain", doc.id);
+    });
+    el.addEventListener("dragend", () => {
+      el.classList.remove("dragging");
+      dragSrcId = null;
+      for (const other of list.querySelectorAll(".doc-item")) other.classList.remove("drag-over");
+    });
+    el.addEventListener("dragover", (e) => {
+      if (!dragSrcId || dragSrcId === doc.id) return;
+      const src = data.docs.find((d) => d.id === dragSrcId);
+      if (!src || !!src.pinned !== !!doc.pinned) return; // can't cross the pin boundary
+      e.preventDefault(); // allow drop
+      for (const other of list.querySelectorAll(".doc-item")) other.classList.remove("drag-over");
+      el.classList.add("drag-over");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("drag-over");
+      if (dragSrcId) reorderDoc(dragSrcId, doc.id);
+    });
 
     const del = document.createElement("button");
     del.className = "del";
