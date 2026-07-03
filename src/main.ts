@@ -94,15 +94,12 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
-let dragSrcId: string | null = null;
-
 function renderDocList(): void {
   const list = $("#doc-list");
   list.replaceChildren();
   for (const doc of data.docs) {
     const el = document.createElement("div");
     el.className = "doc-item" + (doc.id === data.activeId ? " active" : "") + (doc.pinned ? " pinned" : "");
-    el.draggable = true;
     const name = document.createElement("span");
     name.className = "doc-name";
     name.textContent = doc.title || t("untitled");
@@ -119,30 +116,55 @@ function renderDocList(): void {
 
     el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
 
-    el.addEventListener("dragstart", (e) => {
-      dragSrcId = doc.id;
-      el.classList.add("dragging");
-      e.dataTransfer!.effectAllowed = "move";
-      e.dataTransfer?.setData("text/plain", doc.id);
+    // Reordering uses plain mouse tracking, not the native HTML5 drag API —
+    // Tauri's window-level file-drop hook (dragDropEnabled, needed for
+    // dropping .numi files from Explorer) intercepts WebView2's own drag
+    // sessions, so draggable="true" elements never get a valid drop target
+    // and the OS always shows a "not allowed" cursor.
+    let dragging = false;
+    let suppressClick = false;
+    el.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      const startY = e.clientY;
+      const onMove = (ev: MouseEvent) => {
+        if (!dragging) {
+          if (Math.abs(ev.clientY - startY) < 4) return;
+          dragging = true;
+          suppressClick = true;
+          el.classList.add("dragging");
+          document.body.style.cursor = "grabbing";
+        }
+        const items = [...list.querySelectorAll<HTMLElement>(".doc-item")];
+        for (const item of items) item.classList.remove("drag-over");
+        const over = items.find((item) => {
+          if (item === el) return false;
+          const r = item.getBoundingClientRect();
+          return ev.clientY >= r.top && ev.clientY <= r.bottom;
+        });
+        if (over) {
+          const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
+          if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
+        }
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        if (dragging) {
+          const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
+          for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
+          document.body.style.cursor = "";
+          if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
+        }
+        dragging = false;
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
     });
-    el.addEventListener("dragend", () => {
-      el.classList.remove("dragging");
-      dragSrcId = null;
-      for (const other of list.querySelectorAll(".doc-item")) other.classList.remove("drag-over");
+    el.addEventListener("click", () => {
+      if (suppressClick) { suppressClick = false; return; }
+      switchDoc(doc.id);
     });
-    el.addEventListener("dragover", (e) => {
-      if (!dragSrcId || dragSrcId === doc.id) return;
-      const src = data.docs.find((d) => d.id === dragSrcId);
-      if (!src || !!src.pinned !== !!doc.pinned) return; // can't cross the pin boundary
-      e.preventDefault(); // allow drop
-      for (const other of list.querySelectorAll(".doc-item")) other.classList.remove("drag-over");
-      el.classList.add("drag-over");
-    });
-    el.addEventListener("drop", (e) => {
-      e.preventDefault();
-      el.classList.remove("drag-over");
-      if (dragSrcId) reorderDoc(dragSrcId, doc.id);
-    });
+    el.dataset.docId = doc.id;
 
     const del = document.createElement("button");
     del.className = "del";
@@ -169,7 +191,6 @@ function renderDocList(): void {
       saveAppData(data);
     });
     el.appendChild(del);
-    el.addEventListener("click", () => switchDoc(doc.id));
     list.appendChild(el);
   }
 }
