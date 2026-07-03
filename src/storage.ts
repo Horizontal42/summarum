@@ -32,6 +32,10 @@ export interface SettingsData {
   deletedRetentionDays: number;
   /** keep the window above others */
   alwaysOnTop: boolean;
+  /** date display layout; "system" also picks day/month order for ambiguous input like 01/02/2024 */
+  dateFormat: "system" | "iso" | "dmy" | "mdy";
+  /** background update checks at boot + every few hours; manual "Check for updates" always works regardless */
+  autoUpdateEnabled: boolean;
 }
 
 export const defaultSettingsData: SettingsData = {
@@ -48,6 +52,8 @@ export const defaultSettingsData: SettingsData = {
   dataDir: "",
   deletedRetentionDays: 14,
   alwaysOnTop: false,
+  dateFormat: "system",
+  autoUpdateEnabled: true,
 };
 
 /** "" -> undefined for the Rust side (default app data dir) */

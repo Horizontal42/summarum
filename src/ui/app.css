@@ -360,6 +360,38 @@ body {
 }
 #settings-panel.hidden { display: none; }
 #settings-panel h2 { margin: 0 0 10px; font-size: 14px; }
+#settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+#settings-tabs .tab {
+  border: none;
+  background: none;
+  color: var(--fg-muted);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#settings-tabs .tab:hover { background: var(--hover); color: var(--fg); }
+#settings-tabs .tab.active { background: var(--sel); color: var(--fg); }
+.settings-tabpanel.hidden { display: none; }
+.settings-tabpanel-buttons { display: flex; gap: 6px; margin-top: 10px; }
+.settings-tabpanel-buttons button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.settings-tabpanel-buttons button:hover { background: var(--hover); }
 #settings-panel label {
   display: flex;
   justify-content: space-between;
@@ -394,7 +426,7 @@ body {
 }
 .path-btn:hover { background: var(--hover); }
 
-.settings-footer { display: flex; justify-content: space-between; gap: 6px; margin-top: 12px; }
+.settings-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
 .settings-footer button {
   border: 1px solid var(--border);
   background: var(--bg);

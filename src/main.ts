@@ -197,6 +197,7 @@ function applySettings(): void {
     precision: settings.precision,
     groupSeparator: settings.groupSeparator,
     decimalSeparator: settings.decimalSeparator,
+    dateFormat: settings.dateFormat,
   });
   editor?.refresh();
   syncTitleField();
@@ -208,6 +209,7 @@ function bindSettingsUI(): void {
   const precision = $<HTMLInputElement>("#set-precision");
   const groupSep = $<HTMLSelectElement>("#set-groupsep");
   const decimalSep = $<HTMLSelectElement>("#set-decimalsep");
+  const dateFmt = $<HTMLSelectElement>("#set-dateformat");
   const langSel = $<HTMLSelectElement>("#set-lang");
   const hotkey = $<HTMLInputElement>("#set-hotkey");
   const autostart = $<HTMLInputElement>("#set-autostart");
@@ -219,6 +221,7 @@ function bindSettingsUI(): void {
   precision.value = String(settings.precision);
   groupSep.value = settings.groupSeparator;
   decimalSep.value = settings.decimalSeparator;
+  dateFmt.value = settings.dateFormat;
   langSel.value = settings.language;
   hotkey.value = settings.hotkey;
   autostart.checked = settings.autostart;
@@ -236,13 +239,14 @@ function bindSettingsUI(): void {
       settings.groupSeparator = settings.decimalSeparator === "," ? " " : ",";
       groupSep.value = settings.groupSeparator;
     }
+    settings.dateFormat = dateFmt.value as SettingsData["dateFormat"];
     settings.language = langSel.value;
     settings.fontSize = Math.max(10, Math.min(32, Number(fontSize.value) || 15));
     settings.resultsWidth = Math.max(20, Math.min(60, Number(resultsWidth.value) || 42));
     applySettings();
     void saveSettings(settings);
   };
-  for (const el of [themeSel, precision, groupSep, decimalSep, langSel, fontSize]) {
+  for (const el of [themeSel, precision, groupSep, decimalSep, dateFmt, langSel, fontSize]) {
     el.addEventListener("change", save);
   }
   resultsWidth.addEventListener("input", save); // live while sliding
@@ -346,6 +350,22 @@ function bindSettingsUI(): void {
     toast(t("folderChanged"));
   });
 
+  const autoUpdate = $<HTMLInputElement>("#set-autoupdate");
+  autoUpdate.checked = settings.autoUpdateEnabled;
+  autoUpdate.addEventListener("change", () => {
+    settings.autoUpdateEnabled = autoUpdate.checked;
+    void saveSettings(settings);
+  });
+
+  const tabs = document.querySelectorAll<HTMLButtonElement>("#settings-tabs .tab");
+  const tabPanels = document.querySelectorAll<HTMLElement>(".settings-tabpanel");
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const other of tabs) other.classList.toggle("active", other === tab);
+      for (const panel of tabPanels) panel.classList.toggle("hidden", panel.dataset.tabpanel !== tab.dataset.tab);
+    });
+  }
+
   $("#open-settings").addEventListener("click", () => {
     $("#settings-panel").classList.toggle("hidden");
   });
@@ -354,6 +374,7 @@ function bindSettingsUI(): void {
   });
   $("#open-extensions").addEventListener("click", () => void openExtensionsFolder());
   $("#open-backups").addEventListener("click", () => void openBackupsFolder(settings.dataDir));
+  $("#check-update").addEventListener("click", () => void checkUpdate(true));
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (settings.theme === "system") applySettings();
@@ -591,7 +612,12 @@ async function boot(): Promise<void> {
     localStorage.setItem("summarum.langInit", "1");
   }
 
-  engine = new SumEngine({ precision: settings.precision, groupSeparator: settings.groupSeparator });
+  engine = new SumEngine({
+    precision: settings.precision,
+    groupSeparator: settings.groupSeparator,
+    decimalSeparator: settings.decimalSeparator,
+    dateFormat: settings.dateFormat,
+  });
 
   // snapshots run before the app writes anything
   setDataDir(settings.dataDir);
@@ -852,17 +878,30 @@ async function boot(): Promise<void> {
     }
   }
 
-  void checkUpdate();
+  if (settings.autoUpdateEnabled) void checkUpdate();
+  // a tray app can stay running for weeks without a cold restart, and the
+  // update check above only ever runs once at boot — recheck periodically
+  // so a long-lived process still notices new releases; re-read the setting
+  // on every tick since the user can flip it while the app is running
+  setInterval(() => { if (settings.autoUpdateEnabled) void checkUpdate(); }, 6 * 60 * 60 * 1000);
 }
 
-async function checkUpdate(): Promise<void> {
-  const update = await checkForUpdate();
-  if (!update) return;
-  const choice = await askModal(t("updateAvailable").replace("{}", update.version), t("updateInstall"), t("updateLater"));
+/** manual = true when the user clicked "Check for updates" — only then report "up to date" / "check failed" */
+async function checkUpdate(manual = false): Promise<void> {
+  const result = await checkForUpdate();
+  if (result === "error") {
+    if (manual) toast(t("updateCheckFailed"));
+    return;
+  }
+  if (!result) {
+    if (manual) toast(t("upToDate"));
+    return;
+  }
+  const choice = await askModal(t("updateAvailable").replace("{}", result.version), t("updateInstall"), t("updateLater"));
   if (choice !== "a") return;
   toast(t("updateInstalling"));
   try {
-    await update.install();
+    await result.install();
   } catch {
     toast(t("updateFailed"));
   }

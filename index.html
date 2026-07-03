@@ -47,59 +47,94 @@
       </main>
       <div id="settings-panel" class="hidden">
         <h2 data-i18n="settings">Settings</h2>
-        <label><span data-i18n="theme">Theme</span>
-          <select id="set-theme">
-            <option value="system" data-i18n="system">System</option>
-            <option value="light" data-i18n="light">Light</option>
-            <option value="dark" data-i18n="dark">Dark</option>
-          </select>
-        </label>
-        <label><span data-i18n="precision">Decimal places</span>
-          <input id="set-precision" type="number" min="0" max="15" />
-        </label>
-        <label><span data-i18n="groupsep">Thousands separator</span>
-          <select id="set-groupsep">
-            <option value=",">1,000</option>
-            <option value=" ">1 000</option>
-            <option value="">1000</option>
-          </select>
-        </label>
-        <label><span data-i18n="decimalsep">Decimal separator</span>
-          <select id="set-decimalsep">
-            <option value=".">0.5</option>
-            <option value=",">0,5</option>
-          </select>
-        </label>
-        <label><span data-i18n="language">Language</span>
-          <select id="set-lang">
-            <option value="en">English</option>
-            <option value="ru">Русский</option>
-          </select>
-        </label>
-        <label><span data-i18n="hotkey">Global hotkey</span>
-          <input id="set-hotkey" type="text" placeholder="Ctrl+Alt+N" />
-        </label>
-        <label class="row"><input id="set-autostart" type="checkbox" />
-          <span data-i18n="autostart">Launch at startup</span>
-        </label>
-        <label class="row"><input id="set-alwaysontop" type="checkbox" />
-          <span data-i18n="alwaysontop">Always on top</span>
-        </label>
-        <label><span data-i18n="fontsize">Font size</span>
-          <input id="set-fontsize" type="number" min="10" max="32" />
-        </label>
-        <label><span data-i18n="resultswidth">Results column</span>
-          <input id="set-resultswidth" type="range" min="20" max="60" step="1" />
-        </label>
-        <label><span data-i18n="bindays">Bin retention (days)</span>
-          <input id="set-bindays" type="number" min="1" max="365" step="1" />
-        </label>
-        <label><span data-i18n="datadir">Data folder</span>
-          <button id="set-datadir" class="path-btn" title=""></button>
-        </label>
+        <div id="settings-tabs" role="tablist">
+          <button class="tab active" data-tab="general" data-i18n="tabGeneral">General</button>
+          <button class="tab" data-tab="format" data-i18n="tabFormat">Format</button>
+          <button class="tab" data-tab="data" data-i18n="tabData">Data</button>
+          <button class="tab" data-tab="updates" data-i18n="tabUpdates">Updates</button>
+        </div>
+
+        <div class="settings-tabpanel" data-tabpanel="general">
+          <label><span data-i18n="theme">Theme</span>
+            <select id="set-theme">
+              <option value="system" data-i18n="system">System</option>
+              <option value="light" data-i18n="light">Light</option>
+              <option value="dark" data-i18n="dark">Dark</option>
+            </select>
+          </label>
+          <label><span data-i18n="language">Language</span>
+            <select id="set-lang">
+              <option value="en">English</option>
+              <option value="ru">Русский</option>
+            </select>
+          </label>
+          <label><span data-i18n="fontsize">Font size</span>
+            <input id="set-fontsize" type="number" min="10" max="32" />
+          </label>
+          <label><span data-i18n="resultswidth">Results column</span>
+            <input id="set-resultswidth" type="range" min="20" max="60" step="1" />
+          </label>
+          <label class="row"><input id="set-alwaysontop" type="checkbox" />
+            <span data-i18n="alwaysontop">Always on top</span>
+          </label>
+          <label><span data-i18n="hotkey">Global hotkey</span>
+            <input id="set-hotkey" type="text" placeholder="Ctrl+Alt+N" />
+          </label>
+          <label class="row"><input id="set-autostart" type="checkbox" />
+            <span data-i18n="autostart">Launch at startup</span>
+          </label>
+        </div>
+
+        <div class="settings-tabpanel hidden" data-tabpanel="format">
+          <label><span data-i18n="precision">Decimal places</span>
+            <input id="set-precision" type="number" min="0" max="15" />
+          </label>
+          <label><span data-i18n="groupsep">Thousands separator</span>
+            <select id="set-groupsep">
+              <option value=",">1,000</option>
+              <option value=" ">1 000</option>
+              <option value="">1000</option>
+            </select>
+          </label>
+          <label><span data-i18n="decimalsep">Decimal separator</span>
+            <select id="set-decimalsep">
+              <option value=".">0.5</option>
+              <option value=",">0,5</option>
+            </select>
+          </label>
+          <label><span data-i18n="dateformat">Date format</span>
+            <select id="set-dateformat">
+              <option value="system" data-i18n="sysDefault">System</option>
+              <option value="dmy">31.12.2024</option>
+              <option value="mdy">12/31/2024</option>
+              <option value="iso">2024-12-31</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="settings-tabpanel hidden" data-tabpanel="data">
+          <label><span data-i18n="datadir">Data folder</span>
+            <button id="set-datadir" class="path-btn" title=""></button>
+          </label>
+          <label><span data-i18n="bindays">Bin retention (days)</span>
+            <input id="set-bindays" type="number" min="1" max="365" step="1" />
+          </label>
+          <div class="settings-tabpanel-buttons">
+            <button id="open-extensions" data-i18n="extensions">Extensions folder</button>
+            <button id="open-backups" data-i18n="backups">Backups</button>
+          </div>
+        </div>
+
+        <div class="settings-tabpanel hidden" data-tabpanel="updates">
+          <label class="row"><input id="set-autoupdate" type="checkbox" />
+            <span data-i18n="autoUpdate">Automatically check for updates</span>
+          </label>
+          <div class="settings-tabpanel-buttons">
+            <button id="check-update" data-i18n="checkUpdate">Check for updates</button>
+          </div>
+        </div>
+
         <div class="settings-footer">
-          <button id="open-extensions" data-i18n="extensions">Extensions folder</button>
-          <button id="open-backups" data-i18n="backups">Backups</button>
           <button id="close-settings" data-i18n="done">Done</button>
         </div>
       </div>
