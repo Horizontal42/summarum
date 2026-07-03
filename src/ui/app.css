@@ -357,8 +357,14 @@ body {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
   padding: 14px;
   z-index: 50;
+  transform-origin: top right;
 }
 #settings-panel.hidden { display: none; }
+#settings-panel:not(.hidden) { animation: settings-pop-in 0.15s ease; }
+@keyframes settings-pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
 #settings-panel h2 { margin: 0 0 10px; font-size: 14px; }
 #settings-tabs {
   display: flex;
@@ -377,10 +383,16 @@ body {
   padding: 5px 10px;
   border-radius: 6px;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 #settings-tabs .tab:hover { background: var(--hover); color: var(--fg); }
 #settings-tabs .tab.active { background: var(--sel); color: var(--fg); }
 .settings-tabpanel.hidden { display: none; }
+.settings-tabpanel:not(.hidden) { animation: settings-fade-in 0.12s ease; }
+@keyframes settings-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .settings-tabpanel-buttons { display: flex; gap: 6px; margin-top: 10px; }
 .settings-tabpanel-buttons button {
   border: 1px solid var(--border);
