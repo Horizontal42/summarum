@@ -54,6 +54,11 @@
 button, .doc-item, .search-item, #rates-info, #total-line {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
+/* thin scrollbars everywhere (WebView2 is Chromium — ::-webkit-* applies) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
 html, body { margin: 0; height: 100%; }
 body {
   font-family: var(--font);
