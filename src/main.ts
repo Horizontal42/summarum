@@ -18,6 +18,7 @@ import { Workspace } from "./workspace";
 import { EN, RU } from "./engine/vocab-data";
 import { exportSheetImage } from "./ui/export";
 import { initSearch, SearchController } from "./ui/search";
+import pkg from "../package.json";
 
 function welcomeText(lang: string): string {
   const sample = (lang === "ru" ? RU : EN).Samples?.["sample.welcome"];
@@ -356,6 +357,7 @@ function bindSettingsUI(): void {
     settings.autoUpdateEnabled = autoUpdate.checked;
     void saveSettings(settings);
   });
+  void showAppVersion();
 
   const tabs = document.querySelectorAll<HTMLButtonElement>("#settings-tabs .tab");
   const tabPanels = document.querySelectorAll<HTMLElement>(".settings-tabpanel");
@@ -379,6 +381,16 @@ function bindSettingsUI(): void {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (settings.theme === "system") applySettings();
   });
+}
+
+/** tauri.conf.json's version is the source of truth for an actual build; package.json is the vite-dev fallback */
+async function showAppVersion(): Promise<void> {
+  let version = pkg.version;
+  if (isTauri()) {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    version = await getVersion();
+  }
+  $("#app-version").textContent = `${t("version")} ${version}`;
 }
 
 /** Physical key (e.code) → Tauri accelerator name, layout-independent (works on ru). */

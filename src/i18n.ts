@@ -76,6 +76,7 @@ const dict: Record<string, Record<string, string>> = {
     tabFormat: "Format",
     tabData: "Data",
     tabUpdates: "Updates",
+    version: "Version",
   },
   ru: {
     settings: "Настройки",
@@ -152,6 +153,7 @@ const dict: Record<string, Record<string, string>> = {
     tabFormat: "Формат",
     tabData: "Данные",
     tabUpdates: "Обновления",
+    version: "Версия",
   },
 };
 
