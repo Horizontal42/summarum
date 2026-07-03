@@ -816,6 +816,9 @@ async function boot(): Promise<void> {
     (text) => workspace.evaluateSheet(activeDoc().id, text),
     data.contents[data.activeId] ?? "",
   );
+  // the editor above was seeded directly with initialText (not via switchDoc),
+  // so a reopened sheet with "on 2024-01-01" needs its own historical-rate fetch
+  void fetchNeededHistoricalRates(data.contents[data.activeId] ?? "");
 
   applySettings(); // sets the language before bindSettingsUI renders dynamic labels
   bindSettingsUI();

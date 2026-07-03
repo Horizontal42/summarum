@@ -212,7 +212,7 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
     if (isTauri()) {
       return await invoke<Record<string, number>>("fetch_historical_rates", { date });
     }
-    const res = await fetch(`https://api.frankfurter.app/${date}?from=USD`);
+    const res = await fetch(`https://api.frankfurter.dev/v1/${date}?from=USD`);
     const json = await res.json();
     if (!json?.rates) return null;
     const out: Record<string, number> = { USD: 1 };

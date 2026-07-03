@@ -361,7 +361,9 @@ async fn fetch_historical_rates(
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .map_err(|e| e.to_string())?;
-    let url = format!("https://api.frankfurter.app/{}?from=USD", date);
+    // api.frankfurter.app 301-redirects here now, and the old domain is
+    // flaky over reqwest/rustls-tls — go straight to the stable host
+    let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
     let body: serde_json::Value = client
         .get(&url)
         .send()
