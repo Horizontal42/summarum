@@ -916,7 +916,7 @@ async function boot(): Promise<void> {
 
   void onFileDrop((content) => newDoc(content));
 
-  await registerHotkey(null, settings.hotkey);
+  if (!(await registerHotkey(null, settings.hotkey))) toast(t("hotkeyFailed"));
   if (settings.autostart) await applyAutostart(true);
   if (settings.alwaysOnTop) await applyAlwaysOnTop(true);
   void onAppQuit(() => flushAppData());
