@@ -97,6 +97,7 @@ function reorderDoc(srcId: string, targetId: string): void {
 function renderDocList(): void {
   const list = $("#doc-list");
   list.replaceChildren();
+  const frag = document.createDocumentFragment();
   for (const doc of data.docs) {
     const el = document.createElement("div");
     el.className = "doc-item" + (doc.id === data.activeId ? " active" : "") + (doc.pinned ? " pinned" : "");
@@ -192,8 +193,9 @@ function renderDocList(): void {
       saveAppData(data);
     });
     el.appendChild(del);
-    list.appendChild(el);
+    frag.appendChild(el);
   }
+  list.appendChild(frag);
 }
 
 function switchDoc(id: string): void {
