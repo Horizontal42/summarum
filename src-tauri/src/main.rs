@@ -295,23 +295,32 @@ async fn fetch_market_data(
     // v7/finance/quote now requires a cookie+crumb pair Yahoo stopped issuing
     // to plain API clients (returns 401); v8 chart still answers anonymously,
     // one symbol per request.
-    let mut prices = std::collections::HashMap::new();
-    for sym in &symbols {
-        let url = format!(
-            "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d",
-            sym
-        );
-        let Ok(resp) = client.get(&url).send().await else {
-            continue;
-        };
-        let Ok(body) = resp.json::<serde_json::Value>().await else {
-            continue;
-        };
-        if let Some(price) = body["chart"]["result"][0]["meta"]["regularMarketPrice"].as_f64() {
-            if price > 0.0 {
-                prices.insert(sym.clone(), price);
+    let futures_reqs = symbols.iter().map(|sym| {
+        let client = client.clone();
+        async move {
+            let url = format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d",
+                sym
+            );
+            if let Ok(resp) = client.get(&url).send().await {
+                if let Ok(body) = resp.json::<serde_json::Value>().await {
+                    if let Some(price) =
+                        body["chart"]["result"][0]["meta"]["regularMarketPrice"].as_f64()
+                    {
+                        if price > 0.0 {
+                            return Some((sym.clone(), price));
+                        }
+                    }
+                }
             }
+            None
         }
+    });
+
+    let mut prices = std::collections::HashMap::new();
+    let results = futures::future::join_all(futures_reqs).await;
+    for (sym, price) in results.into_iter().flatten() {
+        prices.insert(sym, price);
     }
 
     if !prices.is_empty() {
