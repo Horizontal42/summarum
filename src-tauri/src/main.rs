@@ -319,10 +319,8 @@ async fn fetch_market_data(
 
     let mut prices = std::collections::HashMap::new();
     let results = futures::future::join_all(futures_reqs).await;
-    for res in results {
-        if let Some((sym, price)) = res {
-            prices.insert(sym, price);
-        }
+    for (sym, price) in results.into_iter().flatten() {
+        prices.insert(sym, price);
     }
 
     if !prices.is_empty() {
