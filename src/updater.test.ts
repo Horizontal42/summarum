@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkForUpdate } from './updater';
 import * as storage from './storage';
+import type { Update } from '@tauri-apps/plugin-updater';
 
 vi.mock('./storage', () => ({
   isTauri: vi.fn(),
@@ -62,7 +63,7 @@ describe('checkForUpdate', () => {
       version: '1.1.0',
       currentVersion: '1.0.0',
       downloadAndInstall: vi.fn().mockResolvedValue(undefined),
-    };
+    } as unknown as Update;
     vi.mocked(check).mockResolvedValue(mockUpdate);
 
     const result = await checkForUpdate();
