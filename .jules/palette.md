@@ -1,0 +1,3 @@
+## 2024-05-18 - Missing ARIA labels on dynamic icon buttons and inputs
+**Learning:** Icon-only buttons (like ☰, +, ⚙) and inputs missing explicit labels (`#doc-title`, `#search-input`) were lacking ARIA labels across the application, significantly hurting screen reader accessibility. This includes dynamically generated elements like document tab pin icons.
+**Action:** Always verify that every icon-only interactive element and text input field without an explicit `<label>` has an `aria-label` attribute. Also, remember to dynamically update the `aria-label` when placeholders are dynamically loaded in code like `src/main.ts`.

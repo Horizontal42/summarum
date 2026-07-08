@@ -9,31 +9,31 @@
     <div id="app">
       <aside id="sidebar" class="hidden">
         <div id="doc-list"></div>
-        <button id="new-doc" title="New document">+</button>
+        <button id="new-doc" title="New document" aria-label="New document">+</button>
       </aside>
       <main id="content">
         <div id="titlebar" data-tauri-drag-region>
-          <button id="toggle-sidebar" title="Documents (Ctrl+B)">☰</button>
-          <input id="doc-title" spellcheck="false" autocomplete="off" />
+          <button id="toggle-sidebar" title="Documents (Ctrl+B)" aria-label="Documents">☰</button>
+          <input id="doc-title" spellcheck="false" autocomplete="off" aria-label="Document title" />
           <span class="spacer" data-tauri-drag-region></span>
-          <button id="open-search" title="Search all sheets (Ctrl+F)">🔍︎</button>
-          <button id="open-settings" title="Settings">⚙</button>
+          <button id="open-search" title="Search all sheets (Ctrl+F)" aria-label="Search all sheets">🔍︎</button>
+          <button id="open-settings" title="Settings" aria-label="Settings">⚙</button>
           <div id="win-controls">
-            <button id="win-min" title="Minimize">─</button>
-            <button id="win-close" title="Hide to tray">✕</button>
+            <button id="win-min" title="Minimize" aria-label="Minimize">─</button>
+            <button id="win-close" title="Hide to tray" aria-label="Hide to tray">✕</button>
           </div>
         </div>
         <div id="editor-wrap">
           <div id="editor"></div>
           <div id="results"></div>
-          <div id="col-divider" title="Drag to resize"></div>
+          <div id="col-divider" title="Drag to resize" aria-label="Drag to resize results column"></div>
         </div>
         <div id="statusbar">
           <span id="rates-info" title=""></span>
           <span id="market-info" title="" style="display:none"></span>
           <span class="spacer"></span>
           <div id="export-wrap">
-            <button id="export-btn" title="Export">⤓</button>
+            <button id="export-btn" title="Export" aria-label="Export">⤓</button>
             <div id="export-menu" class="hidden">
               <button data-action="image" data-i18n="exportImage">Copy as image</button>
               <button data-action="copy" data-i18n="exportCopy">Copy sheet</button>
@@ -151,7 +151,7 @@
       </div>
       <div id="search-overlay" class="hidden">
         <div class="search-box">
-          <input id="search-input" type="text" autocomplete="off" spellcheck="false" />
+          <input id="search-input" type="text" autocomplete="off" spellcheck="false" aria-label="Search sheets" />
           <div id="search-results"></div>
         </div>
       </div>

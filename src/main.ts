@@ -110,6 +110,7 @@ function renderDocList(): void {
       b.className = cls;
       b.textContent = text;
       b.title = title;
+      b.setAttribute("aria-label", title);
       b.addEventListener("click", (e) => { e.stopPropagation(); cb(); });
       return b;
     };
@@ -241,7 +242,9 @@ function applySettings(): void {
   document.documentElement.style.setProperty("--editor-font-size", `${settings.fontSize}px`);
   $("#editor-wrap").style.setProperty("--results-width", `${settings.resultsWidth}%`);
   setLang(settings.language);
-  $<HTMLInputElement>("#search-input").placeholder = t("searchPlaceholder");
+  const searchInput = $<HTMLInputElement>("#search-input");
+  searchInput.placeholder = t("searchPlaceholder");
+  searchInput.setAttribute("aria-label", t("searchPlaceholder"));
   engine.updateSettings({
     precision: settings.precision,
     groupSeparator: settings.groupSeparator,
