@@ -27,6 +27,7 @@ export class Workspace {
   private cache = new Map<string, SheetExports>();
   private resolving: Set<string> = new Set();
   private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
+  private titleMap: Map<string, SheetSource> | null = null;
 
   constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
 
@@ -64,6 +65,7 @@ export class Workspace {
   invalidateAll(): void {
     this.cache.clear();
     this.parsedRefsCache.clear();
+    this.titleMap = null;
   }
 
   /**
@@ -99,8 +101,17 @@ export class Workspace {
   }
 
   private findSheetByTitle(title: string): SheetSource | undefined {
+    if (!this.titleMap) {
+      this.titleMap = new Map();
+      for (const s of this.sheets()) {
+        const key = s.title.trim().toLowerCase();
+        if (!this.titleMap.has(key)) {
+          this.titleMap.set(key, s);
+        }
+      }
+    }
     const needle = title.trim().toLowerCase();
-    return this.sheets().find((s) => s.title.trim().toLowerCase() === needle);
+    return this.titleMap.get(needle);
   }
 
   private resolveXRef(sheetTitle: string, key: string): XRefResolution {
