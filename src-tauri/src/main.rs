@@ -436,9 +436,12 @@ fn run_backups(app: AppHandle, dir: Option<String>, retention_days: u32) -> Resu
         .collect();
     snaps.sort();
     if snaps.len() > SNAPSHOT_KEEP {
-        for old in &snaps[..snaps.len() - SNAPSHOT_KEEP] {
-            fs::remove_file(old).ok();
-        }
+        use rayon::prelude::*;
+        snaps[..snaps.len() - SNAPSHOT_KEEP]
+            .par_iter()
+            .for_each(|old| {
+                fs::remove_file(old).ok();
+            });
     }
 
     // prune the deleted-sheets bin by age
