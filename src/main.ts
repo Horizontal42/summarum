@@ -681,23 +681,25 @@ function toast(msg: string): void {
 
 // ---------- boot
 
-async function boot(): Promise<void> {
+async function initSettings(): Promise<void> {
   settings = await loadSettings();
   if (!localStorage.getItem("summarum.langInit") && settings.language === "en") {
     settings.language = detectLang();
     localStorage.setItem("summarum.langInit", "1");
   }
 
+  // snapshots run before the app writes anything
+  setDataDir(settings.dataDir);
+  await runBackups(settings.dataDir, settings.deletedRetentionDays);
+}
+
+async function initDataAndEngine(): Promise<void> {
   engine = new SumEngine({
     precision: settings.precision,
     groupSeparator: settings.groupSeparator,
     decimalSeparator: settings.decimalSeparator,
     dateFormat: settings.dateFormat,
   });
-
-  // snapshots run before the app writes anything
-  setDataDir(settings.dataDir);
-  await runBackups(settings.dataDir, settings.deletedRetentionDays);
 
   const stored = await loadAppData(settings.dataDir);
   // a corrupt or foreign documents.json must not crash the boot
@@ -763,6 +765,9 @@ async function boot(): Promise<void> {
       editor.goToLine(line);
     },
   });
+}
+
+async function initUI(): Promise<void> {
 
   applySettings(); // sets the language before bindSettingsUI renders dynamic labels
   bindSettingsUI();
@@ -960,6 +965,12 @@ async function boot(): Promise<void> {
   // so a long-lived process still notices new releases; re-read the setting
   // on every tick since the user can flip it while the app is running
   setInterval(() => { if (settings.autoUpdateEnabled) void checkUpdate(); }, 6 * 60 * 60 * 1000);
+}
+
+async function boot(): Promise<void> {
+  await initSettings();
+  await initDataAndEngine();
+  await initUI();
 }
 
 /** manual = true when the user clicked "Check for updates" — only then report "up to date" / "check failed" */
