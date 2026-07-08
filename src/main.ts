@@ -565,11 +565,20 @@ const HIST_DATE_RE = /(?:on|на)\s+(\d{4}-\d{2}-\d{2})/gi;
 async function fetchNeededHistoricalRates(text: string): Promise<void> {
   const dates = new Set<string>();
   for (const m of text.matchAll(HIST_DATE_RE)) dates.add(m[1]!);
+  const datesToFetch = Array.from(dates).filter((date) => !engine.hasHistoricalRates(date));
   let fetched = false;
-  for (const date of dates) {
-    if (!engine.hasHistoricalRates(date)) {
-      const rates = await fetchHistoricalRates(date);
-      if (rates) { engine.setHistoricalRates(date, rates); fetched = true; }
+  if (datesToFetch.length > 0) {
+    const results = await Promise.all(
+      datesToFetch.map(async (date) => {
+        const rates = await fetchHistoricalRates(date);
+        return { date, rates };
+      })
+    );
+    for (const { date, rates } of results) {
+      if (rates) {
+        engine.setHistoricalRates(date, rates);
+        fetched = true;
+      }
     }
   }
   if (fetched) { workspace.invalidateAll(); editor.refresh(); }
