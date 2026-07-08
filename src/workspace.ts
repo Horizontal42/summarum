@@ -25,18 +25,18 @@ function escapeRegExp(s: string): string {
 
 export class Workspace {
   private cache = new Map<string, SheetExports>();
-  private resolving: string[] = [];
+  private resolving: Set<string> = new Set();
   private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
 
   constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
 
   /** Evaluate a sheet as the user's active/open document — refs resolve live. */
   evaluateSheet(sheetId: string, text: string): LineResult[] {
-    this.resolving.push(sheetId);
+    this.resolving.add(sheetId);
     try {
       return this.engine.evaluateDocument(text, (sheet, key) => this.resolveXRef(sheet, key));
     } finally {
-      this.resolving.pop();
+      this.resolving.delete(sheetId);
     }
   }
 
@@ -106,7 +106,7 @@ export class Workspace {
   private resolveXRef(sheetTitle: string, key: string): XRefResolution {
     const target = this.findSheetByTitle(sheetTitle);
     if (!target) return { ok: false, reason: `sheet "${sheetTitle}" not found` };
-    if (this.resolving.includes(target.id)) {
+    if (this.resolving.has(target.id)) {
       return { ok: false, reason: "circular reference" };
     }
     const exports = this.exportsFor(target);
@@ -128,12 +128,12 @@ export class Workspace {
   private exportsFor(sheet: SheetSource): SheetExports {
     const cached = this.cache.get(sheet.id);
     if (cached) return cached;
-    this.resolving.push(sheet.id);
+    this.resolving.add(sheet.id);
     let results: LineResult[];
     try {
       results = this.engine.evaluateDocument(sheet.text, (s, k) => this.resolveXRef(s, k));
     } finally {
-      this.resolving.pop();
+      this.resolving.delete(sheet.id);
     }
     const vars = new Map<string, Value>();
     for (const r of results) {
