@@ -26,6 +26,7 @@ function escapeRegExp(s: string): string {
 export class Workspace {
   private cache = new Map<string, SheetExports>();
   private resolving: string[] = [];
+  private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
 
   constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
 
@@ -47,7 +48,7 @@ export class Workspace {
       changed = false;
       for (const s of this.sheets()) {
         if (dirty.has(s.id)) continue;
-        for (const title of this.referencedTitles(s.text)) {
+        for (const title of this.referencedTitles(s.text, s.id)) {
           const target = this.findSheetByTitle(title);
           if (target && dirty.has(target.id)) {
             dirty.add(s.id);
@@ -62,6 +63,7 @@ export class Workspace {
 
   invalidateAll(): void {
     this.cache.clear();
+    this.parsedRefsCache.clear();
   }
 
   /**
@@ -83,9 +85,16 @@ export class Workspace {
     return out;
   }
 
-  private referencedTitles(text: string): string[] {
+  private referencedTitles(text: string, id?: string): string[] {
+    if (id) {
+      const cached = this.parsedRefsCache.get(id);
+      if (cached && cached.text === text) return cached.refs;
+    }
     const out: string[] = [];
     for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
+    if (id) {
+      this.parsedRefsCache.set(id, { text, refs: out });
+    }
     return out;
   }
 
