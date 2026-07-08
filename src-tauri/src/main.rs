@@ -38,7 +38,11 @@ fn safe_name(name: &str) -> bool {
 }
 
 #[tauri::command]
-async fn save_text_file_dialog(app: tauri::AppHandle, contents: String, is_sum: bool) -> Result<bool, String> {
+async fn save_text_file_dialog(
+    app: tauri::AppHandle,
+    contents: String,
+    is_sum: bool,
+) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
     let dialog = app.dialog().file();
     let dialog = if is_sum {
@@ -57,11 +61,19 @@ async fn save_text_file_dialog(app: tauri::AppHandle, contents: String, is_sum: 
 }
 
 #[tauri::command]
-async fn save_image_file_dialog(app: tauri::AppHandle, data_base64: String) -> Result<bool, String> {
-    use tauri_plugin_dialog::DialogExt;
+async fn save_image_file_dialog(
+    app: tauri::AppHandle,
+    data_base64: String,
+) -> Result<bool, String> {
     use std::io::Write;
+    use tauri_plugin_dialog::DialogExt;
 
-    if let Some(path) = app.dialog().file().add_filter("PNG Image", &["png"]).blocking_save_file() {
+    if let Some(path) = app
+        .dialog()
+        .file()
+        .add_filter("PNG Image", &["png"])
+        .blocking_save_file()
+    {
         let path = path.into_path().map_err(|_| "invalid path".to_string())?;
         let bytes = base64_decode(&data_base64)?;
         let tmp = path.with_extension("tmp");
