@@ -2,7 +2,7 @@
 // numi.addUnit, numi.addFunction. Scripts share the engine's JS runtime.
 import { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
 
-export interface ExtensionApi {
+interface ExtensionApi {
   setVariable(name: string, value: number | ExtensionValue): void;
   addUnit(spec: ExtensionUnitSpec): void;
   addFunction(spec: { id: string; phrases: string }, fn: (values: ExtensionValue[]) => ExtensionValue | number): void;
