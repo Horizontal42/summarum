@@ -314,12 +314,24 @@ function registerUnits(reg: Registry): LengthPhrase[] {
         };
         const phrases: string[] = [];
         const csPhrases: string[] = [];
+        const csPhrasesLower: string[] = [];
         if (d.id === "bit") {
           // no "kb" for bits — bare *b symbols mean bytes (common expectation)
-          csPhrases.push(`${pSym}bit`);
+          const bitPhrase = `${pSym}bit`;
+          csPhrases.push(bitPhrase);
+          csPhrasesLower.push(bitPhrase.toLowerCase());
         } else {
           // symbol compositions in every locale: "km" and "км"
-          for (const ps of pSymsAll) for (const us of symbolsAll) csPhrases.push(ps + us);
+          const pSymsAllLower = pSymsAll.map((s) => s.toLowerCase());
+          const symbolsAllLower = symbolsAll.map((s) => s.toLowerCase());
+          for (let i = 0; i < pSymsAll.length; i++) {
+            const ps = pSymsAll[i];
+            const psL = pSymsAllLower[i];
+            for (let j = 0; j < symbolsAll.length; j++) {
+              csPhrases.push(ps + symbolsAll[j]);
+              csPhrasesLower.push(psL + symbolsAllLower[j]);
+            }
+          }
         }
         for (const pw of pWords) for (const wv of wordVariants) phrases.push(pw + wv);
         if (d.id === "byte" && pSym) {
@@ -331,8 +343,8 @@ function registerUnits(reg: Registry): LengthPhrase[] {
         for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
         // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
         // while "mm"/"Mm" stay strict (milli vs mega)
-        for (const ph of csPhrases) {
-          const lower = ph.toLowerCase();
+        for (let i = 0; i < csPhrasesLower.length; i++) {
+          const lower = csPhrasesLower[i];
           const prev = lenientSym.get(lower);
           if (prev === undefined) lenientSym.set(lower, pUnit);
           else if (prev && prev.id !== pUnit.id) lenientSym.set(lower, null);

@@ -1,0 +1,3 @@
+## 2025-07-08 - Optimize string lowercasing in nested loops
+ **Learning:** In nested loops generating combinations of strings (like symbols and prefixes), repeated calls to `.toLowerCase()` on the concatenated string create an overhead. Caching the lowercase strings during concatenation using parallel arrays is an effective strategy to eliminate redundant operations, but extracting the loop variable correctly when restructuring the iteration pattern is crucial to maintain compile safety.
+ **Action:** Prioritize lowercasing loop variables at the earliest possible stage and ensure that when caching results in arrays, corresponding iteration logic consistently references the indexed values correctly.
