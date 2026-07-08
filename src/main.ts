@@ -258,16 +258,13 @@ function applySettings(): void {
   $<HTMLElement>("#sidebar").classList.toggle("hidden", !settings.sidebarVisible);
 }
 
-function bindSettingsUI(): void {
+function bindFormattingSettings(): void {
   const themeSel = $<HTMLSelectElement>("#set-theme");
   const precision = $<HTMLInputElement>("#set-precision");
   const groupSep = $<HTMLSelectElement>("#set-groupsep");
   const decimalSep = $<HTMLSelectElement>("#set-decimalsep");
   const dateFmt = $<HTMLSelectElement>("#set-dateformat");
   const langSel = $<HTMLSelectElement>("#set-lang");
-  const hotkey = $<HTMLInputElement>("#set-hotkey");
-  const autostart = $<HTMLInputElement>("#set-autostart");
-  const alwaysOnTop = $<HTMLInputElement>("#set-alwaysontop");
   const fontSize = $<HTMLInputElement>("#set-fontsize");
   const resultsWidth = $<HTMLInputElement>("#set-resultswidth");
 
@@ -277,9 +274,6 @@ function bindSettingsUI(): void {
   decimalSep.value = settings.decimalSeparator;
   dateFmt.value = settings.dateFormat;
   langSel.value = settings.language;
-  hotkey.value = settings.hotkey;
-  autostart.checked = settings.autostart;
-  alwaysOnTop.checked = settings.alwaysOnTop;
   fontSize.value = String(settings.fontSize);
   resultsWidth.value = String(settings.resultsWidth);
 
@@ -300,11 +294,20 @@ function bindSettingsUI(): void {
     applySettings();
     void saveSettings(settings);
   };
+
   for (const el of [themeSel, precision, groupSep, decimalSep, dateFmt, langSel, fontSize]) {
     el.addEventListener("change", save);
   }
   resultsWidth.addEventListener("input", save); // live while sliding
-  // hotkey is recorded, not typed
+
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (settings.theme === "system") applySettings();
+  });
+}
+
+function bindHotkeySettings(): void {
+  const hotkey = $<HTMLInputElement>("#set-hotkey");
+  hotkey.value = settings.hotkey;
   hotkey.readOnly = true;
   hotkey.addEventListener("focus", () => {
     hotkey.value = "";
@@ -347,6 +350,19 @@ function bindSettingsUI(): void {
     }
     hotkey.blur();
   });
+}
+
+function bindBehaviorSettings(): void {
+  const autostart = $<HTMLInputElement>("#set-autostart");
+  const alwaysOnTop = $<HTMLInputElement>("#set-alwaysontop");
+  const binDays = $<HTMLInputElement>("#set-bindays");
+  const autoUpdate = $<HTMLInputElement>("#set-autoupdate");
+
+  autostart.checked = settings.autostart;
+  alwaysOnTop.checked = settings.alwaysOnTop;
+  binDays.value = String(settings.deletedRetentionDays);
+  autoUpdate.checked = settings.autoUpdateEnabled;
+
   autostart.addEventListener("change", async () => {
     settings.autostart = autostart.checked;
     await applyAutostart(settings.autostart);
@@ -357,16 +373,21 @@ function bindSettingsUI(): void {
     await applyAlwaysOnTop(settings.alwaysOnTop);
     void saveSettings(settings);
   });
-
-  const binDays = $<HTMLInputElement>("#set-bindays");
-  binDays.value = String(settings.deletedRetentionDays);
   binDays.addEventListener("change", () => {
     settings.deletedRetentionDays = Math.max(1, Math.min(365, Math.round(Number(binDays.value)) || 14));
     binDays.value = String(settings.deletedRetentionDays);
     void saveSettings(settings);
     void runBackups(settings.dataDir, settings.deletedRetentionDays); // prune right away
   });
+  autoUpdate.addEventListener("change", () => {
+    settings.autoUpdateEnabled = autoUpdate.checked;
+    void saveSettings(settings);
+  });
 
+  void showAppVersion();
+}
+
+function bindDataDirSettings(): void {
   const dataDirBtn = $<HTMLButtonElement>("#set-datadir");
   const renderDataDir = () => {
     dataDirBtn.textContent = settings.dataDir ? settings.dataDir.split(/[\\/]/).pop() ?? settings.dataDir : t("defaultFolder");
@@ -403,15 +424,9 @@ function bindSettingsUI(): void {
     }
     toast(t("folderChanged"));
   });
+}
 
-  const autoUpdate = $<HTMLInputElement>("#set-autoupdate");
-  autoUpdate.checked = settings.autoUpdateEnabled;
-  autoUpdate.addEventListener("change", () => {
-    settings.autoUpdateEnabled = autoUpdate.checked;
-    void saveSettings(settings);
-  });
-  void showAppVersion();
-
+function bindSettingsNavigation(): void {
   const tabs = document.querySelectorAll<HTMLButtonElement>("#settings-tabs .tab");
   const tabPanels = document.querySelectorAll<HTMLElement>(".settings-tabpanel");
   for (const tab of tabs) {
@@ -430,10 +445,14 @@ function bindSettingsUI(): void {
   $("#open-extensions").addEventListener("click", () => void openExtensionsFolder());
   $("#open-backups").addEventListener("click", () => void openBackupsFolder(settings.dataDir));
   $("#check-update").addEventListener("click", () => void checkUpdate(true));
+}
 
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (settings.theme === "system") applySettings();
-  });
+function bindSettingsUI(): void {
+  bindFormattingSettings();
+  bindHotkeySettings();
+  bindBehaviorSettings();
+  bindDataDirSettings();
+  bindSettingsNavigation();
 }
 
 /** tauri.conf.json's version is the source of truth for an actual build; package.json is the vite-dev fallback */
