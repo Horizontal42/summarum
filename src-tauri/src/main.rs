@@ -9,6 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
@@ -38,20 +39,45 @@ fn safe_name(name: &str) -> bool {
 }
 
 #[tauri::command]
-fn write_text_file(path: String, contents: String) -> Result<(), String> {
-    write_atomic(std::path::Path::new(&path), &contents)
+fn write_text_file(app: AppHandle, contents: String, is_sum: bool) -> Result<bool, String> {
+    let (name, ext) = if is_sum {
+        ("Summarum Sheet", "sum")
+    } else {
+        ("Text file", "txt")
+    };
+    if let Some(p) = app
+        .dialog()
+        .file()
+        .add_filter(name, &[ext])
+        .blocking_save_file()
+    {
+        write_atomic(&p.into_path().map_err(|e| e.to_string())?, &contents)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 #[tauri::command]
-fn write_image_file(path: String, data_base64: String) -> Result<(), String> {
-    use std::io::Write;
-    let bytes = base64_decode(&data_base64)?;
-    let p = std::path::Path::new(&path);
-    let tmp = p.with_extension("tmp");
-    std::fs::File::create(&tmp)
-        .and_then(|mut f| f.write_all(&bytes))
-        .map_err(|e| e.to_string())?;
-    fs::rename(&tmp, p).map_err(|e| e.to_string())
+fn write_image_file(app: AppHandle, data_base64: String) -> Result<bool, String> {
+    if let Some(p) = app
+        .dialog()
+        .file()
+        .add_filter("PNG Image", &["png"])
+        .blocking_save_file()
+    {
+        let path = p.into_path().map_err(|e| e.to_string())?;
+        use std::io::Write;
+        let bytes = base64_decode(&data_base64)?;
+        let tmp = path.with_extension("tmp");
+        std::fs::File::create(&tmp)
+            .and_then(|mut f| f.write_all(&bytes))
+            .map_err(|e| e.to_string())?;
+        fs::rename(&tmp, path).map_err(|e| e.to_string())?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
