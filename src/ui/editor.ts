@@ -65,8 +65,11 @@ function buildDecorations(state: EditorState): DecorationSet {
 
 const highlightField = StateField.define<DecorationSet>({
   create: buildDecorations,
-  update(_value, tr) {
-    return buildDecorations(tr.state);
+  update(value, tr) {
+    const hasResults = tr.effects.some((e) => e.is(setResults));
+    if (hasResults) return buildDecorations(tr.state);
+    if (tr.docChanged) return value.map(tr.changes);
+    return value;
   },
   provide: (f) => EditorView.decorations.from(f),
 });
@@ -98,8 +101,9 @@ function buildVarHighlight(state: EditorState): DecorationSet {
 
 const varHighlightField = StateField.define<DecorationSet>({
   create: buildVarHighlight,
-  update(_value, tr) {
-    return buildVarHighlight(tr.state);
+  update(value, tr) {
+    if (tr.docChanged || tr.selection) return buildVarHighlight(tr.state);
+    return value;
   },
   provide: (f) => EditorView.decorations.from(f),
 });
