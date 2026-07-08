@@ -1,0 +1,3 @@
+## 2024-11-20 - [Avoid unnecessary CodeMirror rebuilds]
+**Learning:** Highlight and Sparkline decorators in CodeMirror trigger `buildDecorations` on every transaction by default, which gets slow as document size increases (e.g. 50+ lines). It re-runs the lexer across the whole document on every keystroke if we do not check `tr.docChanged`/etc.
+**Action:** Use `tr.docChanged` to selectively run `buildDecorations` or just use `value.map(tr.changes)` when only the text changed and results haven't been processed yet.
