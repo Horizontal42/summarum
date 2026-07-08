@@ -38,20 +38,41 @@ fn safe_name(name: &str) -> bool {
 }
 
 #[tauri::command]
-fn write_text_file(path: String, contents: String) -> Result<(), String> {
-    write_atomic(std::path::Path::new(&path), &contents)
+async fn save_text_file_dialog(app: tauri::AppHandle, contents: String, is_sum: bool) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let dialog = app.dialog().file();
+    let dialog = if is_sum {
+        dialog.add_filter("Summarum Sheet", &["sum"])
+    } else {
+        dialog.add_filter("Text file", &["txt"])
+    };
+
+    if let Some(path) = dialog.blocking_save_file() {
+        let path = path.into_path().map_err(|_| "invalid path".to_string())?;
+        write_atomic(&path, &contents)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 #[tauri::command]
-fn write_image_file(path: String, data_base64: String) -> Result<(), String> {
+async fn save_image_file_dialog(app: tauri::AppHandle, data_base64: String) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
     use std::io::Write;
-    let bytes = base64_decode(&data_base64)?;
-    let p = std::path::Path::new(&path);
-    let tmp = p.with_extension("tmp");
-    std::fs::File::create(&tmp)
-        .and_then(|mut f| f.write_all(&bytes))
-        .map_err(|e| e.to_string())?;
-    fs::rename(&tmp, p).map_err(|e| e.to_string())
+
+    if let Some(path) = app.dialog().file().add_filter("PNG Image", &["png"]).blocking_save_file() {
+        let path = path.into_path().map_err(|_| "invalid path".to_string())?;
+        let bytes = base64_decode(&data_base64)?;
+        let tmp = path.with_extension("tmp");
+        std::fs::File::create(&tmp)
+            .and_then(|mut f| f.write_all(&bytes))
+            .map_err(|e| e.to_string())?;
+        fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
@@ -712,8 +733,8 @@ fn main() {
             read_text_file,
             exit_app,
             is_hidden_launch,
-            write_text_file,
-            write_image_file
+            save_text_file_dialog,
+            save_image_file_dialog
         ])
         .setup(|app| {
             let handle = app.handle().clone();

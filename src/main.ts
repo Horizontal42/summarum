@@ -907,17 +907,11 @@ async function boot(): Promise<void> {
     } else if (action === "print") {
       window.print();
     } else if (isTauri()) {
-      const { save } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const isSum = action === "save-sum";
-      const path = await save({
-        filters: isSum
-          ? [{ name: "Summarum Sheet", extensions: ["sum"] }]
-          : [{ name: "Text file", extensions: ["txt"] }],
-      });
-      if (path) {
-        const content = isSum ? editor.getText() : editor.getSheetWithResults();
-        await invoke("write_text_file", { path, contents: content });
+      const content = isSum ? editor.getText() : editor.getSheetWithResults();
+      const saved = await invoke("save_text_file_dialog", { contents: content, isSum });
+      if (saved) {
         toast(t("saved"));
       }
     }

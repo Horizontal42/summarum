@@ -58,14 +58,10 @@ export async function exportSheetImage(deps: ExportImageDeps): Promise<void> {
   } catch {
     // clipboard API failed — save to file
     try {
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const path = await save({ filters: [{ name: "PNG Image", extensions: ["png"] }] });
-      if (path) {
-        const buf = await blob.arrayBuffer();
-        const b64 = bytesToBase64(new Uint8Array(buf));
-        await writeImageFile(path, b64);
-        toast(t("saved"));
-      }
+      const buf = await blob.arrayBuffer();
+      const b64 = bytesToBase64(new Uint8Array(buf));
+      const saved = await writeImageFile(b64);
+      if (saved) toast(t("saved"));
     } catch {
       toast(t("imageFailed"));
     }

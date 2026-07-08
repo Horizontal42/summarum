@@ -234,9 +234,9 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
 
 // ---------- image export
 
-export async function writeImageFile(path: string, dataBase64: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("write_image_file", { path, dataBase64 });
+export async function writeImageFile(dataBase64: string): Promise<boolean> {
+  if (!isTauri()) return false;
+  return await invoke<boolean>("save_image_file_dialog", { dataBase64 });
 }
 
 // ---------- market data
