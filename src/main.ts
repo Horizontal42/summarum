@@ -37,6 +37,7 @@ let lastResults: LineResult[] = [];
 let selectedRange: [number, number] | null = null;
 let ratesFetchedAt = 0;
 let liveRates: Record<string, number> = {};
+let lastWindowFocusAt = 0;
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -663,8 +664,18 @@ function renderRatesInfo(): void {
 
 // ---------- modal
 
-/** two-button modal; resolves "a" | "b" | null (click outside = cancel) */
+let modalChain: Promise<unknown> = Promise.resolve();
+
+/** two-button modal; resolves "a" | "b" | null (click outside = cancel).
+    calls serialize on the shared #modal singleton — a second call waits for
+    the first to resolve rather than clobbering its handlers */
 function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b" | null> {
+  const run = modalChain.then(() => showModal(msg, aLabel, bLabel));
+  modalChain = run.catch(() => {});
+  return run;
+}
+
+function showModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b" | null> {
   return new Promise((resolve) => {
     const modal = $("#modal");
     const a = $("#modal-a");
@@ -674,7 +685,6 @@ function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b
     b.textContent = bLabel;
     a.classList.add("primary");
     modal.classList.remove("hidden");
-    const shownAt = Date.now();
     const done = (res: "a" | "b" | null) => {
       modal.classList.add("hidden");
       a.onclick = b.onclick = modal.onclick = null;
@@ -683,10 +693,10 @@ function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b
     a.onclick = () => done("a");
     b.onclick = () => done("b");
     modal.onclick = (e) => {
-      // a click that focuses the window (e.g. after an unattended auto-check
-      // shows this modal) lands on the backdrop too — ignore it right after
-      // showing so it can't dismiss a prompt the user hasn't actually seen yet
-      if (e.target === modal && Date.now() - shownAt > 300) done(null);
+      // a click that just refocused the window (native dialog closing, or
+      // bringing a backgrounded tray window to front) lands on the backdrop
+      // too — ignore a backdrop dismiss that arrives right after refocus
+      if (e.target === modal && performance.now() - lastWindowFocusAt > 300) done(null);
     };
   });
 }
@@ -883,6 +893,8 @@ async function initUI(): Promise<void> {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   });
+
+  window.addEventListener("focus", () => { lastWindowFocusAt = performance.now(); });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "n") {
