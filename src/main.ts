@@ -674,6 +674,7 @@ function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b
     b.textContent = bLabel;
     a.classList.add("primary");
     modal.classList.remove("hidden");
+    const shownAt = Date.now();
     const done = (res: "a" | "b" | null) => {
       modal.classList.add("hidden");
       a.onclick = b.onclick = modal.onclick = null;
@@ -682,7 +683,10 @@ function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b
     a.onclick = () => done("a");
     b.onclick = () => done("b");
     modal.onclick = (e) => {
-      if (e.target === modal) done(null);
+      // a click that focuses the window (e.g. after an unattended auto-check
+      // shows this modal) lands on the backdrop too — ignore it right after
+      // showing so it can't dismiss a prompt the user hasn't actually seen yet
+      if (e.target === modal && Date.now() - shownAt > 300) done(null);
     };
   });
 }
