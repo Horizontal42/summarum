@@ -95,6 +95,57 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
+function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, data: AppData): void {
+  // Reordering uses plain mouse tracking, not the native HTML5 drag API —
+  // Tauri's window-level file-drop hook (dragDropEnabled, needed for
+  // dropping .numi files from Explorer) intercepts WebView2's own drag
+  // sessions, so draggable="true" elements never get a valid drop target
+  // and the OS always shows a "not allowed" cursor.
+  let dragging = false;
+  let suppressClick = false;
+  el.addEventListener("mousedown", (e) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const startY = e.clientY;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientY - startY) < 4) return;
+        dragging = true;
+        suppressClick = true;
+        el.classList.add("dragging");
+        document.body.style.cursor = "grabbing";
+      }
+      const items = [...list.querySelectorAll<HTMLElement>(".doc-item")];
+      for (const item of items) item.classList.remove("drag-over");
+      const over = items.find((item) => {
+        if (item === el) return false;
+        const r = item.getBoundingClientRect();
+        return ev.clientY >= r.top && ev.clientY <= r.bottom;
+      });
+      if (over) {
+        const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
+        if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (dragging) {
+        const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
+        for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
+        document.body.style.cursor = "";
+        if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
+      }
+      dragging = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  });
+  el.addEventListener("click", () => {
+    if (suppressClick) { suppressClick = false; return; }
+    switchDoc(doc.id);
+  });
+}
+
 function renderDocList(): void {
   const list = $("#doc-list");
   list.replaceChildren();
@@ -119,54 +170,7 @@ function renderDocList(): void {
 
     el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
 
-    // Reordering uses plain mouse tracking, not the native HTML5 drag API —
-    // Tauri's window-level file-drop hook (dragDropEnabled, needed for
-    // dropping .numi files from Explorer) intercepts WebView2's own drag
-    // sessions, so draggable="true" elements never get a valid drop target
-    // and the OS always shows a "not allowed" cursor.
-    let dragging = false;
-    let suppressClick = false;
-    el.addEventListener("mousedown", (e) => {
-      if ((e.target as HTMLElement).closest("button")) return;
-      const startY = e.clientY;
-      const onMove = (ev: MouseEvent) => {
-        if (!dragging) {
-          if (Math.abs(ev.clientY - startY) < 4) return;
-          dragging = true;
-          suppressClick = true;
-          el.classList.add("dragging");
-          document.body.style.cursor = "grabbing";
-        }
-        const items = [...list.querySelectorAll<HTMLElement>(".doc-item")];
-        for (const item of items) item.classList.remove("drag-over");
-        const over = items.find((item) => {
-          if (item === el) return false;
-          const r = item.getBoundingClientRect();
-          return ev.clientY >= r.top && ev.clientY <= r.bottom;
-        });
-        if (over) {
-          const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
-          if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
-        }
-      };
-      const onUp = () => {
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-        if (dragging) {
-          const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
-          for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
-          document.body.style.cursor = "";
-          if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
-        }
-        dragging = false;
-      };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    });
-    el.addEventListener("click", () => {
-      if (suppressClick) { suppressClick = false; return; }
-      switchDoc(doc.id);
-    });
+    setupDocInteraction(el, doc, list, data);
     el.dataset.docId = doc.id;
 
     const del = document.createElement("button");
