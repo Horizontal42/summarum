@@ -800,13 +800,7 @@ async function initDataAndEngine(): Promise<void> {
   });
 }
 
-async function initUI(): Promise<void> {
-
-  applySettings(); // sets the language before bindSettingsUI renders dynamic labels
-  bindSettingsUI();
-  renderDocList();
-  syncTitleField();
-
+function bindTitleUI(): void {
   const titleField = $<HTMLInputElement>("#doc-title");
   titleField.addEventListener("change", () => {
     const doc = activeDoc();
@@ -830,7 +824,9 @@ async function initUI(): Promise<void> {
   titleField.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === "Escape") titleField.blur();
   });
+}
 
+function bindMiscUI(): void {
   $("#total-line").addEventListener("click", () => {
     const v = $("#total-line").dataset.value;
     if (v) {
@@ -841,6 +837,10 @@ async function initUI(): Promise<void> {
 
   $("#open-search").addEventListener("click", () => search.open());
 
+  window.addEventListener("focus", () => { lastWindowFocusAt = performance.now(); });
+}
+
+async function bindWindowControls(): Promise<void> {
   if (isTauri()) {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
@@ -849,7 +849,9 @@ async function initUI(): Promise<void> {
   } else {
     $("#win-controls").style.display = "none";
   }
+}
 
+function bindSidebarUI(): void {
   $("#toggle-sidebar").addEventListener("click", () => {
     settings.sidebarVisible = !settings.sidebarVisible;
     $("#sidebar").classList.toggle("hidden", !settings.sidebarVisible);
@@ -869,7 +871,9 @@ async function initUI(): Promise<void> {
     $("#sidebar").classList.add("hidden");
     void saveSettings(settings);
   });
+}
 
+function bindDividerUI(): void {
   const divider = $("#col-divider");
   const wrap = $("#editor-wrap");
   divider.addEventListener("mousedown", (e) => {
@@ -893,9 +897,9 @@ async function initUI(): Promise<void> {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   });
+}
 
-  window.addEventListener("focus", () => { lastWindowFocusAt = performance.now(); });
-
+function bindKeyboardShortcuts(): void {
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault();
@@ -919,8 +923,9 @@ async function initUI(): Promise<void> {
       toast(t("copied"));
     }
   });
+}
 
-  // export button + dropdown
+function bindExportUI(): void {
   const exportBtn = $("#export-btn");
   const exportMenu = $("#export-menu");
   exportBtn.addEventListener("click", (e) => {
@@ -960,12 +965,16 @@ async function initUI(): Promise<void> {
       }
     }
   });
+}
 
+function bindRatesAndMarketUI(): void {
   $("#rates-info").addEventListener("click", () => void refreshRates(true));
   $("#market-info").addEventListener("click", () => void refreshMarket(true));
   setInterval(renderRatesInfo, 60_000);
   setInterval(renderMarketInfo, 60_000);
+}
 
+async function bindLifecycle(): Promise<void> {
   void onFileDrop((content) => newDoc(content));
 
   if (!(await registerHotkey(null, settings.hotkey))) toast(t("hotkeyFailed"));
@@ -998,6 +1007,24 @@ async function initUI(): Promise<void> {
   // so a long-lived process still notices new releases; re-read the setting
   // on every tick since the user can flip it while the app is running
   setInterval(() => { if (settings.autoUpdateEnabled) void checkUpdate(); }, 6 * 60 * 60 * 1000);
+}
+
+async function initUI(): Promise<void> {
+
+  applySettings(); // sets the language before bindSettingsUI renders dynamic labels
+  bindSettingsUI();
+  renderDocList();
+  syncTitleField();
+
+  bindTitleUI();
+  bindMiscUI();
+  await bindWindowControls();
+  bindSidebarUI();
+  bindDividerUI();
+  bindKeyboardShortcuts();
+  bindExportUI();
+  bindRatesAndMarketUI();
+  await bindLifecycle();
 }
 
 async function boot(): Promise<void> {
