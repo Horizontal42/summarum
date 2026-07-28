@@ -466,15 +466,66 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
   return qty(lo.plus(hi).div(2));
 }
 
-function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart", ctx: EvalCtx): Value {
-  const { lineValues, lineKinds, index } = ctx.line;
-  if (name === "prev") {
-    for (let i = index - 1; i >= 0; i--) {
-      const v = lineValues[i];
-      if (v) return v;
+const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
+  count: (block) => qty(new Decimal(block.length)),
+  chart: (block) => {
+    const refDim = block[0].unit?.dimension ?? null;
+    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    if (compatible.length < 2) throw new EvalError("need at least 2 values for chart");
+    return {
+      kind: "chart",
+      points: compatible.map((q) => toBase(q)),
+      unitLabel: block[0].unit?.format ?? null,
+    };
+  },
+  min: (block) => {
+    const refDim = block[0].unit?.dimension ?? null;
+    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    return compatible.reduce((best, q) => toBase(q).lt(toBase(best)) ? q : best);
+  },
+  max: (block) => {
+    const refDim = block[0].unit?.dimension ?? null;
+    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    return compatible.reduce((best, q) => toBase(q).gt(toBase(best)) ? q : best);
+  },
+  product: (block) => qty(block.reduce((acc, q) => acc.mul(q.value), new Decimal(1))),
+  sum: (block) => {
+    let acc = block[0];
+    for (let i = 1; i < block.length; i++) {
+      try {
+        acc = numericAdd(acc, block[i], 1);
+      } catch {
+        // skip lines with incompatible dimensions
+      }
     }
-    throw new EvalError("no previous result");
+    return acc;
+  },
+  avg: (block) => {
+    let acc = block[0];
+    let counted = 1;
+    for (let i = 1; i < block.length; i++) {
+      try {
+        acc = numericAdd(acc, block[i], 1);
+        counted++;
+      } catch {
+        // skip lines with incompatible dimensions
+      }
+    }
+    return qty(acc.value.div(counted), acc.unit);
   }
+};
+
+function getPrevResult(ctx: EvalCtx): Value {
+  const { lineValues, index } = ctx.line;
+  for (let i = index - 1; i >= 0; i--) {
+    const v = lineValues[i];
+    if (v) return v;
+  }
+  throw new EvalError("no previous result");
+}
+
+function getAggBlock(ctx: EvalCtx): Quantity[] {
+  const { lineValues, lineKinds, index } = ctx.line;
   const block: Quantity[] = [];
   for (let i = index - 1; i >= 0; i--) {
     if (lineKinds[i] === "empty" || lineKinds[i] === "header") {
@@ -487,45 +538,15 @@ function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "produ
   }
   if (block.length === 0) throw new EvalError("nothing to aggregate");
   block.reverse();
+  return block;
+}
 
-  if (name === "count") return qty(new Decimal(block.length));
-
-  if (name === "chart") {
-    const refDim = block[0].unit?.dimension ?? null;
-    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
-    if (compatible.length < 2) throw new EvalError("need at least 2 values for chart");
-    return {
-      kind: "chart",
-      points: compatible.map((q) => toBase(q)),
-      unitLabel: block[0].unit?.format ?? null,
-    };
-  }
-
-  if (name === "min" || name === "max") {
-    const refDim = block[0].unit?.dimension ?? null;
-    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
-    return compatible.reduce((best, q) =>
-      (name === "min" ? toBase(q).lt(toBase(best)) : toBase(q).gt(toBase(best))) ? q : best
-    );
-  }
-
-  if (name === "product") {
-    return qty(block.reduce((acc, q) => acc.mul(q.value), new Decimal(1)));
-  }
-
-  let acc = block[0];
-  let counted = 1;
-  for (let i = 1; i < block.length; i++) {
-    const item = block[i];
-    try {
-      acc = numericAdd(acc, item, 1);
-      counted++;
-    } catch {
-      // skip lines with incompatible dimensions
-    }
-  }
-  if (name === "avg") return qty(acc.value.div(counted), acc.unit);
-  return acc;
+function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart", ctx: EvalCtx): Value {
+  if (name === "prev") return getPrevResult(ctx);
+  const block = getAggBlock(ctx);
+  const func = AGG_FUNCS[name];
+  if (!func) throw new EvalError(`unknown aggregate function ${name}`);
+  return func(block);
 }
 
 function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
