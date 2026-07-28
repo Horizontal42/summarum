@@ -50,9 +50,13 @@ function activeDoc(): DocMeta {
 }
 
 function titleFromContent(text: string): string {
-  for (const line of text.split("\n")) {
-    const s = line.trim();
+  let start = 0;
+  while (start < text.length) {
+    let end = text.indexOf("\n", start);
+    if (end === -1) end = text.length;
+    const s = text.slice(start, end).trim();
     if (s.length > 0) return s.replace(/^#\s*/, "").slice(0, 30);
+    start = end + 1;
   }
   return t("untitled");
 }
