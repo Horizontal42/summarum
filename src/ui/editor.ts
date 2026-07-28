@@ -1,6 +1,6 @@
 // CodeMirror editor wired to the engine: evaluates on change, highlights
 // engine tokens, renders the results overlay, autocompletes phrases.
-import { EditorView, ViewUpdate, Decoration, DecorationSet, keymap, drawSelection } from "@codemirror/view";
+import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, keymap, drawSelection } from "@codemirror/view";
 import { EditorState, StateEffect, StateField, RangeSetBuilder } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { autocompletion, CompletionContext, CompletionResult, acceptCompletion } from "@codemirror/autocomplete";
@@ -99,14 +99,47 @@ function buildVarHighlight(state: EditorState): DecorationSet {
   return builder.finish();
 }
 
+const setVarHighlight = StateEffect.define<DecorationSet>();
+
 const varHighlightField = StateField.define<DecorationSet>({
-  create: buildVarHighlight,
+  create: () => Decoration.none,
   update(value, tr) {
-    if (tr.docChanged || tr.selection) return buildVarHighlight(tr.state);
+    for (const e of tr.effects) {
+      if (e.is(setVarHighlight)) return e.value;
+    }
+    if (tr.docChanged) return value.map(tr.changes);
     return value;
   },
   provide: (f) => EditorView.decorations.from(f),
 });
+
+const varHighlightPlugin = ViewPlugin.fromClass(
+  class {
+    timeout: ReturnType<typeof setTimeout> | null = null;
+
+    constructor(view: EditorView) {
+      this.schedule(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.selectionSet) {
+        this.schedule(update.view);
+      }
+    }
+
+    schedule(view: EditorView) {
+      if (this.timeout) clearTimeout(this.timeout);
+      this.timeout = setTimeout(() => {
+        const decos = buildVarHighlight(view.state);
+        view.dispatch({ effects: setVarHighlight.of(decos) });
+      }, 150);
+    }
+
+    destroy() {
+      if (this.timeout) clearTimeout(this.timeout);
+    }
+  }
+);
 
 function buildSparkline(pts: number[], top: number): SVGSVGElement {
   const NS = "http://www.w3.org/2000/svg";
@@ -201,6 +234,7 @@ export class SumEditor {
           resultsField,
           highlightField,
           varHighlightField,
+          varHighlightPlugin,
           EditorView.lineWrapping,
           drawSelection({ cursorBlinkRate: 1000 }),
           // CM injects its base styles at runtime after app.css, so layout
