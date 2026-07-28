@@ -199,43 +199,37 @@ function numericAdd(a: Quantity, b: Quantity, sign: 1 | -1): Quantity {
   return qty(sign === 1 ? a.value.add(b.value) : a.value.sub(b.value), unit);
 }
 
-function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value, r: Value, ctx: EvalCtx): Value {
-  // ---- dates
-  if (l.kind === "date" || r.kind === "date") return evalDateArith(op, l, r);
-
-  // ---- percent combinations
-  if (l.kind === "percent" || r.kind === "percent") {
-    if (l.kind === "percent" && r.kind === "percent") {
-      switch (op) {
-        case "plus": return pct(l.value.add(r.value));
-        case "minus": return pct(l.value.sub(r.value));
-        case "mul": return pct(l.value.mul(r.value).div(100));
-        case "div": return qty(l.value.div(r.value));
-        default: throw new EvalError("bad percent op");
-      }
-    }
-    const q = (l.kind === "quantity" ? l : r) as Quantity;
-    const p = (l.kind === "percent" ? l : r as { kind: "percent"; value: Decimal }).value;
+function evalPercentArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value, r: Value): Value {
+  if (l.kind === "percent" && r.kind === "percent") {
     switch (op) {
-      case "plus": return qty(q.value.mul(new Decimal(1).add(p.div(100))), q.unit);
-      case "minus":
-        if (l.kind === "percent") throw new EvalError("percent minus number");
-        return qty(q.value.mul(new Decimal(1).sub(p.div(100))), q.unit);
-      case "mul": return qty(q.value.mul(p).div(100), q.unit);
-      case "div":
-        if (l.kind === "percent") throw new EvalError("percent div number");
-        return qty(q.value.div(p.div(100)), q.unit);
-      case "pow":
-        // which side the percent is on matters: 50% ^ 2 = 0.25, 2 ^ 50% = √2
-        return l.kind === "percent"
-          ? qty(p.div(100).pow(q.value))
-          : qty(q.value.pow(p.div(100)), q.unit);
+      case "plus": return pct(l.value.add(r.value));
+      case "minus": return pct(l.value.sub(r.value));
+      case "mul": return pct(l.value.mul(r.value).div(100));
+      case "div": return qty(l.value.div(r.value));
       default: throw new EvalError("bad percent op");
     }
   }
+  const q = (l.kind === "quantity" ? l : r) as Quantity;
+  const p = (l.kind === "percent" ? l : r as { kind: "percent"; value: Decimal }).value;
+  switch (op) {
+    case "plus": return qty(q.value.mul(new Decimal(1).add(p.div(100))), q.unit);
+    case "minus":
+      if (l.kind === "percent") throw new EvalError("percent minus number");
+      return qty(q.value.mul(new Decimal(1).sub(p.div(100))), q.unit);
+    case "mul": return qty(q.value.mul(p).div(100), q.unit);
+    case "div":
+      if (l.kind === "percent") throw new EvalError("percent div number");
+      return qty(q.value.div(p.div(100)), q.unit);
+    case "pow":
+      // which side the percent is on matters: 50% ^ 2 = 0.25, 2 ^ 50% = √2
+      return l.kind === "percent"
+        ? qty(p.div(100).pow(q.value))
+        : qty(q.value.pow(p.div(100)), q.unit);
+    default: throw new EvalError("bad percent op");
+  }
+}
 
-  const a = l as Quantity;
-  const b = r as Quantity;
+function evalQuantityArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", a: Quantity, b: Quantity, ctx: EvalCtx): Value {
   switch (op) {
     case "plus": return numericAdd(a, b, 1);
     case "minus": return numericAdd(a, b, -1);
@@ -279,6 +273,18 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
       return qty(result, b.unit ? null : a.unit && b.value.eq(1) ? a.unit : null);
     }
   }
+}
+
+function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value, r: Value, ctx: EvalCtx): Value {
+  if (l.kind === "date" || r.kind === "date") {
+    return evalDateArith(op, l, r);
+  }
+
+  if (l.kind === "percent" || r.kind === "percent") {
+    return evalPercentArith(op, l, r);
+  }
+
+  return evalQuantityArith(op, l as Quantity, r as Quantity, ctx);
 }
 
 function evalBit(op: string, l: Value, r: Value): Value {
