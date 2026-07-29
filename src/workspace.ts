@@ -15,6 +15,7 @@ interface SheetExports {
   vars: Map<string, Value>;
   total: Value | null;
   last: Value | null;
+  results: LineResult[];
 }
 
 const XREF_SCAN_RE = /@(?:\[([^\]]+)\]|([\p{L}_][\p{L}\d_]*))\./gu;
@@ -38,6 +39,10 @@ export class Workspace {
     } finally {
       this.resolving.delete(sheetId);
     }
+  }
+
+  getCachedResults(sheet: SheetSource): LineResult[] {
+    return this.exportsFor(sheet).results;
   }
 
   /** Drop cached exports for a sheet and everything that transitively depends on it. */
@@ -146,7 +151,7 @@ export class Workspace {
         break;
       }
     }
-    const exports: SheetExports = { vars, total: this.engine.totalValueOf(results), last };
+    const exports: SheetExports = { vars, total: this.engine.totalValueOf(results), last, results };
     // A cycle-interrupted pass produces incomplete/wrong exports (dropped
     // assignments, missing total) — don't let it poison the cache. Re-evaluate
     // fresh on every query until the cycle is actually broken by an edit.

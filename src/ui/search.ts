@@ -49,7 +49,7 @@ function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     const th = rq.threshold.value;
     const hits: SearchHit[] = [];
     for (const doc of docs) {
-      const results = deps.workspace.evaluateSheet(doc.id, doc.text);
+      const results = deps.workspace.getCachedResults(doc);
       const lines = doc.text.split("\n");
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
