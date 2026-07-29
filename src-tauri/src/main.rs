@@ -35,7 +35,18 @@ fn docs_dir(app: &AppHandle, dir: &Option<String>) -> PathBuf {
 }
 
 fn safe_name(name: &str) -> bool {
-    !name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")
+    let path = Path::new(name);
+    let mut components = path.components();
+    match components.next() {
+        Some(std::path::Component::Normal(_)) => {
+            if components.next().is_none() {
+                !name.contains(['/', '\\', ':'])
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
 }
 
 #[tauri::command]
