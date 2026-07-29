@@ -130,7 +130,7 @@ auto-derived one) so the reference doesn't break when its first line changes.
 
 ## Extensions
 
-> **Note:** extensions run as trusted local scripts with access to your files. Only load code you wrote or fully trust.
+> **Note:** extensions run inside a WebAssembly sandbox — no file, network or app access, only the `numi` API below. A script that hangs is cut off; a script that fails is skipped.
 
 Drop a `.js` file into the extensions folder (Settings → Extensions folder)
 and restart. The API is compatible with Numi extensions:
@@ -156,7 +156,7 @@ see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 npm install
-npm test               # engine tests (152 cases)
+npm test               # engine tests (259 cases)
 npm run tauri dev      # run the app
 npm run tauri build    # build the installer
 ```

@@ -1,9 +1,9 @@
-// WARNING: extensions run as trusted local code with full access to your files.
-// Only load scripts you wrote yourself or fully trust.
-
 // Summarum extension example.
 // Drop .js files into this folder and restart the app.
 // API: numi.setVariable, numi.addUnit, numi.addFunction.
+//
+// Scripts run in a WebAssembly sandbox: no files, no network, no app internals,
+// and no console/setTimeout/fetch — only plain JS and the numi API above.
 
 // A global variable usable on any sheet, e.g. `salary * vat`
 // numi.setVariable("vat", { "double": 20 });

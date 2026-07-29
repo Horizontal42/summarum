@@ -26,7 +26,8 @@ src/
     app.css          themes (light/dark via CSS variables)
   main.ts            app bootstrap: documents, settings, status bar, dnd
   storage.ts         Tauri commands / localStorage fallback
-  extensions.ts      runs user .js files against the engine
+  extensions.ts      runs user .js files in a QuickJS/WASM sandbox, bridged
+                     to the engine's numi.* API
   i18n.ts            interface strings (en/ru)
   updater.ts         checks tauri-plugin-updater, installs + relaunches
 src-tauri/
@@ -263,7 +264,7 @@ All files below live in `%APPDATA%/app.summarum.calc` (or the user-chosen folder
 
 ## Tests
 
-`npm test` runs 152 vitest cases: `src/engine/*.test.ts` covers every
+`npm test` runs 259 vitest cases: `src/engine/*.test.ts` covers every
 expression class, both languages, deterministic injected rates, goal seek,
 historical rates (injected), date-format literals/display (dedicated engines
 with an explicit `dateFormat`, since the default "system" format depends on
