@@ -215,6 +215,12 @@ describe("numeral systems", () => {
 });
 
 describe("variables and document context", () => {
+  it("sequence error recovery", () => {
+    eng.addFunction({ id: "throw_err", phrases: "throw_err" }, () => {
+      throw new Error("test error");
+    });
+    expect(calc("throw_err(1) 2 hours")).toBe("2 h");
+  });
   it("assignment and reuse", () => {
     expect(calcDoc("x = 5\nx * 2")).toEqual(["5", "10"]);
   });
