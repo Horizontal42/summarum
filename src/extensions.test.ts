@@ -47,7 +47,7 @@ describe("extensions", () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it("runs scripts successfully using numi api", () => {
+    it("runs scripts successfully using numi api", async () => {
       const scripts = [
         {
           name: "script1",
@@ -59,14 +59,14 @@ describe("extensions", () => {
         },
       ];
 
-      runExtensions(mockEngine as SumEngine, scripts);
+      await runExtensions(mockEngine as SumEngine, scripts);
 
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var1", 10);
       expect(mockEngine.addUnit).toHaveBeenCalledWith({ id: "unit1", phrases: "u", baseUnitId: "USD", ratio: 1 });
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    it("swallows errors and logs to console.error", () => {
+    it("swallows errors and logs to console.error", async () => {
       const scripts = [
         {
           name: "script1",
@@ -74,15 +74,15 @@ describe("extensions", () => {
         },
       ];
 
-      runExtensions(mockEngine as SumEngine, scripts);
+      await runExtensions(mockEngine as SumEngine, scripts);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "extension script1 failed:",
-        expect.any(Error)
+        expect.any(Object)
       );
     });
 
-    it("continues running other scripts if one fails", () => {
+    it("continues running other scripts if one fails", async () => {
       const scripts = [
         {
           name: "script1",
@@ -98,7 +98,7 @@ describe("extensions", () => {
         },
       ];
 
-      runExtensions(mockEngine as SumEngine, scripts);
+      await runExtensions(mockEngine as SumEngine, scripts);
 
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var1", 10);
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var3", 30);

@@ -745,7 +745,7 @@ async function initDataAndEngine(): Promise<void> {
   if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
 
   const scripts = await loadExtensionScripts();
-  runExtensions(engine, scripts);
+  await runExtensions(engine, scripts);
 
   workspace = new Workspace(engine, () =>
     data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),

@@ -27,7 +27,8 @@
     "@tauri-apps/plugin-opener": "^2.2.0",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
-    "decimal.js": "^10.4.3"
+    "decimal.js": "^10.4.3",
+    "quickjs-emscripten": "^0.32.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
