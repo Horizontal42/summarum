@@ -32,14 +32,18 @@ export class Workspace {
 
   constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
 
-  /** Evaluate a sheet as the user's active/open document — refs resolve live. */
-  evaluateSheet(sheetId: string, text: string): LineResult[] {
+  private doEvaluate(sheetId: string, text: string): LineResult[] {
     this.resolving.add(sheetId);
     try {
       return this.engine.evaluateDocument(text, (sheet, key) => this.resolveXRef(sheet, key));
     } finally {
       this.resolving.delete(sheetId);
     }
+  }
+
+  /** Evaluate a sheet as the user's active/open document — refs resolve live. */
+  evaluateSheet(sheetId: string, text: string): LineResult[] {
+    return this.doEvaluate(sheetId, text);
   }
 
   getCachedResults(sheet: SheetSource): LineResult[] {
@@ -145,13 +149,7 @@ export class Workspace {
   private exportsFor(sheet: SheetSource): SheetExports {
     const cached = this.cache.get(sheet.id);
     if (cached) return cached;
-    this.resolving.add(sheet.id);
-    let results: LineResult[];
-    try {
-      results = this.engine.evaluateDocument(sheet.text, (s, k) => this.resolveXRef(s, k));
-    } finally {
-      this.resolving.delete(sheet.id);
-    }
+    const results = this.doEvaluate(sheet.id, sheet.text);
     const vars = new Map<string, Value>();
     for (const r of results) {
       if (r.assign && r.value) vars.set(r.assign, r.value);
