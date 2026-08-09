@@ -569,6 +569,7 @@ fn migrate_data_dir(
     }
     // merge backups (skip files that already exist in the target)
     let mut all_copied = true;
+    let mut files_to_copy = Vec::new();
     for sub in ["backups", "backups/deleted"] {
         let from = old.join(sub);
         let to = new.join(sub);
@@ -576,10 +577,38 @@ fn migrate_data_dir(
         if let Ok(entries) = fs::read_dir(&from) {
             for entry in entries.flatten() {
                 let dest = to.join(entry.file_name());
-                if entry.path().is_file() && !dest.exists() && fs::copy(entry.path(), dest).is_err()
-                {
+                if entry.path().is_file() && !dest.exists() {
+                    files_to_copy.push((entry.path(), dest));
+                }
+            }
+        }
+    }
+
+    if !files_to_copy.is_empty() {
+        let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let chunk_size = (files_to_copy.len() / thread_count).max(1);
+        let chunks: Vec<_> = files_to_copy.chunks(chunk_size).map(|c| c.to_vec()).collect();
+
+        let mut handles = Vec::new();
+        for chunk in chunks {
+            handles.push(std::thread::spawn(move || {
+                let mut chunk_all_copied = true;
+                for (src, dest) in chunk {
+                    if fs::copy(&src, &dest).is_err() {
+                        chunk_all_copied = false;
+                    }
+                }
+                chunk_all_copied
+            }));
+        }
+
+        for handle in handles {
+            if let Ok(chunk_all_copied) = handle.join() {
+                if !chunk_all_copied {
                     all_copied = false;
                 }
+            } else {
+                all_copied = false;
             }
         }
     }
