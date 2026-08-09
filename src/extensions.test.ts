@@ -130,13 +130,10 @@ describe("extensions", () => {
 
     it("has no host globals inside the sandbox", async () => {
       await runExtensions(mockEngine as SumEngine, [
-        { name: "probe", code: "if (typeof window !== 'undefined' || typeof fetch !== 'undefined') throw new Error('leak');" },
-        { name: "log", code: "console.log('hi');" },
+        { name: "probe", code: "if (typeof window !== 'undefined' || typeof fetch !== 'undefined' || typeof console !== 'undefined') throw new Error('leak');" },
       ]);
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy.mock.calls[0][0]).toBe("extension log failed:");
-      expect(consoleErrorSpy.mock.calls[0][1].message).toMatch(/console/);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     it("interrupts an infinite loop at load time", async () => {
