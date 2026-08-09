@@ -13,38 +13,12 @@ describe("datetime", () => {
       vi.restoreAllMocks();
     });
 
-    it("should detect dmy", () => {
-      const mockFormatToParts = vi.fn().mockReturnValue([
-        { type: "day", value: "31" },
-        { type: "literal", value: "/" },
-        { type: "month", value: "12" },
-        { type: "literal", value: "/" },
-        { type: "year", value: "2000" },
-      ]);
-
-      const mockDateTimeFormat = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => ({
-        formatToParts: mockFormatToParts,
-      }) as any);
-
-      expect(detectDateOrder()).toBe("dmy");
-      mockDateTimeFormat.mockRestore();
+    it("should detect dmy (e.g. en-GB)", () => {
+      expect(detectDateOrder("en-GB")).toBe("dmy");
     });
 
-    it("should detect mdy", () => {
-      const mockFormatToParts = vi.fn().mockReturnValue([
-        { type: "month", value: "12" },
-        { type: "literal", value: "/" },
-        { type: "day", value: "31" },
-        { type: "literal", value: "/" },
-        { type: "year", value: "2000" },
-      ]);
-
-      const mockDateTimeFormat = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => ({
-        formatToParts: mockFormatToParts,
-      }) as any);
-
-      expect(detectDateOrder()).toBe("mdy");
-      mockDateTimeFormat.mockRestore();
+    it("should detect mdy (e.g. en-US)", () => {
+      expect(detectDateOrder("en-US")).toBe("mdy");
     });
 
     it("should default to dmy if neither is found", () => {

@@ -2,8 +2,8 @@
 import { DateOrder } from "./types";
 
 /** Does the OS locale write the day or the month first? (31.12 vs 12/31) */
-export function detectDateOrder(): DateOrder {
-  const parts = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "numeric", year: "numeric" })
+export function detectDateOrder(locale?: string): DateOrder {
+  const parts = new Intl.DateTimeFormat(locale, { day: "numeric", month: "numeric", year: "numeric" })
     .formatToParts(new Date(2000, 11, 31));
   for (const p of parts) {
     if (p.type === "day") return "dmy";
