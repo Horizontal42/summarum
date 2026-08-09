@@ -150,6 +150,44 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
   });
 }
 
+function mkBtn(cls: string, text: string, title: string, cb: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.className = cls;
+  b.textContent = text;
+  b.title = title;
+  b.setAttribute("aria-label", title);
+  b.addEventListener("click", (e) => { e.stopPropagation(); cb(); });
+  return b;
+}
+
+function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: SettingsData): HTMLButtonElement {
+  const del = document.createElement("button");
+  del.className = "del";
+  del.textContent = "✕";
+  let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (appData.docs.length === 1) return;
+    if (!del.classList.contains("confirm")) {
+      del.classList.add("confirm");
+      del.textContent = "✓";
+      confirmTimer = setTimeout(() => {
+        del.classList.remove("confirm");
+        del.textContent = "✕";
+      }, 2000);
+      return;
+    }
+    if (confirmTimer) clearTimeout(confirmTimer);
+    void backupDeletedSheet(appSettings.dataDir, doc.title, appData.contents[doc.id] ?? "");
+    delete appData.contents[doc.id];
+    appData.docs = appData.docs.filter((d) => d.id !== doc.id);
+    if (appData.activeId === doc.id) switchDoc(appData.docs[0].id);
+    else renderDocList();
+    saveAppData(appData);
+  });
+  return del;
+}
+
 function renderDocList(): void {
   const list = $("#doc-list");
   list.replaceChildren();
@@ -162,46 +200,12 @@ function renderDocList(): void {
     name.textContent = doc.title || t("untitled");
     el.appendChild(name);
 
-    const mkBtn = (cls: string, text: string, title: string, cb: () => void): HTMLButtonElement => {
-      const b = document.createElement("button");
-      b.className = cls;
-      b.textContent = text;
-      b.title = title;
-      b.setAttribute("aria-label", title);
-      b.addEventListener("click", (e) => { e.stopPropagation(); cb(); });
-      return b;
-    };
-
     el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
 
     setupDocInteraction(el, doc, list, data);
     el.dataset.docId = doc.id;
 
-    const del = document.createElement("button");
-    del.className = "del";
-    del.textContent = "✕";
-    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
-    del.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (data.docs.length === 1) return;
-      if (!del.classList.contains("confirm")) {
-        del.classList.add("confirm");
-        del.textContent = "✓";
-        confirmTimer = setTimeout(() => {
-          del.classList.remove("confirm");
-          del.textContent = "✕";
-        }, 2000);
-        return;
-      }
-      if (confirmTimer) clearTimeout(confirmTimer);
-      void backupDeletedSheet(settings.dataDir, doc.title, data.contents[doc.id] ?? "");
-      delete data.contents[doc.id];
-      data.docs = data.docs.filter((d) => d.id !== doc.id);
-      if (data.activeId === doc.id) switchDoc(data.docs[0].id);
-      else renderDocList();
-      saveAppData(data);
-    });
-    el.appendChild(del);
+    el.appendChild(createDeleteButton(doc, data, settings));
     frag.appendChild(el);
   }
   list.appendChild(frag);
