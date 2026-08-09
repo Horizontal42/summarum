@@ -140,9 +140,11 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
         if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
       }
     };
+    const onScroll = () => { cachedItems = null; };
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      list.removeEventListener("scroll", onScroll);
       cachedItems = null;
       if (dragging) {
         const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
@@ -154,6 +156,7 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    list.addEventListener("scroll", onScroll);
   });
   el.addEventListener("click", () => {
     if (suppressClick) { suppressClick = false; return; }
