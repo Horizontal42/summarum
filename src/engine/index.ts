@@ -134,11 +134,18 @@ export class SumEngine {
         };
         try {
           value = evaluate(parsed.expr, ctx);
-          // a line without a result beats a dead sheet — swallow everything,
-          // including extension bugs and BigInt conversion errors
+          // a line without a result beats a dead sheet.
+          // surface unexpected bugs so the user knows why it failed
         } catch (e) {
-          lineError = e instanceof Error ? e.message : String(e);
-          if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
+          if (e instanceof XRefError) {
+            lineError = e.message;
+          } else if (e instanceof EvalError) {
+            // Expected evaluation failure; remain silent
+          } else {
+            // Surface unexpected bugs/BigInt errors and log them
+            lineError = e instanceof Error ? e.message : String(e);
+            console.warn("evaluate failed:", e);
+          }
           value = null;
         }
         if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
