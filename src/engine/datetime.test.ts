@@ -178,5 +178,32 @@ describe("datetime", () => {
       expect(isCalendarUnit("minute", 1)).toBe(false);
       expect(isCalendarUnit("unit:meter", 1)).toBe(false);
     });
+
+    it("should handle edge cases for amount", () => {
+      expect(isCalendarUnit("day", 0)).toBe(true);
+      expect(isCalendarUnit("day", Number.MAX_SAFE_INTEGER)).toBe(true);
+      expect(isCalendarUnit("day", Number.MIN_SAFE_INTEGER)).toBe(true);
+
+      expect(isCalendarUnit("day", NaN)).toBe(false);
+      expect(isCalendarUnit("day", Infinity)).toBe(false);
+      expect(isCalendarUnit("day", -Infinity)).toBe(false);
+    });
+
+    it("should handle edge cases for unitId string format", () => {
+      expect(isCalendarUnit("", 1)).toBe(false);
+      expect(isCalendarUnit(":", 1)).toBe(false);
+
+      // string.split(":") behavior:
+      expect(isCalendarUnit("time:month", 1)).toBe(true);
+      expect(isCalendarUnit(":day", 1)).toBe(true);
+      expect(isCalendarUnit("day:", 1)).toBe(false);
+      expect(isCalendarUnit("a:day:c", 1)).toBe(true);
+    });
+
+    it("should return false for case-sensitive mismatch", () => {
+      expect(isCalendarUnit("Day", 1)).toBe(false);
+      expect(isCalendarUnit("YEAR", 1)).toBe(false);
+      expect(isCalendarUnit("MONTH", 1)).toBe(false);
+    });
   });
 });
