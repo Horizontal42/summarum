@@ -5,8 +5,32 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem};
+
+struct MigrationState(Mutex<Option<PathBuf>>);
+
+#[derive(Serialize)]
+struct PickDataDirResult {
+    path: String,
+    has_documents: bool,
+}
+
+#[tauri::command]
+fn pick_data_dir(app: AppHandle, state: tauri::State<'_, MigrationState>) -> Result<Option<PickDataDirResult>, String> {
+    if let Some(p) = app.dialog().file().blocking_pick_folder() {
+        let path = p.into_path().map_err(|e| e.to_string())?;
+        let has_docs = path.join("documents.json").exists();
+        *state.0.lock().unwrap() = Some(path.clone());
+        Ok(Some(PickDataDirResult {
+            path: path.to_string_lossy().into_owned(),
+            has_documents: has_docs,
+        }))
+    } else {
+        Ok(None)
+    }
+}
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -537,11 +561,6 @@ fn open_backups_folder(app: AppHandle, dir: Option<String>) -> Result<(), String
 
 // ---------- data folder migration
 
-#[tauri::command]
-fn data_dir_has_documents(dir: String) -> bool {
-    PathBuf::from(dir).join("documents.json").exists()
-}
-
 /// strategy: "move" (copy mine, delete originals), "overwrite" (same, target
 /// had documents), "use_existing" (just switch — keep the target's files)
 #[tauri::command]
@@ -550,9 +569,15 @@ fn migrate_data_dir(
     old_dir: Option<String>,
     new_dir: String,
     strategy: String,
+    state: tauri::State<'_, MigrationState>,
 ) -> Result<(), String> {
-    let old = docs_dir(&app, &old_dir);
+    let approved_dir = state.0.lock().unwrap().take();
     let new = PathBuf::from(&new_dir);
+    if Some(new.clone()) != approved_dir {
+        return Err("Migration rejected: target directory was not explicitly chosen by the user.".into());
+    }
+
+    let old = docs_dir(&app, &old_dir);
     fs::create_dir_all(&new).map_err(|e| e.to_string())?;
     // canonicalize: "C:\Data" and "c:\data" are the same folder on Windows
     let canon_old = fs::canonicalize(&old).unwrap_or_else(|_| old.clone());
@@ -743,7 +768,7 @@ fn main() {
             run_backups,
             backup_deleted_sheet,
             open_backups_folder,
-            data_dir_has_documents,
+            pick_data_dir,
             migrate_data_dir,
             fetch_rates,
             fetch_historical_rates,
@@ -758,6 +783,7 @@ fn main() {
             write_image_file
         ])
         .setup(|app| {
+            app.manage(MigrationState(Mutex::new(None)));
             let handle = app.handle().clone();
             let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Summarum", true, None::<&str>)?;

@@ -167,16 +167,12 @@ export async function openBackupsFolder(dataDir: string): Promise<void> {
   if (isTauri()) await invoke("open_backups_folder", { dir: dirArg(dataDir) });
 }
 
-export async function chooseFolder(): Promise<string | null> {
+export async function pickDataDir(): Promise<{ path: string, hasDocuments: boolean } | null> {
   if (!isTauri()) return null;
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const picked = await open({ directory: true, multiple: false });
-  return typeof picked === "string" ? picked : null;
-}
-
-export async function dataDirHasDocuments(dir: string): Promise<boolean> {
-  if (!isTauri()) return false;
-  return invoke<boolean>("data_dir_has_documents", { dir });
+  return invoke<{ path: string, has_documents: boolean } | null>("pick_data_dir").then(res => {
+    if (!res) return null;
+    return { path: res.path, hasDocuments: res.has_documents };
+  });
 }
 
 export type MigrateStrategy = "move" | "overwrite" | "use_existing";

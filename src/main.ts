@@ -8,7 +8,7 @@ import {
   fetchRates, fetchMarketData, fetchHistoricalRates, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
-  chooseFolder, dataDirHasDocuments, migrateDataDir,
+  pickDataDir, migrateDataDir,
 } from "./storage";
 import type { LineResult } from "./engine";
 import { setLang, detectLang, t } from "./i18n";
@@ -404,10 +404,12 @@ function bindDataDirSettings(): void {
   };
   renderDataDir();
   dataDirBtn.addEventListener("click", async () => {
-    const picked = await chooseFolder();
-    if (!picked || picked === settings.dataDir) return;
+    const res = await pickDataDir();
+    if (!res) return;
+    const { path: picked, hasDocuments } = res;
+    if (picked === settings.dataDir) return;
     let strategy: "move" | "overwrite" | "use_existing" = "move";
-    if (await dataDirHasDocuments(picked)) {
+    if (hasDocuments) {
       const ans = await askModal(t("folderConflict"), t("useExisting"), t("replaceMine"));
       if (ans === null) return;
       strategy = ans === "a" ? "use_existing" : "overwrite";
