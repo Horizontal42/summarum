@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { SumEngine } from "./index";
-import { qty, EvalError, XRefError, Decimal } from "./types";
+import { qty, EvalError, XRefError } from "./types";
 import type { XRefResolution, EvalCtx } from "./evaluator";
 import { evaluate } from "./evaluator";
 import { formatValue } from "./formatter";
@@ -440,7 +440,7 @@ describe("evaluation errors", () => {
       vars: new Map(),
       reg: eng.reg,
       historicalRates: {},
-      resolveXRef: (sheet: string, key: string) => ({ ok: false, reason: "xref error" }),
+      resolveXRef: () => ({ ok: false, reason: "xref error" }),
     } as unknown as EvalCtx;
     expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
   });
