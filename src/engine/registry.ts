@@ -8,6 +8,7 @@ import * as vocab from "./vocab";
 import { UNIT_DATA, SI_PREFIXES, DATA_SI_PREFIXES, IEC_PREFIXES, SCALE_DATA } from "./unitdata";
 import { EXTRA_UNITS, CRYPTO } from "./extraunits";
 
+/** Operators for percentage calculations. */
 export type PctOp =
   | "of" | "off" | "on"
   | "as_pct_of" | "as_pct_off" | "as_pct_on"
