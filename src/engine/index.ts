@@ -137,8 +137,8 @@ export class SumEngine {
           // a line without a result beats a dead sheet — swallow everything,
           // including extension bugs and BigInt conversion errors
         } catch (e) {
-          if (e instanceof XRefError) lineError = e.message;
-          else if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
+          lineError = e instanceof Error ? e.message : String(e);
+          if (!(e instanceof EvalError)) console.warn("evaluate failed:", e);
           value = null;
         }
         if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
