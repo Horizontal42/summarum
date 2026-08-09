@@ -10,6 +10,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
@@ -595,8 +596,11 @@ fn migrate_data_dir(
 
 /// Used by drag&drop: read a calculation/text file from an absolute path.
 #[tauri::command]
-fn read_text_file(path: String) -> Result<String, String> {
+fn read_text_file(app: AppHandle, path: String) -> Result<String, String> {
     let p = std::path::PathBuf::from(&path);
+    if !app.try_fs_scope().map(|scope| scope.is_allowed(&p)).unwrap_or(false) {
+        return Err("path not authorized".into());
+    }
     let ext = p
         .extension()
         .and_then(|e| e.to_str())
@@ -726,6 +730,7 @@ fn main() {
                 win.set_focus().ok();
             }
         }))
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
