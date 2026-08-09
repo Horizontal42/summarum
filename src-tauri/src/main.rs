@@ -3,12 +3,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, Emitter, Manager, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -679,10 +681,20 @@ fn migrate_data_dir(
     Ok(())
 }
 
-/// Used by drag&drop: read a calculation/text file from an absolute path.
+/// Paths the OS actually handed us in a window drop event. The frontend can
+/// name any path over IPC, so this is the only proof a read was user-initiated.
+#[derive(Default)]
+struct DroppedFiles(Mutex<HashSet<PathBuf>>);
+
+/// Used by drag&drop: read a calculation/text file dropped onto the window.
 #[tauri::command]
-fn read_text_file(path: String) -> Result<String, String> {
-    let p = std::path::PathBuf::from(&path);
+fn read_text_file(app: AppHandle, path: String) -> Result<String, String> {
+    // compare canonicalized, so a symlink or ".." spelling of an allowed path
+    // cannot stand in for a different file
+    let p = fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    if !app.state::<DroppedFiles>().0.lock().unwrap().contains(&p) {
+        return Err("file was not dropped onto the window".into());
+    }
     let ext = p
         .extension()
         .and_then(|e| e.to_str())
@@ -821,6 +833,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(DroppedFiles::default())
         .invoke_handler(tauri::generate_handler![
             save_file,
             load_file,
@@ -873,12 +886,23 @@ fn main() {
             let _ = handle;
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
             // close hides to tray
-            if let WindowEvent::CloseRequested { api, .. } = event {
+            WindowEvent::CloseRequested { api, .. } => {
                 window.hide().ok();
                 api.prevent_close();
             }
+            // runs before the webview gets tauri://drag-drop (that emit only
+            // queues a script eval), so the paths are allowed by the time the
+            // frontend can ask for them
+            WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) => {
+                let allowed: HashSet<PathBuf> = paths
+                    .iter()
+                    .filter_map(|p| fs::canonicalize(p).ok())
+                    .collect();
+                *window.state::<DroppedFiles>().0.lock().unwrap() = allowed;
+            }
+            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running Summarum");
