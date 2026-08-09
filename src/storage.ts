@@ -213,6 +213,26 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
 
 // ---------- historical rates
 
+export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record<string, Record<string, number>>> {
+  if (dates.length === 0) return {};
+  try {
+    if (isTauri()) {
+      return await invoke<Record<string, Record<string, number>>>("fetch_historical_rates_batch", { dates });
+    }
+    const results: Record<string, Record<string, number>> = {};
+    await Promise.all(
+      dates.map(async (date) => {
+        const rates = await fetchHistoricalRates(date);
+        if (rates) results[date] = rates;
+      })
+    );
+    return results;
+  } catch (e) {
+    console.warn("fetchHistoricalRatesBatch failed", e);
+    return {};
+  }
+}
+
 export async function fetchHistoricalRates(date: string): Promise<Record<string, number> | null> {
   try {
     if (isTauri()) {

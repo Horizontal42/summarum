@@ -5,7 +5,7 @@ import { SumEditor } from "./ui/editor";
 import {
   AppData, DocMeta, SettingsData, defaultSettingsData,
   loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
-  fetchRates, fetchMarketData, fetchHistoricalRates, loadExtensionScripts, openExtensionsFolder, isTauri,
+  fetchRates, fetchMarketData, fetchHistoricalRatesBatch, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
   setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
   chooseFolder, dataDirHasDocuments, migrateDataDir,
@@ -605,13 +605,9 @@ async function fetchNeededHistoricalRates(text: string): Promise<void> {
   const datesToFetch = Array.from(dates).filter((date) => !engine.hasHistoricalRates(date));
   let fetched = false;
   if (datesToFetch.length > 0) {
-    const results = await Promise.all(
-      datesToFetch.map(async (date) => {
-        const rates = await fetchHistoricalRates(date);
-        return { date, rates };
-      })
-    );
-    for (const { date, rates } of results) {
+    const results = await fetchHistoricalRatesBatch(datesToFetch);
+    for (const date of datesToFetch) {
+      const rates = results[date];
       if (rates) {
         engine.setHistoricalRates(date, rates);
         fetched = true;

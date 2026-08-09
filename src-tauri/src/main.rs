@@ -201,10 +201,12 @@ fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
 }
 
 async fn fetch_rates_online() -> Result<RatesPayload, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default()
+    });
 
     let body: serde_json::Value = client
         .get("https://open.er-api.com/v6/latest/USD")
@@ -380,6 +382,8 @@ fn valid_date_str(date: &str) -> bool {
         && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()))
 }
 
+static HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
 #[tauri::command]
 async fn fetch_historical_rates(
     app: AppHandle,
@@ -394,10 +398,12 @@ async fn fetch_historical_rates(
             return Ok(cached);
         }
     }
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default()
+    });
     // api.frankfurter.app 301-redirects here now, and the old domain is
     // flaky over reqwest/rustls-tls — go straight to the stable host
     let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
@@ -423,6 +429,86 @@ async fn fetch_historical_rates(
         write_atomic(&cache_path, &serialized).ok();
     }
     Ok(rates)
+}
+
+#[tauri::command]
+async fn fetch_historical_rates_batch(
+    app: AppHandle,
+    dates: Vec<String>,
+) -> Result<std::collections::HashMap<String, std::collections::HashMap<String, f64>>, String> {
+    let mut results = std::collections::HashMap::new();
+    let mut missing_dates = Vec::new();
+
+    for date in &dates {
+        if !valid_date_str(date) {
+            continue;
+        }
+        let cache_path = data_dir(&app).join(format!("rates-{}.json", date));
+        if let Ok(raw) = std::fs::read_to_string(&cache_path) {
+            if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw)
+            {
+                results.insert(date.clone(), cached);
+                continue;
+            }
+        }
+        missing_dates.push(date.clone());
+    }
+
+    if missing_dates.is_empty() {
+        return Ok(results);
+    }
+
+    let client = HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default()
+    });
+
+    let mut futures = Vec::new();
+
+    for date in missing_dates {
+        let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
+        let client_clone = client.clone();
+        let app_clone = app.clone();
+
+        futures.push(async move {
+            let mut rate_map = None;
+            if let Ok(resp) = client_clone.get(&url).send().await {
+                if let Ok(body) = resp.json::<serde_json::Value>().await {
+                    if let Some(rates_obj) = body["rates"].as_object() {
+                        let mut daily_rates = std::collections::HashMap::new();
+                        daily_rates.insert("USD".to_string(), 1.0_f64);
+                        for (code, val) in rates_obj {
+                            if let Some(v) = val.as_f64() {
+                                if v > 0.0 {
+                                    daily_rates.insert(code.to_uppercase(), v);
+                                }
+                            }
+                        }
+                        let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
+                        if let Ok(serialized) = serde_json::to_string(&daily_rates) {
+                            let _ = crate::write_atomic(&cache_path, &serialized);
+                        }
+                        rate_map = Some((date, daily_rates));
+                    }
+                }
+            }
+            rate_map
+        });
+    }
+
+    use futures::stream::StreamExt;
+    let fetched_results = futures::stream::iter(futures)
+        .buffer_unordered(5)
+        .collect::<Vec<_>>()
+        .await;
+
+    for (date, rates) in fetched_results.into_iter().flatten() {
+        results.insert(date, rates);
+    }
+
+    Ok(results)
 }
 
 // ---------- documents in the (possibly custom) data folder
@@ -747,6 +833,7 @@ fn main() {
             migrate_data_dir,
             fetch_rates,
             fetch_historical_rates,
+            fetch_historical_rates_batch,
             fetch_market_data,
             load_extensions,
             open_extensions_folder,
