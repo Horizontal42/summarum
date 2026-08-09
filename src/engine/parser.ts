@@ -97,6 +97,17 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
   return { assign, expr: p.parseSeq() };
 }
 
+
+const PREC = {
+  CONV: 10,
+  BIT: 20,
+  ADD: 30,
+  MUL: 40,
+  UNARY: 50,
+  POW: 55,
+  POSTFIX: 60,
+};
+
 class Parser {
   private i = 0;
   constructor(private toks: Token[], private vars: Set<string>) {}
@@ -130,7 +141,7 @@ class Parser {
       }
       if (tk.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is")) && items.length > 0) {
         this.i++;
-        const r = this.parseAdd();
+        const r = this.parseExpr(PREC.ADD);
         if (r) {
           items = [{ k: "pctop", op: tk.op, l: mk(), r }];
           continue;
@@ -141,7 +152,7 @@ class Parser {
       if (tk.t === "op" && items.length > 0) {
         const save = this.i;
         this.i++;
-        const r = tk.op === "plus" || tk.op === "minus" ? this.parseMul() : this.parseUnary();
+        const r = tk.op === "plus" || tk.op === "minus" ? this.parseExpr(PREC.MUL) : this.parseExpr(PREC.UNARY);
         if (r) {
           items = [{ k: "bin", op: tk.op, l: mk(), r }];
           continue;
@@ -152,7 +163,7 @@ class Parser {
       if (tk.t === "bitop" && items.length > 0) {
         const save = this.i;
         this.i++;
-        const r = this.parseAdd();
+        const r = this.parseExpr(PREC.ADD);
         if (r) {
           items = [{ k: "bit", op: tk.op, l: mk(), r }];
           continue;
@@ -161,7 +172,7 @@ class Parser {
         continue;
       }
       const before = this.i;
-      const node = this.parseBit();
+      const node = this.parseExpr(PREC.BIT);
       if (node) items.push(node);
       if (this.i === before) this.i++; // skip unparsable token
     }
@@ -169,52 +180,144 @@ class Parser {
     return mk();
   }
 
-  /** bitwise level (one flat precedence, left-assoc): & | xor << >> */
-  private parseBit(): Node | null {
-    let l = this.parseAdd();
-    if (!l) return null;
-    for (;;) {
-      const tk = this.peek();
-      if (tk?.t !== "bitop") break;
-      const save = this.i;
-      this.i++;
-      const r = this.parseAdd();
-      if (!r) {
-        this.i = save;
-        break;
-      }
-      l = { k: "bit", op: tk.op, l, r };
-    }
-    return l;
-  }
+  /**
+   * Pratt parser implementation for expressions.
+   */
+  private parseExpr(minPrec: number = 0): Node | null {
+    let tk = this.peek();
+    if (!tk) return null;
 
-  /** conversion level: `x in cm`, `x as a % of y`, `x of what is y` */
-  private parseConv(): Node | null {
-    let l = this.parseBit();
-    if (!l) return null;
+    let lhs: Node | null = null;
+
+    if (tk.t === "op" && tk.op === "minus") {
+      this.i++;
+      const x = this.parseExpr(PREC.UNARY);
+      if (!x) return null;
+      lhs = { k: "neg", x };
+    } else if (tk.t === "op" && tk.op === "plus") {
+      this.i++;
+      lhs = this.parseExpr(PREC.UNARY);
+      if (!lhs) return null;
+    } else {
+      lhs = this.parsePrimary();
+    }
+
+    if (!lhs) return null;
+
     for (;;) {
-      const tk = this.peek();
-      if (tk?.t === "conv") {
+      tk = this.peek();
+      if (!tk) break;
+
+      if (tk.t === "percent") {
+        if (PREC.POSTFIX < minPrec) break;
+        this.i++;
+        lhs = { k: "pct", x: lhs };
+        continue;
+      }
+      if (tk.t === "bang") {
+        if (PREC.POSTFIX < minPrec) break;
+        this.i++;
+        lhs = { k: "fact", x: lhs };
+        continue;
+      }
+      if (tk.t === "unit") {
+        if (PREC.POSTFIX < minPrec) break;
+        this.i++;
+        lhs = { k: "unit", x: lhs, unit: tk.unit };
+        continue;
+      }
+      if (tk.t === "currency") {
+        if (PREC.POSTFIX < minPrec) break;
+        this.i++;
+        lhs = { k: "curr", x: lhs, code: tk.code };
+        continue;
+      }
+      if (tk.t === "scale") {
+        if (PREC.POSTFIX < minPrec) break;
+        this.i++;
+        lhs = { k: "scale", x: lhs, mult: tk.mult, label: "" };
+        continue;
+      }
+      if (tk.t === "op" && tk.op === "pow") {
+        if (PREC.POW < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.POW);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "bin", op: "pow", l: lhs, r };
+        continue;
+      }
+      if (tk.t === "op" && (tk.op === "mul" || tk.op === "div" || tk.op === "mod")) {
+        if (PREC.MUL < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.MUL + 1);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "bin", op: tk.op, l: lhs, r };
+        continue;
+      }
+      if (tk.t === "pctop" && (tk.op === "of" || tk.op === "off" || tk.op === "on")) {
+        if (!(lhs.k === "pct" || lhs.k === "var" || lhs.k === "pctop")) {
+          this.i++;
+          continue;
+        }
+        if (PREC.MUL < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.MUL + 1);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "pctop", op: tk.op, l: lhs, r };
+        continue;
+      }
+      if (tk.t === "lparen" || tk.t === "const" || tk.t === "func" || (tk.t === "word" && this.vars.has(tk.raw))) {
+        if (PREC.MUL < minPrec) break;
+        const save = this.i;
+        const r = this.parseExpr(PREC.MUL + 1);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "bin", op: "mul", l: lhs, r };
+        continue;
+      }
+      if (tk.t === "op" && (tk.op === "plus" || tk.op === "minus")) {
+        if (PREC.ADD < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.ADD + 1);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "bin", op: tk.op, l: lhs, r };
+        continue;
+      }
+      if (tk.t === "bitop") {
+        if (PREC.BIT < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.BIT + 1);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "bit", op: tk.op, l: lhs, r };
+        continue;
+      }
+      if (tk.t === "conv") {
+        if (PREC.CONV < minPrec) break;
         const save = this.i;
         this.i++;
         const target = this.parseTarget();
-        if (!target) {
-          this.i = save;
-          break;
-        }
-        l = { k: "conv", x: l, target: this.tryHistoricalDate(target) };
-      } else if (tk?.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is"))) {
-        this.i++;
-        const r = this.parseAdd();
-        if (!r) break;
-        l = { k: "pctop", op: tk.op, l, r };
-      } else {
-        break;
+        if (!target) { this.i = save; break; }
+        lhs = { k: "conv", x: lhs, target: this.tryHistoricalDate(target) };
+        continue;
       }
-    }
-    return l;
-  }
+      if (tk.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is"))) {
+        if (PREC.CONV < minPrec) break;
+        const save = this.i;
+        this.i++;
+        const r = this.parseExpr(PREC.ADD);
+        if (!r) { this.i = save; break; }
+        lhs = { k: "pctop", op: tk.op, l: lhs, r };
+        continue;
+      }
 
+      break;
+    }
+    return lhs;
+  }
   /** If the current token is `pctop(on)` + `datelit`, consume them and attach `onDate`. */
   private tryHistoricalDate(target: ConvTarget): ConvTarget {
     if (target.type !== "currency") return target;
@@ -280,122 +383,6 @@ class Parser {
     return null;
   }
 
-  private parseAdd(): Node | null {
-    let l = this.parseMul();
-    if (!l) return null;
-    for (;;) {
-      const tk = this.peek();
-      if (tk?.t === "op" && (tk.op === "plus" || tk.op === "minus")) {
-        const save = this.i;
-        this.i++;
-        const r = this.parseMul();
-        if (!r) {
-          this.i = save;
-          break;
-        }
-        l = { k: "bin", op: tk.op, l, r };
-      } else {
-        break;
-      }
-    }
-    return l;
-  }
-
-  private parseMul(): Node | null {
-    let l = this.parseUnary();
-    if (!l) return null;
-    for (;;) {
-      const tk = this.peek();
-      if (tk?.t === "op" && (tk.op === "mul" || tk.op === "div" || tk.op === "mod")) {
-        const save = this.i;
-        this.i++;
-        const r = this.parseUnary();
-        if (!r) {
-          this.i = save;
-          break;
-        }
-        l = { k: "bin", op: tk.op, l, r };
-      } else if (tk?.t === "pctop" && (tk.op === "of" || tk.op === "off" || tk.op === "on")) {
-        // of/off/on only make sense with a percent on the left ("20% of x");
-        // otherwise the word is prose noise ("5 on coffee")
-        if (!(l.k === "pct" || l.k === "var" || l.k === "pctop")) {
-          this.i++;
-          continue;
-        }
-        const save = this.i;
-        this.i++;
-        const r = this.parseUnary();
-        if (!r) {
-          this.i = save;
-          break;
-        }
-        l = { k: "pctop", op: tk.op, l, r };
-      } else if (
-        tk &&
-        (tk.t === "lparen" || tk.t === "const" || tk.t === "func" || (tk.t === "word" && this.vars.has(tk.raw)))
-      ) {
-        // implicit multiplication: 2(3+4), 2pi, 2x
-        const save = this.i;
-        const r = this.parseUnary();
-        if (!r) {
-          this.i = save;
-          break;
-        }
-        l = { k: "bin", op: "mul", l, r };
-      } else {
-        break;
-      }
-    }
-    return l;
-  }
-
-  private parseUnary(): Node | null {
-    const tk = this.peek();
-    if (tk?.t === "op" && tk.op === "minus") {
-      this.i++;
-      const x = this.parseUnary();
-      return x ? { k: "neg", x } : null;
-    }
-    if (tk?.t === "op" && tk.op === "plus") {
-      this.i++;
-      return this.parseUnary();
-    }
-    return this.parsePostfix();
-  }
-
-  private parsePostfix(): Node | null {
-    let x = this.parsePrimary();
-    if (!x) return null;
-    for (;;) {
-      const tk = this.peek();
-      if (!tk) break;
-      if (tk.t === "percent") {
-        this.i++;
-        x = { k: "pct", x };
-      } else if (tk.t === "bang") {
-        this.i++;
-        x = { k: "fact", x };
-      } else if (tk.t === "unit") {
-        this.i++;
-        x = { k: "unit", x, unit: tk.unit };
-      } else if (tk.t === "currency") {
-        this.i++;
-        x = { k: "curr", x, code: tk.code };
-      } else if (tk.t === "scale") {
-        this.i++;
-        x = { k: "scale", x, mult: tk.mult, label: "" };
-      } else if (tk.t === "op" && tk.op === "pow") {
-        this.i++;
-        const r = this.parseUnary();
-        if (!r) break;
-        x = { k: "bin", op: "pow", l: x, r };
-      } else {
-        break;
-      }
-    }
-    return x;
-  }
-
   private parsePrimary(): Node | null {
     const tk = this.peek();
     if (!tk) return null;
@@ -431,7 +418,7 @@ class Parser {
           this.i++;
           const args: Node[] = [];
           for (;;) {
-            const arg = this.parseConv();
+            const arg = this.parseExpr(PREC.CONV);
             if (arg) args.push(arg);
             const nx = this.peek();
             if (nx?.t === "semicolon") {
@@ -452,12 +439,12 @@ class Parser {
         // `sqrt 16` / `square root of 16` — the "of" is decorative
         const nx = this.peek();
         if (nx?.t === "pctop" && nx.op === "of") this.i++;
-        const arg = this.parseUnary();
+        const arg = this.parseExpr(PREC.UNARY);
         return arg ? { k: "call", name, args: [arg] } : null;
       }
       case "lparen": {
         this.i++;
-        const inner = this.parseConv();
+        const inner = this.parseExpr(PREC.CONV);
         if (this.peek()?.t === "rparen") this.i++;
         return inner;
       }
