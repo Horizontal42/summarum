@@ -585,9 +585,14 @@ fn migrate_data_dir(
     }
 
     if !files_to_copy.is_empty() {
-        let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let thread_count = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         let chunk_size = (files_to_copy.len() / thread_count).max(1);
-        let chunks: Vec<_> = files_to_copy.chunks(chunk_size).map(|c| c.to_vec()).collect();
+        let chunks: Vec<_> = files_to_copy
+            .chunks(chunk_size)
+            .map(|c| c.to_vec())
+            .collect();
 
         let mut handles = Vec::new();
         for chunk in chunks {
