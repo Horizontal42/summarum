@@ -631,18 +631,24 @@ fn extensions_dir(app: &AppHandle) -> PathBuf {
 }
 
 #[tauri::command]
-fn load_extensions(app: AppHandle) -> Vec<ExtensionScript> {
+async fn load_extensions(app: AppHandle) -> Vec<ExtensionScript> {
     let mut out = Vec::new();
     if let Ok(entries) = fs::read_dir(extensions_dir(&app)) {
+        let mut tasks = Vec::new();
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "js") {
-                if let Ok(code) = fs::read_to_string(&path) {
-                    out.push(ExtensionScript {
-                        name: entry.file_name().to_string_lossy().into_owned(),
-                        code,
-                    });
-                }
+                let name = entry.file_name().to_string_lossy().into_owned();
+                tasks.push(tauri::async_runtime::spawn_blocking(move || {
+                    fs::read_to_string(&path)
+                        .ok()
+                        .map(|code| ExtensionScript { name, code })
+                }));
+            }
+        }
+        for task in tasks {
+            if let Ok(Some(script)) = task.await {
+                out.push(script);
             }
         }
     }
