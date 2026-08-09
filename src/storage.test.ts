@@ -1,14 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
-}));
-
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: vi.fn(),
 }));
 
 describe('storage', () => {
@@ -310,14 +305,14 @@ describe('storage', () => {
 
       it('returns path when in Tauri and folder is chosen', async () => {
         vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
-        vi.mocked(open).mockResolvedValue('chosen_path');
+        vi.mocked(invoke).mockResolvedValue('chosen_path');
         expect(await chooseFolder()).toBe('chosen_path');
-        expect(open).toHaveBeenCalledWith({ directory: true, multiple: false });
+        expect(invoke).toHaveBeenCalledWith('pick_data_dir', undefined);
       });
 
       it('returns null when in Tauri and folder choice is cancelled', async () => {
         vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
-        vi.mocked(open).mockResolvedValue(null);
+        vi.mocked(invoke).mockResolvedValue(null);
         expect(await chooseFolder()).toBeNull();
       });
     });

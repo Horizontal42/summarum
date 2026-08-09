@@ -630,6 +630,23 @@ fn data_dir_has_documents(dir: String) -> bool {
     PathBuf::from(dir).join("documents.json").exists()
 }
 
+/// The folder the user last chose in the native picker. `migrate_data_dir`
+/// writes to and prunes whatever it is handed, and the frontend can name any
+/// path over IPC, so the target has to be proven user-chosen.
+#[derive(Default)]
+struct PickedDataDir(Mutex<Option<PathBuf>>);
+
+#[tauri::command]
+fn pick_data_dir(app: AppHandle) -> Result<Option<String>, String> {
+    let Some(picked) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let path = picked.into_path().map_err(|e| e.to_string())?;
+    let canon = fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    *app.state::<PickedDataDir>().0.lock().unwrap() = Some(canon);
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// strategy: "move" (copy mine, delete originals), "overwrite" (same, target
 /// had documents), "use_existing" (just switch — keep the target's files)
 #[tauri::command]
@@ -639,12 +656,19 @@ fn migrate_data_dir(
     new_dir: String,
     strategy: String,
 ) -> Result<(), String> {
-    let old = docs_dir(&app, &old_dir);
     let new = PathBuf::from(&new_dir);
-    fs::create_dir_all(&new).map_err(|e| e.to_string())?;
     // canonicalize: "C:\Data" and "c:\data" are the same folder on Windows
+    let canon_new = fs::canonicalize(&new).map_err(|e| e.to_string())?;
+    let state = app.state::<PickedDataDir>();
+    {
+        let mut picked = state.0.lock().unwrap();
+        if picked.as_deref() != Some(canon_new.as_path()) {
+            return Err("target folder was not chosen by the user".into());
+        }
+        *picked = None;
+    }
+    let old = docs_dir(&app, &old_dir);
     let canon_old = fs::canonicalize(&old).unwrap_or_else(|_| old.clone());
-    let canon_new = fs::canonicalize(&new).unwrap_or_else(|_| new.clone());
     if canon_old == canon_new {
         return Ok(());
     }
@@ -675,8 +699,20 @@ fn migrate_data_dir(
     if old_docs.exists() {
         fs::remove_file(&old_docs).ok();
     }
+    // one level at a time, files only — `old` comes from the frontend, and a
+    // recursive delete of anything named "backups" is too big a hammer to hand
+    // over. run_backups/backup_deleted_sheet only ever write flat files here.
     if all_copied {
-        fs::remove_dir_all(old.join("backups")).ok();
+        for sub in ["backups", "backups/deleted"] {
+            if let Ok(entries) = fs::read_dir(old.join(sub)) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_file() {
+                        fs::remove_file(&p).ok();
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -834,6 +870,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(DroppedFiles::default())
+        .manage(PickedDataDir::default())
         .invoke_handler(tauri::generate_handler![
             save_file,
             load_file,
@@ -843,6 +880,7 @@ fn main() {
             backup_deleted_sheet,
             open_backups_folder,
             data_dir_has_documents,
+            pick_data_dir,
             migrate_data_dir,
             fetch_rates,
             fetch_historical_rates,

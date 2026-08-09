@@ -167,11 +167,10 @@ export async function openBackupsFolder(dataDir: string): Promise<void> {
   if (isTauri()) await invoke("open_backups_folder", { dir: dirArg(dataDir) });
 }
 
+/** Rust-side picker: migrateDataDir only accepts a folder chosen through this. */
 export async function chooseFolder(): Promise<string | null> {
   if (!isTauri()) return null;
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const picked = await open({ directory: true, multiple: false });
-  return typeof picked === "string" ? picked : null;
+  return (await invoke<string | null>("pick_data_dir")) ?? null;
 }
 
 export async function dataDirHasDocuments(dir: string): Promise<boolean> {
