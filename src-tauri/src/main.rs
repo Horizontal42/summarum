@@ -477,24 +477,28 @@ fn run_backups(app: AppHandle, dir: Option<String>, retention_days: u32) -> Resu
         })
         .collect();
     snaps.sort();
-    if snaps.len() > SNAPSHOT_KEEP {
-        for old in &snaps[..snaps.len() - SNAPSHOT_KEEP] {
-            fs::remove_file(old).ok();
-        }
-    }
 
-    // prune the deleted-sheets bin by age
-    let cutoff =
-        SystemTime::now() - std::time::Duration::from_secs(u64::from(retention_days) * 86400);
-    if let Ok(entries) = fs::read_dir(bdir.join("deleted")) {
-        for entry in entries.flatten() {
-            if let Ok(meta) = entry.metadata() {
-                if meta.modified().map(|m| m < cutoff).unwrap_or(false) {
-                    fs::remove_file(entry.path()).ok();
+    std::thread::spawn(move || {
+        if snaps.len() > SNAPSHOT_KEEP {
+            for old in &snaps[..snaps.len() - SNAPSHOT_KEEP] {
+                fs::remove_file(old).ok();
+            }
+        }
+
+        // prune the deleted-sheets bin by age
+        let cutoff =
+            SystemTime::now() - std::time::Duration::from_secs(u64::from(retention_days) * 86400);
+        if let Ok(entries) = fs::read_dir(bdir.join("deleted")) {
+            for entry in entries.flatten() {
+                if let Ok(meta) = entry.metadata() {
+                    if meta.modified().map(|m| m < cutoff).unwrap_or(false) {
+                        fs::remove_file(entry.path()).ok();
+                    }
                 }
             }
         }
-    }
+    });
+
     Ok(())
 }
 
