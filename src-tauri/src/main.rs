@@ -598,7 +598,11 @@ fn migrate_data_dir(
 #[tauri::command]
 fn read_text_file(app: AppHandle, path: String) -> Result<String, String> {
     let p = std::path::PathBuf::from(&path);
-    if !app.try_fs_scope().map(|scope| scope.is_allowed(&p)).unwrap_or(false) {
+    if !app
+        .try_fs_scope()
+        .map(|scope| scope.is_allowed(&p))
+        .unwrap_or(false)
+    {
         return Err("path not authorized".into());
     }
     let ext = p
