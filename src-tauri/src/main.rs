@@ -431,7 +431,6 @@ async fn fetch_historical_rates(
     Ok(rates)
 }
 
-
 #[tauri::command]
 async fn fetch_historical_rates_batch(
     app: AppHandle,
@@ -446,7 +445,8 @@ async fn fetch_historical_rates_batch(
         }
         let cache_path = data_dir(&app).join(format!("rates-{}.json", date));
         if let Ok(raw) = std::fs::read_to_string(&cache_path) {
-            if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw) {
+            if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw)
+            {
                 results.insert(date.clone(), cached);
                 continue;
             }
