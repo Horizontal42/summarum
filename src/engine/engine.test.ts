@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { SumEngine } from "./index";
-import { qty } from "./types";
-import type { XRefResolution } from "./evaluator";
-import { formatValue } from "./index";
+import { qty, EvalError, XRefError, Decimal } from "./types";
+import type { XRefResolution, EvalCtx } from "./evaluator";
+import { evaluate } from "./evaluator";
+import { formatValue } from "./formatter";
 
 let eng: SumEngine;
 
@@ -421,5 +422,26 @@ describe("cross-sheet references", () => {
   it("an assignment line reports the assigned name via LineResult.assign", () => {
     const r = eng.evaluateDocument("rent = $500");
     expect(r[0].assign).toBe("rent");
+  });
+});
+
+describe("evaluation errors", () => {
+  it("throws EvalError for unknown variable", () => {
+    const ctx = {
+      vars: new Map(),
+      reg: eng.reg,
+      historicalRates: {},
+    } as unknown as EvalCtx;
+    expect(() => evaluate({ k: "var", name: "unknown" }, ctx)).toThrowError(EvalError);
+  });
+
+  it("throws XRefError for unresolved xref", () => {
+    const ctx = {
+      vars: new Map(),
+      reg: eng.reg,
+      historicalRates: {},
+      resolveXRef: (sheet: string, key: string) => ({ ok: false, reason: "xref error" }),
+    } as unknown as EvalCtx;
+    expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
   });
 });
