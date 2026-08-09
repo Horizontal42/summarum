@@ -110,6 +110,7 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
   el.addEventListener("mousedown", (e) => {
     if ((e.target as HTMLElement).closest("button")) return;
     const startY = e.clientY;
+    let cachedItems: { el: HTMLElement, top: number, bottom: number }[] | null = null;
     const onMove = (ev: MouseEvent) => {
       if (!dragging) {
         if (Math.abs(ev.clientY - startY) < 4) return;
@@ -118,13 +119,22 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
         el.classList.add("dragging");
         document.body.style.cursor = "grabbing";
       }
-      const items = [...list.querySelectorAll<HTMLElement>(".doc-item")];
-      for (const item of items) item.classList.remove("drag-over");
-      const over = items.find((item) => {
-        if (item === el) return false;
-        const r = item.getBoundingClientRect();
-        return ev.clientY >= r.top && ev.clientY <= r.bottom;
-      });
+      if (!cachedItems) {
+        const domItems = [...list.querySelectorAll<HTMLElement>(".doc-item")];
+        cachedItems = domItems.map((item) => {
+          const rect = item.getBoundingClientRect();
+          return { el: item, top: rect.top, bottom: rect.bottom };
+        });
+      }
+      let over: HTMLElement | undefined;
+      for (const item of cachedItems) {
+        item.el.classList.remove("drag-over");
+        if (!over && item.el !== el) {
+          if (ev.clientY >= item.top && ev.clientY <= item.bottom) {
+            over = item.el;
+          }
+        }
+      }
       if (over) {
         const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
         if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
@@ -133,6 +143,7 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      cachedItems = null;
       if (dragging) {
         const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
         for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
