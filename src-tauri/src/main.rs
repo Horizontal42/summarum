@@ -18,7 +18,10 @@ struct PickDataDirResult {
 }
 
 #[tauri::command]
-fn pick_data_dir(app: AppHandle, state: tauri::State<'_, MigrationState>) -> Result<Option<PickDataDirResult>, String> {
+fn pick_data_dir(
+    app: AppHandle,
+    state: tauri::State<'_, MigrationState>,
+) -> Result<Option<PickDataDirResult>, String> {
     if let Some(p) = app.dialog().file().blocking_pick_folder() {
         let path = p.into_path().map_err(|e| e.to_string())?;
         let has_docs = path.join("documents.json").exists();
@@ -574,7 +577,9 @@ fn migrate_data_dir(
     let approved_dir = state.0.lock().unwrap().take();
     let new = PathBuf::from(&new_dir);
     if Some(new.clone()) != approved_dir {
-        return Err("Migration rejected: target directory was not explicitly chosen by the user.".into());
+        return Err(
+            "Migration rejected: target directory was not explicitly chosen by the user.".into(),
+        );
     }
 
     let old = docs_dir(&app, &old_dir);
