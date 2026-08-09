@@ -36,69 +36,27 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
     case "num":
       return qty(node.v, null, node.repr);
     case "const":
-      switch (node.name) {
-        case "pi": return qty(PI);
-        case "e": return qty(E);
-        case "half": return qty(new Decimal("0.5"));
-        case "onehalf": return qty(new Decimal("1.5"));
-      }
-    case "var": {
-      const v = ctx.vars.get(node.name);
-      if (!v) throw new EvalError(`unknown variable ${node.name}`);
-      return v;
-    }
+      return evaluateConst(node);
+    case "var":
+    case "xref":
+    case "unknown":
+      return evaluateRef(node, ctx);
     case "date":
       return evalDateWord(node.word);
     case "datelit":
       return { kind: "date", ms: node.ms, hasTime: false };
-    case "xref": {
-      const res = ctx.resolveXRef?.(node.sheet, node.key);
-      if (!res || !res.ok) {
-        throw new XRefError(res && !res.ok ? res.reason : `sheet "${node.sheet}" not found`);
-      }
-      return res.value;
-    }
-    case "unknown": {
-      const xv = ctx.vars.get("__x__");
-      if (!xv) throw new EvalError("? used outside goal seek");
-      return xv;
-    }
     case "goalseek":
       return evalGoalSeek(node.lhs, node.rhs, ctx);
     case "agg":
       return evalAgg(node.name, ctx);
-    case "neg": {
-      const v = evaluate(node.x, ctx);
-      if (v.kind === "quantity") return { ...v, value: v.value.neg() };
-      if (v.kind === "percent") return pct(v.value.neg());
-      throw new EvalError("cannot negate a date");
-    }
-    case "pct": {
-      const v = evaluate(node.x, ctx);
-      if (v.kind === "quantity" && !v.unit) return pct(v.value);
-      if (v.kind === "percent") return v;
-      throw new EvalError("% needs a plain number");
-    }
-    case "fact": {
-      const v = asScalar(evaluate(node.x, ctx));
-      return qty(factorial(v));
-    }
-    case "unit": {
-      const v = evaluate(node.x, ctx);
-      return attachUnit(v, node.unit);
-    }
-    case "curr": {
-      const unit = ctx.reg.makeCurrencyUnit(node.code);
-      if (!unit) throw new EvalError(`no rate for ${node.code}`);
-      const v = evaluate(node.x, ctx);
-      return attachUnit(v, unit);
-    }
-    case "scale": {
-      const v = evaluate(node.x, ctx);
-      if (v.kind === "quantity") return { ...v, value: v.value.mul(node.mult) };
-      if (v.kind === "percent") return pct(v.value.mul(node.mult));
-      throw new EvalError("cannot scale a date");
-    }
+    case "neg":
+    case "pct":
+    case "fact":
+    case "scale":
+      return evaluateMath(node, ctx);
+    case "unit":
+    case "curr":
+      return evaluateUnitMod(node, ctx);
     case "bin":
       return evalBin(node.op, evaluate(node.l, ctx), evaluate(node.r, ctx), ctx);
     case "bit":
@@ -109,29 +67,8 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
       return evalConv(evaluate(node.x, ctx), node.target, ctx);
     case "call":
       return evalCall(node.name, node.args.map((a) => evaluate(a, ctx)), ctx);
-    case "seq": {
-      let acc: Value | null = null;
-      for (const item of node.items) {
-        let v: Value;
-        try {
-          v = evaluate(item, ctx);
-        } catch {
-          continue;
-        }
-        if (
-          acc?.kind === "quantity" && v.kind === "quantity" &&
-          acc.unit && v.unit && acc.unit.dimension === v.unit.dimension &&
-          acc.unit.dimension !== "scalar"
-        ) {
-          // "2 hours 30 min", "5 ft 4 in" — adjacent same-dimension quantities add up
-          acc = addQ(acc, v);
-        } else {
-          acc = v;
-        }
-      }
-      if (!acc) throw new EvalError("empty expression");
-      return acc;
-    }
+    case "seq":
+      return evaluateSeq(node, ctx);
   }
 }
 
@@ -642,5 +579,99 @@ function factorial(n: Decimal): Decimal {
   if (!n.isInteger() || n.isNegative() || n.gt(300)) throw new EvalError("bad factorial");
   let acc = new Decimal(1);
   for (let i = 2; i <= n.toNumber(); i++) acc = acc.mul(i);
+  return acc;
+}
+
+function evaluateConst(node: { k: "const", name: "pi" | "e" | "half" | "onehalf" }): Value {
+  switch (node.name) {
+    case "pi": return qty(PI);
+    case "e": return qty(E);
+    case "half": return qty(new Decimal("0.5"));
+    case "onehalf": return qty(new Decimal("1.5"));
+  }
+}
+
+function evaluateRef(node: Node, ctx: EvalCtx): Value {
+  if (node.k === "var") {
+    const v = ctx.vars.get(node.name);
+    if (!v) throw new EvalError(`unknown variable ${node.name}`);
+    return v;
+  }
+  if (node.k === "xref") {
+    const res = ctx.resolveXRef?.(node.sheet, node.key);
+    if (!res || !res.ok) {
+      throw new XRefError(res && !res.ok ? res.reason : `sheet "${node.sheet}" not found`);
+    }
+    return res.value;
+  }
+  if (node.k === "unknown") {
+    const xv = ctx.vars.get("__x__");
+    if (!xv) throw new EvalError("? used outside goal seek");
+    return xv;
+  }
+  throw new EvalError("invalid ref node");
+}
+
+function evaluateMath(node: Node, ctx: EvalCtx): Value {
+  if (node.k === "neg") {
+    const v = evaluate(node.x, ctx);
+    if (v.kind === "quantity") return { ...v, value: v.value.neg() };
+    if (v.kind === "percent") return pct(v.value.neg());
+    throw new EvalError("cannot negate a date");
+  }
+  if (node.k === "pct") {
+    const v = evaluate(node.x, ctx);
+    if (v.kind === "quantity" && !v.unit) return pct(v.value);
+    if (v.kind === "percent") return v;
+    throw new EvalError("% needs a plain number");
+  }
+  if (node.k === "fact") {
+    const v = asScalar(evaluate(node.x, ctx));
+    return qty(factorial(v));
+  }
+  if (node.k === "scale") {
+    const v = evaluate(node.x, ctx);
+    if (v.kind === "quantity") return { ...v, value: v.value.mul(node.mult) };
+    if (v.kind === "percent") return pct(v.value.mul(node.mult));
+    throw new EvalError("cannot scale a date");
+  }
+  throw new EvalError("invalid math node");
+}
+
+function evaluateUnitMod(node: Node, ctx: EvalCtx): Value {
+  if (node.k === "unit") {
+    const v = evaluate(node.x, ctx);
+    return attachUnit(v, node.unit);
+  }
+  if (node.k === "curr") {
+    const unit = ctx.reg.makeCurrencyUnit(node.code);
+    if (!unit) throw new EvalError(`no rate for ${node.code}`);
+    const v = evaluate(node.x, ctx);
+    return attachUnit(v, unit);
+  }
+  throw new EvalError("invalid unit mod node");
+}
+
+function evaluateSeq(node: { k: "seq", items: Node[] }, ctx: EvalCtx): Value {
+  let acc: Value | null = null;
+  for (const item of node.items) {
+    let v: Value;
+    try {
+      v = evaluate(item, ctx);
+    } catch {
+      continue;
+    }
+    if (
+      acc?.kind === "quantity" && v.kind === "quantity" &&
+      acc.unit && v.unit && acc.unit.dimension === v.unit.dimension &&
+      acc.unit.dimension !== "scalar"
+    ) {
+      // "2 hours 30 min", "5 ft 4 in" — adjacent same-dimension quantities add up
+      acc = addQ(acc, v);
+    } else {
+      acc = v;
+    }
+  }
+  if (!acc) throw new EvalError("empty expression");
   return acc;
 }
