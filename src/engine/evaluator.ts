@@ -143,7 +143,7 @@ function asScalar(v: Value): Decimal {
   throw new EvalError("expected a number");
 }
 
-function attachUnit(v: Value, unit: Unit): Value {
+export function attachUnit(v: Value, unit: Unit): Value {
   if (v.kind === "quantity") {
     if (v.unit && v.unit.dimension === unit.dimension) return convertQ(v, unit);
     if (v.unit) throw new EvalError("unit mismatch");
