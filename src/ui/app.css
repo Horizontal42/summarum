@@ -654,3 +654,6 @@ body {
 }
 .cm-tooltip-autocomplete ul li { font-family: var(--mono); font-size: 13px; color: var(--fg); }
 .cm-tooltip-autocomplete ul li[aria-selected] { background: var(--sel); color: var(--fg); }
+
+/* utility classes for visibility */
+.d-none { display: none !important; }
