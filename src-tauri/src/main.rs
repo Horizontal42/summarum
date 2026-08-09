@@ -10,6 +10,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
@@ -538,8 +539,15 @@ fn open_backups_folder(app: AppHandle, dir: Option<String>) -> Result<(), String
 // ---------- data folder migration
 
 #[tauri::command]
-fn data_dir_has_documents(dir: String) -> bool {
-    PathBuf::from(dir).join("documents.json").exists()
+fn data_dir_has_documents(app: AppHandle, dir: String) -> bool {
+    let path = PathBuf::from(dir).join("documents.json");
+    if !app
+        .try_fs_scope()
+        .is_some_and(|scope| scope.is_allowed(&path))
+    {
+        return false;
+    }
+    path.exists()
 }
 
 /// strategy: "move" (copy mine, delete originals), "overwrite" (same, target
@@ -715,6 +723,7 @@ fn toggle_window(app: &AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(path) = args.iter().skip(1).find(|a| is_sheet_path(a)) {
                 if let Ok(content) = fs::read_to_string(path) {
