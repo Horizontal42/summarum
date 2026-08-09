@@ -191,12 +191,14 @@ describe('storage', () => {
       // Fast forward past debounce time
       vi.runAllTimers();
 
-      // Allow dynamic import and promise resolution by temporarily using real timers
+      // storage.ts's invoke wrapper does a dynamic import() before calling
+      // invoke(), which resolves over real event-loop ticks (module
+      // transform/IO) even with fake timers active — poll with real timers
+      // until it settles instead of guessing a fixed number of ticks.
       vi.useRealTimers();
-      await new Promise(resolve => setTimeout(resolve, 0));
-      vi.useFakeTimers();
-
-      expect(invoke).toHaveBeenCalledWith('save_documents', { dir: 'custom_dir', contents: JSON.stringify(mockAppData) });
+      await vi.waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith('save_documents', { dir: 'custom_dir', contents: JSON.stringify(mockAppData) });
+      });
     });
 
     it('flushAppData clears timer and saves immediately', async () => {
