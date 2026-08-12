@@ -384,6 +384,23 @@ fn valid_date_str(date: &str) -> bool {
 
 static HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
 
+/// frankfurter quotes everything against the `from=USD` base, so USD itself is
+/// never in the response and has to be anchored by hand.
+fn parse_rate_map(
+    raw_rates: &serde_json::Map<String, serde_json::Value>,
+) -> std::collections::HashMap<String, f64> {
+    let mut rates = std::collections::HashMap::new();
+    rates.insert("USD".to_string(), 1.0_f64);
+    for (code, val) in raw_rates {
+        if let Some(v) = val.as_f64() {
+            if v > 0.0 {
+                rates.insert(code.to_uppercase(), v);
+            }
+        }
+    }
+    rates
+}
+
 #[tauri::command]
 async fn fetch_historical_rates(
     app: AppHandle,
@@ -415,16 +432,7 @@ async fn fetch_historical_rates(
         .json()
         .await
         .map_err(|e| e.to_string())?;
-    let raw_rates = body["rates"].as_object().ok_or("no rates in response")?;
-    let mut rates = std::collections::HashMap::new();
-    rates.insert("USD".to_string(), 1.0_f64);
-    for (code, val) in raw_rates {
-        if let Some(v) = val.as_f64() {
-            if v > 0.0 {
-                rates.insert(code.to_uppercase(), v);
-            }
-        }
-    }
+    let rates = parse_rate_map(body["rates"].as_object().ok_or("no rates in response")?);
     if let Ok(serialized) = serde_json::to_string(&rates) {
         write_atomic(&cache_path, &serialized).ok();
     }
@@ -477,15 +485,7 @@ async fn fetch_historical_rates_batch(
             if let Ok(resp) = client_clone.get(&url).send().await {
                 if let Ok(body) = resp.json::<serde_json::Value>().await {
                     if let Some(rates_obj) = body["rates"].as_object() {
-                        let mut daily_rates = std::collections::HashMap::new();
-                        daily_rates.insert("USD".to_string(), 1.0_f64);
-                        for (code, val) in rates_obj {
-                            if let Some(v) = val.as_f64() {
-                                if v > 0.0 {
-                                    daily_rates.insert(code.to_uppercase(), v);
-                                }
-                            }
-                        }
+                        let daily_rates = parse_rate_map(rates_obj);
                         let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
                         if let Ok(serialized) = serde_json::to_string(&daily_rates) {
                             let _ = crate::write_atomic(&cache_path, &serialized);
@@ -989,5 +989,33 @@ mod tests {
         assert!(!is_sheet_path("script.js"));
         assert!(!is_sheet_path("numi"));
         assert!(!is_sheet_path(""));
+    }
+
+    // parse_rate_map
+    #[test]
+    fn parse_rate_map_always_anchors_usd() {
+        let obj = serde_json::json!({});
+        let map = parse_rate_map(obj.as_object().unwrap());
+        assert_eq!(map.get("USD"), Some(&1.0));
+    }
+
+    #[test]
+    fn parse_rate_map_uppercases_codes() {
+        let obj = serde_json::json!({ "eur": 0.9, "Gbp": 0.8 });
+        let map = parse_rate_map(obj.as_object().unwrap());
+        assert_eq!(map.get("EUR"), Some(&0.9));
+        assert_eq!(map.get("GBP"), Some(&0.8));
+    }
+
+    #[test]
+    fn parse_rate_map_skips_nonpositive_and_nonnumeric() {
+        let obj =
+            serde_json::json!({ "EUR": 0.9, "AAA": 0.0, "BBB": -1.5, "CCC": "oops", "DDD": null });
+        let map = parse_rate_map(obj.as_object().unwrap());
+        assert_eq!(map.get("EUR"), Some(&0.9));
+        assert!(!map.contains_key("AAA"));
+        assert!(!map.contains_key("BBB"));
+        assert!(!map.contains_key("CCC"));
+        assert!(!map.contains_key("DDD"));
     }
 }
