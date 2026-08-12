@@ -425,12 +425,15 @@ function bindDataDirSettings(): void {
     const picked = await chooseFolder();
     if (!picked || picked === settings.dataDir) return;
     let strategy: "move" | "overwrite" | "use_existing" = "move";
-    if (await dataDirHasDocuments(picked)) {
-      const ans = await askModal(t("folderConflict"), t("useExisting"), t("replaceMine"));
-      if (ans === null) return;
-      strategy = ans === "a" ? "use_existing" : "overwrite";
-    }
     try {
+      if (await dataDirHasDocuments(picked)) {
+        const ans = await askModal(t("folderConflict"), t("useExisting"), t("replaceMine"));
+        if (ans === null) return;
+        strategy = ans === "a" ? "use_existing" : "overwrite";
+      }
+      // a debounced save still aimed at the old folder would land after the
+      // migration moved documents.json away and silently strand the last edit
+      await flushAppData();
       await migrateDataDir(settings.dataDir, picked, strategy);
     } catch (e) {
       console.warn("migrate failed", e);
