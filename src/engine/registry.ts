@@ -2,8 +2,10 @@
 // currencies, word-operators, functions, scales, date words) to a payload
 // for the tokenizer. Longest phrase wins; case-sensitive entries (symbols
 // like "m"/"M", "kB") are tried before the case-insensitive ones.
-import { Decimal, Dimension, NumeralRepr, Unit, Value } from "./types";
-import { Lex, lexLine } from "./lexer";
+import type { Dimension, NumeralRepr, Unit, Value } from "./types";
+import { Decimal } from "./types";
+import type { Lex} from "./lexer";
+import { lexLine } from "./lexer";
 import * as vocab from "./vocab";
 import { UNIT_DATA, SI_PREFIXES, DATA_SI_PREFIXES, IEC_PREFIXES, SCALE_DATA } from "./unitdata";
 import { EXTRA_UNITS, CRYPTO } from "./extraunits";
@@ -75,7 +77,7 @@ export class Registry {
 
   addPhrase(phrase: string, payload: Payload, opts: { caseSensitive?: boolean } = {}): void {
     const lexs = lexLine(phrase);
-    if (lexs.length === 0) return;
+    if (lexs.length === 0) {return;}
     const lexemes = lexs.map((l) => l.raw);
     const caseSensitive = opts.caseSensitive ?? lexemes.every((l) => l.length <= 2);
     const wordOrNum = (t: Lex["type"]) => t === "word" || t === "num";
@@ -104,9 +106,9 @@ export class Registry {
    */
   match(lexes: Lex[], lowers: string[], i: number): { payload: Payload; length: number } | null {
     const list = this.byFirst.get(lowers[i]);
-    if (!list) return null;
+    if (!list) {return null;}
     for (const e of list) {
-      if (i + e.lexemes.length > lexes.length) continue;
+      if (i + e.lexemes.length > lexes.length) {continue;}
       let ok = true;
       for (let k = 0; k < e.lexemes.length; k++) {
         if (e.caseSensitive ? lexes[i + k].raw !== e.lexemes[k] : lowers[i + k] !== e.lower[k]) {
@@ -118,7 +120,7 @@ export class Registry {
           break;
         }
       }
-      if (ok) return { payload: e.payload, length: e.lexemes.length };
+      if (ok) {return { payload: e.payload, length: e.lexemes.length };}
     }
     return null;
   }
@@ -127,14 +129,14 @@ export class Registry {
     this.rates.clear();
     for (const [code, v] of Object.entries(rates)) {
       const d = new Decimal(v);
-      if (d.isFinite() && d.gt(0)) this.rates.set(code.toUpperCase(), d);
+      if (d.isFinite() && d.gt(0)) {this.rates.set(code.toUpperCase(), d);}
     }
     this.rates.set("USD", new Decimal(1));
   }
 
   makeCurrencyUnit(code: string): Unit | null {
     const rate = this.rates.get(code);
-    if (!rate) return null;
+    if (!rate) {return null;}
     return this.makeCurrencyUnitFromRate(code, rate);
   }
 
@@ -154,7 +156,7 @@ export class Registry {
 
 function addUnitPhrases(reg: Registry, phrases: string[], unit: Unit, opts: { caseSensitive?: boolean } = {}): void {
   reg.unitsById.set(unit.id, unit);
-  for (const p of phrases) reg.addPhrase(p, { t: "unit", unit }, opts);
+  for (const p of phrases) {reg.addPhrase(p, { t: "unit", unit }, opts);}
 }
 
 interface LengthPhrase { phrase: string; unit: Unit; caseSensitive?: boolean }
@@ -180,27 +182,27 @@ function registerCoreVocab(reg: Registry): void {
     ["divide", { t: "op", op: "div" }],
   ];
   for (const [key, payload] of ops) {
-    for (const v of vocab.variants("Operations", `${key}.variants`)) reg.addPhrase(v, payload, { caseSensitive: false });
+    for (const v of vocab.variants("Operations", `${key}.variants`)) {reg.addPhrase(v, payload, { caseSensitive: false });}
   }
-  for (const v of vocab.variants("Operations", "conversion.variants")) reg.addPhrase(v, { t: "conv" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "assignment.variants")) reg.addPhrase(v, { t: "assign" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "sum.variants")) reg.addPhrase(v, { t: "agg", name: "sum" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "avg.variants")) reg.addPhrase(v, { t: "agg", name: "avg" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "prev.variants")) reg.addPhrase(v, { t: "agg", name: "prev" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "count.variants")) reg.addPhrase(v, { t: "agg", name: "count" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "min.variants")) reg.addPhrase(v, { t: "agg", name: "min" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "max.variants")) reg.addPhrase(v, { t: "agg", name: "max" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "product.variants")) reg.addPhrase(v, { t: "agg", name: "product" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "chart.variants")) reg.addPhrase(v, { t: "agg", name: "chart" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "sqrt.variants")) reg.addPhrase(v, { t: "func", name: "sqrt" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "cbrt.variants")) reg.addPhrase(v, { t: "func", name: "cbrt" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "abs.variants")) reg.addPhrase(v, { t: "func", name: "abs" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "ln.variants")) reg.addPhrase(v, { t: "func", name: "ln" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "log.variants")) reg.addPhrase(v, { t: "func", name: "log" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "round.variants")) reg.addPhrase(v, { t: "func", name: "round" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "random.variants")) reg.addPhrase(v, { t: "func", name: "random" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "until.variants")) reg.addPhrase(v, { t: "func", name: "until" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "since.variants")) reg.addPhrase(v, { t: "func", name: "since" }, { caseSensitive: false });
+  for (const v of vocab.variants("Operations", "conversion.variants")) {reg.addPhrase(v, { t: "conv" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "assignment.variants")) {reg.addPhrase(v, { t: "assign" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "sum.variants")) {reg.addPhrase(v, { t: "agg", name: "sum" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "avg.variants")) {reg.addPhrase(v, { t: "agg", name: "avg" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "prev.variants")) {reg.addPhrase(v, { t: "agg", name: "prev" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "count.variants")) {reg.addPhrase(v, { t: "agg", name: "count" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "min.variants")) {reg.addPhrase(v, { t: "agg", name: "min" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "max.variants")) {reg.addPhrase(v, { t: "agg", name: "max" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "product.variants")) {reg.addPhrase(v, { t: "agg", name: "product" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "chart.variants")) {reg.addPhrase(v, { t: "agg", name: "chart" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "sqrt.variants")) {reg.addPhrase(v, { t: "func", name: "sqrt" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "cbrt.variants")) {reg.addPhrase(v, { t: "func", name: "cbrt" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "abs.variants")) {reg.addPhrase(v, { t: "func", name: "abs" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "ln.variants")) {reg.addPhrase(v, { t: "func", name: "ln" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "log.variants")) {reg.addPhrase(v, { t: "func", name: "log" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "round.variants")) {reg.addPhrase(v, { t: "func", name: "round" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "random.variants")) {reg.addPhrase(v, { t: "func", name: "random" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "until.variants")) {reg.addPhrase(v, { t: "func", name: "until" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Operations", "since.variants")) {reg.addPhrase(v, { t: "func", name: "since" }, { caseSensitive: false });}
   reg.addPhrase("mod", { t: "op", op: "mod" }, { caseSensitive: false });
   reg.addPhrase("modulo", { t: "op", op: "mod" }, { caseSensitive: false });
 
@@ -224,30 +226,30 @@ function registerCoreVocab(reg: Registry): void {
     reg.addPhrase(v, { t: "repr", repr: "roman" }, { caseSensitive: false });
   }
 
-  for (const v of vocab.variants("Percent", "percent.variants")) reg.addPhrase(v, { t: "percent" });
+  for (const v of vocab.variants("Percent", "percent.variants")) {reg.addPhrase(v, { t: "percent" });}
   const pctOps: Array<[string, PctOp]> = [
     ["percent_of", "of"], ["percent_off", "off"], ["percent_on", "on"],
     ["as_a_percent_of", "as_pct_of"], ["as_a_percent_off", "as_pct_off"], ["as_a_percent_on", "as_pct_on"],
     ["percent_of_what_is", "of_what_is"], ["percent_off_what_is", "off_what_is"], ["percent_on_what_is", "on_what_is"],
   ];
   for (const [key, op] of pctOps) {
-    for (const v of vocab.variants("Percent", `${key}.variants`)) reg.addPhrase(v, { t: "pctop", op }, { caseSensitive: false });
+    for (const v of vocab.variants("Percent", `${key}.variants`)) {reg.addPhrase(v, { t: "pctop", op }, { caseSensitive: false });}
   }
 
   const dateWords: Array<[string, DateWord]> = [
     ["today", "today"], ["tomorrow", "tomorrow"], ["yesterday", "yesterday"],
   ];
   for (const [key, word] of dateWords) {
-    for (const v of vocab.variants("Dates", `${key}.variants`)) reg.addPhrase(v, { t: "date", word }, { caseSensitive: false });
+    for (const v of vocab.variants("Dates", `${key}.variants`)) {reg.addPhrase(v, { t: "date", word }, { caseSensitive: false });}
   }
-  for (const v of vocab.variants("Dates", "current_time.variants")) reg.addPhrase(v, { t: "date", word: v.toLowerCase() === "now" || v.toLowerCase() === "сейчас" ? "now" : "time" }, { caseSensitive: false });
-  for (const v of vocab.variants("Dates", "local_time.variants")) reg.addPhrase(v, { t: "date", word: "local" }, { caseSensitive: false });
+  for (const v of vocab.variants("Dates", "current_time.variants")) {reg.addPhrase(v, { t: "date", word: v.toLowerCase() === "now" || v.toLowerCase() === "сейчас" ? "now" : "time" }, { caseSensitive: false });}
+  for (const v of vocab.variants("Dates", "local_time.variants")) {reg.addPhrase(v, { t: "date", word: "local" }, { caseSensitive: false });}
 
   const reprs: Array<[string, NumeralRepr]> = [
     ["hex", "hex"], ["binary", "binary"], ["octal", "octal"], ["decimal", "decimal"], ["scientific", "scientific"],
   ];
   for (const [key, repr] of reprs) {
-    for (const v of vocab.variants("Numbers", `${key}.variants`)) reg.addPhrase(v, { t: "repr", repr }, { caseSensitive: false });
+    for (const v of vocab.variants("Numbers", `${key}.variants`)) {reg.addPhrase(v, { t: "repr", repr }, { caseSensitive: false });}
   }
 
   for (const [id, mult] of Object.entries(SCALE_DATA)) {
@@ -267,7 +269,7 @@ function registerCoreVocab(reg: Registry): void {
   reg.addPhrase("полтора", { t: "const", name: "onehalf" }, { caseSensitive: false });
   reg.addPhrase("полторы", { t: "const", name: "onehalf" }, { caseSensitive: false });
 
-  for (const f of BUILTIN_FUNCS) reg.addPhrase(f, { t: "func", name: f }, { caseSensitive: false });
+  for (const f of BUILTIN_FUNCS) {reg.addPhrase(f, { t: "func", name: f }, { caseSensitive: false });}
 }
 
 // UNIT_DATA + SI/IEC prefixes; returns the length-dimension phrases the
@@ -291,7 +293,7 @@ function registerUnits(reg: Registry): LengthPhrase[] {
     };
     addUnitPhrases(reg, variants, unit);
     if (d.dimension === "length") {
-      for (const v of variants) lengthPhrases.push({ phrase: v, unit });
+      for (const v of variants) {lengthPhrases.push({ phrase: v, unit });}
     }
 
     if (d.prefixes) {
@@ -320,34 +322,34 @@ function registerUnits(reg: Registry): LengthPhrase[] {
           csPhrases.push(`${pSym}bit`);
         } else {
           // symbol compositions in every locale: "km" and "км"
-          for (const ps of pSymsAll) for (const us of symbolsAll) csPhrases.push(ps + us);
+          for (const ps of pSymsAll) {for (const us of symbolsAll) {csPhrases.push(ps + us);}}
         }
-        for (const pw of pWords) for (const wv of wordVariants) phrases.push(pw + wv);
+        for (const pw of pWords) {for (const wv of wordVariants) {phrases.push(pw + wv);}}
         if (d.id === "byte" && pSym) {
           // lenient: KB/kb/Kb all mean kilobyte
           phrases.push((pSym + "b").toLowerCase());
         }
         reg.unitsById.set(pUnit.id, pUnit);
-        for (const ph of csPhrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });
-        for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
+        for (const ph of csPhrases) {reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });}
+        for (const ph of phrases) {reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });}
         // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
         // while "mm"/"Mm" stay strict (milli vs mega)
         for (const ph of csPhrases) {
           const lower = ph.toLowerCase();
           const prev = lenientSym.get(lower);
-          if (prev === undefined) lenientSym.set(lower, pUnit);
-          else if (prev && prev.id !== pUnit.id) lenientSym.set(lower, null);
+          if (prev === undefined) {lenientSym.set(lower, pUnit);}
+          else if (prev && prev.id !== pUnit.id) {lenientSym.set(lower, null);}
         }
         if (d.dimension === "length") {
-          for (const ph of csPhrases) lengthPhrases.push({ phrase: ph, unit: pUnit, caseSensitive: true });
-          for (const pw of pWords) for (const wv of wordVariants) lengthPhrases.push({ phrase: pw + wv, unit: pUnit, caseSensitive: false });
+          for (const ph of csPhrases) {lengthPhrases.push({ phrase: ph, unit: pUnit, caseSensitive: true });}
+          for (const pw of pWords) {for (const wv of wordVariants) {lengthPhrases.push({ phrase: pw + wv, unit: pUnit, caseSensitive: false });}}
         }
       }
     }
   }
 
   for (const [lower, unit] of lenientSym) {
-    if (unit) reg.addPhrase(lower, { t: "unit", unit }, { caseSensitive: false });
+    if (unit) {reg.addPhrase(lower, { t: "unit", unit }, { caseSensitive: false });}
   }
 
   return lengthPhrases;
@@ -400,10 +402,10 @@ function registerCurrencies(reg: Registry): void {
   for (const code of codes) {
     reg.currencyCodes.add(code);
     const fmt = vocab.entryEn("Currency", `${code}.format`);
-    if (fmt) reg.currencyFormat.set(code, fmt.replace("%@", "{}"));
+    if (fmt) {reg.currencyFormat.set(code, fmt.replace("%@", "{}"));}
     const variants = vocab.variants("Currency", `${code}.variants`);
-    if (!variants.some((v) => v.toUpperCase() === code)) variants.push(code);
-    for (const v of variants) reg.addPhrase(v, { t: "currency", code }, { caseSensitive: false });
+    if (!variants.some((v) => v.toUpperCase() === code)) {variants.push(code);}
+    for (const v of variants) {reg.addPhrase(v, { t: "currency", code }, { caseSensitive: false });}
   }
 }
 
@@ -420,12 +422,12 @@ function registerExtraUnits(reg: Registry): void {
     reg.unitsById.set(unit.id, unit);
     for (const p of d.phrases.split(",")) {
       const ph = p.trim();
-      if (ph) reg.addPhrase(ph, { t: "unit", unit }, { caseSensitive: false });
+      if (ph) {reg.addPhrase(ph, { t: "unit", unit }, { caseSensitive: false });}
     }
     if (d.symbols) {
       for (const s of d.symbols.split(",")) {
         const ph = s.trim();
-        if (ph) reg.addPhrase(ph, { t: "unit", unit }, { caseSensitive: true });
+        if (ph) {reg.addPhrase(ph, { t: "unit", unit }, { caseSensitive: true });}
       }
     }
   }
@@ -441,7 +443,7 @@ function registerCrypto(reg: Registry): void {
     reg.addPhrase(c.code, { t: "currency", code: c.code }, { caseSensitive: CRYPTO_STRICT_CODES.has(c.code) });
     for (const p of c.phrases.split(",")) {
       const ph = p.trim();
-      if (ph) reg.addPhrase(ph, { t: "currency", code: c.code }, { caseSensitive: false });
+      if (ph) {reg.addPhrase(ph, { t: "currency", code: c.code }, { caseSensitive: false });}
     }
   }
 }
@@ -450,18 +452,18 @@ function registerCompletions(reg: Registry): void {
   const seen = new Set<string>();
   const addCompletion = (label: string, type: Completion["type"], detail?: string) => {
     const k = `${type}:${label.toLowerCase()}`;
-    if (seen.has(k) || label.length < 2 || !/^[\p{L}]/u.test(label)) return;
+    if (seen.has(k) || label.length < 2 || !/^[\p{L}]/u.test(label)) {return;}
     seen.add(k);
     reg.completions.push({ label, type, detail });
   };
   for (const d of UNIT_DATA) {
-    for (const v of vocab.variants(d.category, `${d.id}.variants`)) addCompletion(v, "unit", d.dimension);
+    for (const v of vocab.variants(d.category, `${d.id}.variants`)) {addCompletion(v, "unit", d.dimension);}
   }
   for (const d of EXTRA_UNITS) {
-    for (const v of d.phrases.split(",")) addCompletion(v.trim(), "unit", d.dimension);
+    for (const v of d.phrases.split(",")) {addCompletion(v.trim(), "unit", d.dimension);}
   }
-  for (const code of reg.currencyCodes) addCompletion(code, "currency");
-  for (const f of BUILTIN_FUNCS) addCompletion(f, "function");
+  for (const code of reg.currencyCodes) {addCompletion(code, "currency");}
+  for (const f of BUILTIN_FUNCS) {addCompletion(f, "function");}
   for (const k of ["sum", "total", "average", "avg", "prev", "today", "tomorrow", "yesterday", "time", "now", "hex", "binary"]) {
     addCompletion(k, "keyword");
   }

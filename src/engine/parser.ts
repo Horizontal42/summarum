@@ -1,9 +1,9 @@
 // Noise-tolerant Pratt parser. Unknown words are dropped (free text around
 // math is allowed), except right after a conversion word — those may name
 // a timezone ("time in New York").
-import { Decimal, NumeralRepr, Unit } from "./types";
-import { Token } from "./tokenizer";
-import { PctOp, DateWord, BitOp } from "./registry";
+import type { Decimal, NumeralRepr, Unit } from "./types";
+import type { Token } from "./tokenizer";
+import type { PctOp, DateWord, BitOp } from "./registry";
 
 export type ConvTarget =
   | { type: "unit"; unit: Unit }
@@ -48,7 +48,7 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
   let assign: string | undefined;
   // a defined variable shadows whatever its name tokenized as (unit "m", agg "sum"...)
   let toks: Token[] = tokens.map((tk) => {
-    if (tk.t === "word" || tk.t === "num" || tk.t === "junk") return tk;
+    if (tk.t === "word" || tk.t === "num" || tk.t === "junk") {return tk;}
     const raw = line.slice(tk.start, tk.end);
     return knownVars.has(raw) ? { t: "word", raw, start: tk.start, end: tk.end } : tk;
   });
@@ -67,9 +67,9 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
   const filtered: Token[] = [];
   let afterConv = false;
   for (const tk of toks) {
-    if (tk.t === "junk") continue;
+    if (tk.t === "junk") {continue;}
     if (tk.t === "word") {
-      if (knownVars.has(tk.raw) || afterConv) filtered.push(tk);
+      if (knownVars.has(tk.raw) || afterConv) {filtered.push(tk);}
       continue;
     }
     // a bare "/" inside a timezone name ("Europe/Berlin") must not break the
@@ -89,7 +89,7 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
     if (assignIdx >= 0) {
       const lhs = new Parser(filtered.slice(0, assignIdx), knownVars).parseSeq();
       const rhs = new Parser(filtered.slice(assignIdx + 1), knownVars).parseSeq();
-      if (lhs && rhs) return { expr: { k: "goalseek", lhs, rhs } };
+      if (lhs && rhs) {return { expr: { k: "goalseek", lhs, rhs } };}
     }
   }
 
@@ -173,10 +173,10 @@ class Parser {
       }
       const before = this.i;
       const node = this.parseExpr(PREC.BIT);
-      if (node) items.push(node);
-      if (this.i === before) this.i++; // skip unparsable token
+      if (node) {items.push(node);}
+      if (this.i === before) {this.i++;} // skip unparsable token
     }
-    if (items.length === 0) return null;
+    if (items.length === 0) {return null;}
     return mk();
   }
 
@@ -185,61 +185,61 @@ class Parser {
    */
   private parseExpr(minPrec: number = 0): Node | null {
     let tk = this.peek();
-    if (!tk) return null;
+    if (!tk) {return null;}
 
     let lhs: Node | null = null;
 
     if (tk.t === "op" && tk.op === "minus") {
       this.i++;
       const x = this.parseExpr(PREC.UNARY);
-      if (!x) return null;
+      if (!x) {return null;}
       lhs = { k: "neg", x };
     } else if (tk.t === "op" && tk.op === "plus") {
       this.i++;
       lhs = this.parseExpr(PREC.UNARY);
-      if (!lhs) return null;
+      if (!lhs) {return null;}
     } else {
       lhs = this.parsePrimary();
     }
 
-    if (!lhs) return null;
+    if (!lhs) {return null;}
 
     for (;;) {
       tk = this.peek();
-      if (!tk) break;
+      if (!tk) {break;}
 
       if (tk.t === "percent") {
-        if (PREC.POSTFIX < minPrec) break;
+        if (PREC.POSTFIX < minPrec) {break;}
         this.i++;
         lhs = { k: "pct", x: lhs };
         continue;
       }
       if (tk.t === "bang") {
-        if (PREC.POSTFIX < minPrec) break;
+        if (PREC.POSTFIX < minPrec) {break;}
         this.i++;
         lhs = { k: "fact", x: lhs };
         continue;
       }
       if (tk.t === "unit") {
-        if (PREC.POSTFIX < minPrec) break;
+        if (PREC.POSTFIX < minPrec) {break;}
         this.i++;
         lhs = { k: "unit", x: lhs, unit: tk.unit };
         continue;
       }
       if (tk.t === "currency") {
-        if (PREC.POSTFIX < minPrec) break;
+        if (PREC.POSTFIX < minPrec) {break;}
         this.i++;
         lhs = { k: "curr", x: lhs, code: tk.code };
         continue;
       }
       if (tk.t === "scale") {
-        if (PREC.POSTFIX < minPrec) break;
+        if (PREC.POSTFIX < minPrec) {break;}
         this.i++;
         lhs = { k: "scale", x: lhs, mult: tk.mult, label: "" };
         continue;
       }
       if (tk.t === "op" && tk.op === "pow") {
-        if (PREC.POW < minPrec) break;
+        if (PREC.POW < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.POW);
@@ -248,7 +248,7 @@ class Parser {
         continue;
       }
       if (tk.t === "op" && (tk.op === "mul" || tk.op === "div" || tk.op === "mod")) {
-        if (PREC.MUL < minPrec) break;
+        if (PREC.MUL < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.MUL + 1);
@@ -261,7 +261,7 @@ class Parser {
           this.i++;
           continue;
         }
-        if (PREC.MUL < minPrec) break;
+        if (PREC.MUL < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.MUL + 1);
@@ -270,7 +270,7 @@ class Parser {
         continue;
       }
       if (tk.t === "lparen" || tk.t === "const" || tk.t === "func" || (tk.t === "word" && this.vars.has(tk.raw))) {
-        if (PREC.MUL < minPrec) break;
+        if (PREC.MUL < minPrec) {break;}
         const save = this.i;
         const r = this.parseExpr(PREC.MUL + 1);
         if (!r) { this.i = save; break; }
@@ -278,7 +278,7 @@ class Parser {
         continue;
       }
       if (tk.t === "op" && (tk.op === "plus" || tk.op === "minus")) {
-        if (PREC.ADD < minPrec) break;
+        if (PREC.ADD < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.ADD + 1);
@@ -287,7 +287,7 @@ class Parser {
         continue;
       }
       if (tk.t === "bitop") {
-        if (PREC.BIT < minPrec) break;
+        if (PREC.BIT < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.BIT + 1);
@@ -296,7 +296,7 @@ class Parser {
         continue;
       }
       if (tk.t === "conv") {
-        if (PREC.CONV < minPrec) break;
+        if (PREC.CONV < minPrec) {break;}
         const save = this.i;
         this.i++;
         const target = this.parseTarget();
@@ -305,7 +305,7 @@ class Parser {
         continue;
       }
       if (tk.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is"))) {
-        if (PREC.CONV < minPrec) break;
+        if (PREC.CONV < minPrec) {break;}
         const save = this.i;
         this.i++;
         const r = this.parseExpr(PREC.ADD);
@@ -320,9 +320,9 @@ class Parser {
   }
   /** If the current token is `pctop(on)` + `datelit`, consume them and attach `onDate`. */
   private tryHistoricalDate(target: ConvTarget): ConvTarget {
-    if (target.type !== "currency") return target;
+    if (target.type !== "currency") {return target;}
     const nx = this.peek();
-    if (nx?.t !== "pctop" || nx.op !== "on") return target;
+    if (nx?.t !== "pctop" || nx.op !== "on") {return target;}
     const save = this.i;
     this.i++;
     const dk = this.peek();
@@ -338,7 +338,7 @@ class Parser {
 
   private parseTarget(): ConvTarget | null {
     const tk = this.peek();
-    if (!tk) return null;
+    if (!tk) {return null;}
     if (tk.t === "unit") {
       this.i++;
       return { type: "unit", unit: tk.unit };
@@ -378,14 +378,14 @@ class Parser {
         }
         break;
       }
-      if (words.length > 0) return { type: "tz", words };
+      if (words.length > 0) {return { type: "tz", words };}
     }
     return null;
   }
 
   private parsePrimary(): Node | null {
     const tk = this.peek();
-    if (!tk) return null;
+    if (!tk) {return null;}
     switch (tk.t) {
       case "num":
         this.i++;
@@ -419,7 +419,7 @@ class Parser {
           const args: Node[] = [];
           for (;;) {
             const arg = this.parseExpr(PREC.CONV);
-            if (arg) args.push(arg);
+            if (arg) {args.push(arg);}
             const nx = this.peek();
             if (nx?.t === "semicolon") {
               this.i++;
@@ -429,7 +429,7 @@ class Parser {
               this.i++;
               break;
             }
-            if (!nx) break;
+            if (!nx) {break;}
             if (!arg) {
               this.i++; // skip stray token inside call
             }
@@ -438,14 +438,14 @@ class Parser {
         }
         // `sqrt 16` / `square root of 16` — the "of" is decorative
         const nx = this.peek();
-        if (nx?.t === "pctop" && nx.op === "of") this.i++;
+        if (nx?.t === "pctop" && nx.op === "of") {this.i++;}
         const arg = this.parseExpr(PREC.UNARY);
         return arg ? { k: "call", name, args: [arg] } : null;
       }
       case "lparen": {
         this.i++;
         const inner = this.parseExpr(PREC.CONV);
-        if (this.peek()?.t === "rparen") this.i++;
+        if (this.peek()?.t === "rparen") {this.i++;}
         return inner;
       }
       case "currency": {

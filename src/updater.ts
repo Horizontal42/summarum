@@ -11,7 +11,7 @@ interface AvailableUpdate {
  * (`vite dev`) also reports null.
  */
 export async function checkForUpdate(): Promise<AvailableUpdate | null | "error"> {
-  if (!isTauri()) return null;
+  if (!isTauri()) {return null;}
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();

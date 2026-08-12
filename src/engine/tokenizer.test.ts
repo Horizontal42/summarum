@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { tokenize } from "./tokenizer";
-import { buildRegistry, Registry } from "./registry";
+import type { Registry } from "./registry";
+import { buildRegistry } from "./registry";
 
 describe("tokenizer", () => {
   let reg: Registry;

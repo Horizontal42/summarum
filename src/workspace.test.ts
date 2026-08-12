@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { SumEngine } from "./engine";
-import { Workspace, SheetSource } from "./workspace";
+import type { SheetSource } from "./workspace";
+import { Workspace } from "./workspace";
 
 function makeWorkspace(initial: Record<string, { title: string; text: string }>) {
   const engine = new SumEngine();

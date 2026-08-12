@@ -1,17 +1,21 @@
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
-import { Registry, buildRegistry, Completion } from "./registry";
-import { tokenize, Token } from "./tokenizer";
+import type { DateOrder, EngineSettings, Quantity, Unit, Value} from "./types";
+import { Decimal, EvalError, XRefError, defaultSettings, qty } from "./types";
+import type { Registry, Completion } from "./registry";
+import { buildRegistry } from "./registry";
+import type { Token } from "./tokenizer";
+import { tokenize } from "./tokenizer";
 import { parseLine } from "./parser";
-import { evaluate, EvalCtx, XRefResolver, toBase, fromBase } from "./evaluator";
+import type { EvalCtx, XRefResolver} from "./evaluator";
+import { evaluate, toBase, fromBase } from "./evaluator";
 import { formatValue } from "./formatter";
 import { detectDateOrder } from "./datetime";
 import snapshot from "./rates-snapshot.json";
 import { CRYPTO } from "./extraunits";
 
 const cryptoSnapshot: Record<string, number> = {};
-for (const c of CRYPTO) cryptoSnapshot[c.code] = 1 / c.snapshotUsd;
+for (const c of CRYPTO) {cryptoSnapshot[c.code] = 1 / c.snapshotUsd;}
 
 // "//" only starts a comment at line start or after whitespace, so URLs like
 // "see https://example.com" aren't cut off.
@@ -74,7 +78,7 @@ export class SumEngine {
 
   setHistoricalRates(date: string, rates: Record<string, number>): void {
     const m = new Map<string, number>();
-    for (const [k, v] of Object.entries(rates)) m.set(k.toUpperCase(), v);
+    for (const [k, v] of Object.entries(rates)) {m.set(k.toUpperCase(), v);}
     this.historicalRates.set(date, m);
   }
 
@@ -84,7 +88,7 @@ export class SumEngine {
 
   updateSettings(patch: Partial<EngineSettings>): void {
     this.settings = { ...this.settings, ...patch };
-    if (patch.dateFormat) this.dateOrder = resolveDateOrder(this.settings.dateFormat);
+    if (patch.dateFormat) {this.dateOrder = resolveDateOrder(this.settings.dateFormat);}
   }
 
   completions(): Completion[] {
@@ -148,8 +152,8 @@ export class SumEngine {
           }
           value = null;
         }
-        if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
-        if (value && parsed.assign) vars.set(parsed.assign, value);
+        if (value?.kind === "quantity" && !value.value.isFinite()) {value = null;}
+        if (value && parsed.assign) {vars.set(parsed.assign, value);}
       }
 
       lineValues.push(value);
@@ -182,7 +186,7 @@ export class SumEngine {
     const qs = results
       .map((r) => r.value)
       .filter((v): v is Quantity => v !== null && v.kind === "quantity");
-    if (qs.length < 2) return null;
+    if (qs.length < 2) {return null;}
     const anchor = qs.find((q) => q.unit) ?? qs[0];
     let acc = new Decimal(0);
     let count = 0;
@@ -195,7 +199,7 @@ export class SumEngine {
         count++;
       }
     }
-    if (count < 2) return null;
+    if (count < 2) {return null;}
     const value = anchor.unit ? fromBase(acc, anchor.unit) : acc;
     return qty(value, anchor.unit ?? null);
   }
@@ -214,7 +218,7 @@ export class SumEngine {
 
   addUnit(spec: ExtensionUnitSpec): void {
     const base = this.reg.unitsById.get(spec.baseUnitId) ?? this.currencyBase(spec.baseUnitId);
-    if (!base) throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
+    if (!base) {throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);}
     const unit: Unit = {
       id: spec.id,
       dimension: base.dimension,
@@ -225,7 +229,7 @@ export class SumEngine {
     this.reg.unitsById.set(unit.id, unit);
     for (const p of spec.phrases.split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "unit", unit }, { caseSensitive: false });
+      if (phrase) {this.reg.addPhrase(phrase, { t: "unit", unit }, { caseSensitive: false });}
     }
     this.reg.completions.push({ label: spec.id, type: "unit", detail: "extension" });
   }
@@ -238,7 +242,7 @@ export class SumEngine {
     });
     for (const p of (spec.phrases || spec.id).split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "func", name }, { caseSensitive: false });
+      if (phrase) {this.reg.addPhrase(phrase, { t: "func", name }, { caseSensitive: false });}
     }
     this.reg.completions.push({ label: name, type: "function", detail: "extension" });
   }
@@ -248,7 +252,7 @@ export class SumEngine {
   }
 
   private toValue(v: number | ExtensionValue): Value {
-    if (typeof v === "number") return qty(v);
+    if (typeof v === "number") {return qty(v);}
     const unit = v.unitId
       ? this.reg.unitsById.get(v.unitId) ?? this.currencyBase(v.unitId) ?? null
       : null;
@@ -259,8 +263,8 @@ export class SumEngine {
     if (v.kind === "quantity") {
       return { double: v.value.toNumber(), ...(v.unit ? { unitId: v.unit.id } : {}) };
     }
-    if (v.kind === "percent") return { double: v.value.div(100).toNumber() };
-    if (v.kind === "date") return { double: v.ms };
+    if (v.kind === "percent") {return { double: v.value.div(100).toNumber() };}
+    if (v.kind === "date") {return { double: v.ms };}
     return { double: 0 }; // chart — not representable as ExtensionValue
   }
 }

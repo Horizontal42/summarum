@@ -1,7 +1,7 @@
 // Lexes a line and resolves phrases through the registry into semantic tokens.
-import { DateOrder, Decimal, NumeralRepr, Unit } from "./types";
+import type { DateOrder, Decimal, NumeralRepr, Unit } from "./types";
 import { lexLine } from "./lexer";
-import { Registry, PctOp, DateWord, BitOp } from "./registry";
+import type { Registry, PctOp, DateWord, BitOp } from "./registry";
 
 export type Token =
   | { t: "num"; v: Decimal; repr: NumeralRepr; start: number; end: number }
@@ -125,15 +125,15 @@ export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dm
  */
 function disambiguateIn(tokens: Token[], reg: Registry, line: string): Token[] {
   const inch = reg.unitsById.get("inch");
-  if (!inch) return tokens;
+  if (!inch) {return tokens;}
   return tokens.map((tk, i) => {
-    if (tk.t !== "conv" || line.slice(tk.start, tk.end).toLowerCase() !== "in") return tk;
+    if (tk.t !== "conv" || line.slice(tk.start, tk.end).toLowerCase() !== "in") {return tk;}
     const prev = tokens[i - 1];
     const next = tokens[i + 1];
     const prevIsNum = prev?.t === "num";
     const nextEnds = !next || next.t === "conv" || next.t === "op" || next.t === "rparen";
     if (prevIsNum && nextEnds) {
-      return { t: "unit", unit: inch, start: tk.start, end: tk.end } as Token;
+      return { t: "unit", unit: inch, start: tk.start, end: tk.end };
     }
     return tk;
   });

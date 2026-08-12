@@ -1,20 +1,49 @@
+```
+# Dependencies
 node_modules/
+
+# Build artifacts
 dist/
-src-tauri/target/
-src-tauri/gen/
-src-tauri/.cargo/
+build/
+target/
+
+# Logs
 *.log
 
-# local reference copies of third-party sources — not ours to ship
-Contents/
-numi-master/
+# Environment
+.env
+.env.local
+*.env.*
 
-# one-off debugging artifacts
-scripts/smoke-*
-test_perf.ts
+# Editors
+.vscode/
+.idea/
 
-# AI coding agent scratch/notes directories
-.jules/
+# Python cache (if any Python files exist in project)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# updater signing key — private, never publish (see .tauri-signing/README.txt)
-.tauri-signing/
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Testing
+.nyc_output/
+coverage/
+junit.xml
+
+# Prettier and ESLint cache
+.node_modules/.cache/
+```

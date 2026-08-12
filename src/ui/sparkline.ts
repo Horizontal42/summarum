@@ -1,7 +1,7 @@
 export function buildSparkline(pts: number[], top: number): SVGSVGElement {
   const NS = "http://www.w3.org/2000/svg";
   const W = 80, H = 20, pad = 2;
-  const svg = document.createElementNS(NS, "svg") as SVGSVGElement;
+  const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("width", String(W));
   svg.setAttribute("height", String(H));
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);

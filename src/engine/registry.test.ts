@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { buildRegistry, Registry } from "./registry";
+import type { Registry } from "./registry";
+import { buildRegistry } from "./registry";
 import { lexLine } from "./lexer";
 import { Decimal } from "./types";
 
@@ -16,12 +17,12 @@ describe("registry", () => {
       const plusPayload = reg.match(lexLine("plus"), ["plus"], 0);
       expect(plusPayload).not.toBeNull();
       expect(plusPayload?.payload.t).toBe("op");
-      if (plusPayload?.payload.t === "op") expect(plusPayload.payload.op).toBe("plus");
+      if (plusPayload?.payload.t === "op") {expect(plusPayload.payload.op).toBe("plus");}
 
       const piPayload = reg.match(lexLine("pi"), ["pi"], 0);
       expect(piPayload).not.toBeNull();
       expect(piPayload?.payload.t).toBe("const");
-      if (piPayload?.payload.t === "const") expect(piPayload.payload.name).toBe("pi");
+      if (piPayload?.payload.t === "const") {expect(piPayload.payload.name).toBe("pi");}
     });
 
     it("registers built-in functions", () => {
@@ -90,14 +91,14 @@ describe("registry", () => {
       const log2Match = reg.match(lex2, lex2.map(l => l.raw), 0);
       expect(log2Match).not.toBeNull();
       expect(log2Match?.payload.t).toBe("func");
-      if (log2Match?.payload.t === "func") expect(log2Match.payload.name).toBe("log2");
+      if (log2Match?.payload.t === "func") {expect(log2Match.payload.name).toBe("log2");}
 
       const lexSpace2 = lexLine("log 2");
       const logSpace2Match = reg.match(lexSpace2, lexSpace2.map(l => l.raw), 0);
       // "log 2" should match "log", length 1, not "log2"
       expect(logSpace2Match).not.toBeNull();
       expect(logSpace2Match?.length).toBe(1);
-      if (logSpace2Match?.payload.t === "func") expect(logSpace2Match.payload.name).toBe("log");
+      if (logSpace2Match?.payload.t === "func") {expect(logSpace2Match.payload.name).toBe("log");}
     });
 
     it("returns null for no match", () => {

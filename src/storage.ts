@@ -77,7 +77,7 @@ export async function loadSettings(): Promise<SettingsData> {
     const raw = isTauri()
       ? await invoke<string | null>("load_file", { name: "settings.json" })
       : localStorage.getItem("summarum.settings");
-    if (raw) return { ...defaultSettingsData, ...JSON.parse(raw) };
+    if (raw) {return { ...defaultSettingsData, ...JSON.parse(raw) };}
   } catch (e) {
     console.warn("loadSettings failed", e);
   }
@@ -86,8 +86,8 @@ export async function loadSettings(): Promise<SettingsData> {
 
 export async function saveSettings(s: SettingsData): Promise<void> {
   const raw = JSON.stringify(s, null, 2);
-  if (isTauri()) await invoke("save_file", { name: "settings.json", contents: raw });
-  else localStorage.setItem("summarum.settings", raw);
+  if (isTauri()) {await invoke("save_file", { name: "settings.json", contents: raw });}
+  else {localStorage.setItem("summarum.settings", raw);}
 }
 
 // ---------- documents
@@ -97,7 +97,7 @@ export async function loadAppData(dataDir: string): Promise<AppData | null> {
     const raw = isTauri()
       ? await invoke<string | null>("load_documents", { dir: dirArg(dataDir) })
       : localStorage.getItem("summarum.documents");
-    if (raw) return JSON.parse(raw);
+    if (raw) {return JSON.parse(raw);}
   } catch (e) {
     console.warn("loadAppData failed", e);
   }
@@ -115,7 +115,7 @@ export function setDataDir(dataDir: string): void {
 export function saveAppData(data: AppData): void {
   // debounce: autosave on every keystroke without disk churn
   pendingData = data;
-  if (saveTimer) clearTimeout(saveTimer);
+  if (saveTimer) {clearTimeout(saveTimer);}
   saveTimer = setTimeout(() => void flushAppData(), 400);
 }
 
@@ -125,12 +125,12 @@ export async function flushAppData(): Promise<void> {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  if (!pendingData) return;
+  if (!pendingData) {return;}
   const raw = JSON.stringify(pendingData);
   pendingData = null;
   try {
-    if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
-    else localStorage.setItem("summarum.documents", raw);
+    if (isTauri()) {await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });}
+    else {localStorage.setItem("summarum.documents", raw);}
   } catch (e) {
     console.warn("saveAppData failed", e);
   }
@@ -138,7 +138,7 @@ export async function flushAppData(): Promise<void> {
 
 /** quit initiated from the tray: flush unsaved edits, then exit for real */
 export async function onAppQuit(cb: () => Promise<void>): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   const { listen } = await import("@tauri-apps/api/event");
   await listen("app-quit", () => void cb().finally(() => void invoke("exit_app")));
 }
@@ -146,7 +146,7 @@ export async function onAppQuit(cb: () => Promise<void>): Promise<void> {
 // ---------- backups & data folder
 
 export async function runBackups(dataDir: string, retentionDays: number): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   try {
     await invoke("run_backups", { dir: dirArg(dataDir), retentionDays });
   } catch (e) {
@@ -155,7 +155,7 @@ export async function runBackups(dataDir: string, retentionDays: number): Promis
 }
 
 export async function backupDeletedSheet(dataDir: string, title: string, contents: string): Promise<void> {
-  if (!isTauri() || !contents.trim()) return;
+  if (!isTauri() || !contents.trim()) {return;}
   try {
     await invoke("backup_deleted_sheet", { dir: dirArg(dataDir), title, contents });
   } catch (e) {
@@ -164,24 +164,24 @@ export async function backupDeletedSheet(dataDir: string, title: string, content
 }
 
 export async function openBackupsFolder(dataDir: string): Promise<void> {
-  if (isTauri()) await invoke("open_backups_folder", { dir: dirArg(dataDir) });
+  if (isTauri()) {await invoke("open_backups_folder", { dir: dirArg(dataDir) });}
 }
 
 /** Rust-side picker: migrateDataDir only accepts a folder chosen through this. */
 export async function chooseFolder(): Promise<string | null> {
-  if (!isTauri()) return null;
+  if (!isTauri()) {return null;}
   return (await invoke<string | null>("pick_data_dir")) ?? null;
 }
 
 export async function dataDirHasDocuments(dir: string): Promise<boolean> {
-  if (!isTauri()) return false;
+  if (!isTauri()) {return false;}
   return invoke<boolean>("data_dir_has_documents", { dir });
 }
 
 export type MigrateStrategy = "move" | "overwrite" | "use_existing";
 
 export async function migrateDataDir(oldDir: string, newDir: string, strategy: MigrateStrategy): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   await invoke("migrate_data_dir", { oldDir: dirArg(oldDir), newDir, strategy });
 }
 
@@ -213,7 +213,7 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
 // ---------- historical rates
 
 export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record<string, Record<string, number>>> {
-  if (dates.length === 0) return {};
+  if (dates.length === 0) {return {};}
   try {
     if (isTauri()) {
       return await invoke<Record<string, Record<string, number>>>("fetch_historical_rates_batch", { dates });
@@ -222,7 +222,7 @@ export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record
     await Promise.all(
       dates.map(async (date) => {
         const rates = await fetchHistoricalRates(date);
-        if (rates) results[date] = rates;
+        if (rates) {results[date] = rates;}
       })
     );
     return results;
@@ -239,10 +239,10 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
     }
     const res = await fetch(`https://api.frankfurter.dev/v1/${date}?from=USD`);
     const json = await res.json();
-    if (!json?.rates) return null;
+    if (!json?.rates) {return null;}
     const out: Record<string, number> = { USD: 1 };
     for (const [k, v] of Object.entries(json.rates as Record<string, number>)) {
-      if (v > 0) out[k.toUpperCase()] = v;
+      if (v > 0) {out[k.toUpperCase()] = v;}
     }
     return out;
   } catch (e) {
@@ -254,14 +254,14 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
 // ---------- image export
 
 export async function writeImageFile(dataBase64: string): Promise<boolean> {
-  if (!isTauri()) return false;
+  if (!isTauri()) {return false;}
   return invoke("write_image_file", { dataBase64 });
 }
 
 // ---------- market data
 
 export async function fetchMarketData(symbols: string[]): Promise<Record<string, number>> {
-  if (!isTauri() || symbols.length === 0) return {};
+  if (!isTauri() || symbols.length === 0) {return {};}
   try {
     return await invoke<Record<string, number>>("fetch_market_data", { symbols });
   } catch (e) {
@@ -273,7 +273,7 @@ export async function fetchMarketData(symbols: string[]): Promise<Record<string,
 // ---------- extensions
 
 export async function loadExtensionScripts(): Promise<{ name: string; code: string }[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) {return [];}
   try {
     return await invoke<{ name: string; code: string }[]>("load_extensions");
   } catch (e) {
@@ -283,13 +283,13 @@ export async function loadExtensionScripts(): Promise<{ name: string; code: stri
 }
 
 export async function openExtensionsFolder(): Promise<void> {
-  if (isTauri()) await invoke("open_extensions_folder");
+  if (isTauri()) {await invoke("open_extensions_folder");}
 }
 
 // ---------- .numi file association
 
 export async function getLaunchFile(): Promise<string | null> {
-  if (!isTauri()) return null;
+  if (!isTauri()) {return null;}
   try {
     return await invoke<string | null>("get_launch_file");
   } catch {
@@ -298,7 +298,7 @@ export async function getLaunchFile(): Promise<string | null> {
 }
 
 export async function onOpenFile(cb: (content: string) => void): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   const { listen } = await import("@tauri-apps/api/event");
   await listen<string>("open-file", (e) => cb(e.payload));
 }
@@ -308,7 +308,7 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
   if (isTauri()) {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     await getCurrentWebview().onDragDropEvent(async (event) => {
-      if (event.payload.type !== "drop") return;
+      if (event.payload.type !== "drop") {return;}
       for (const path of event.payload.paths) {
         try {
           const content = await invoke<string>("read_text_file", { path });
@@ -324,7 +324,7 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
   window.addEventListener("drop", async (e) => {
     e.preventDefault();
     for (const f of e.dataTransfer?.files ?? []) {
-      if (/\.(numi|txt|md)$/i.test(f.name)) cb(await f.text());
+      if (/\.(numi|txt|md)$/i.test(f.name)) {cb(await f.text());}
     }
   });
 }

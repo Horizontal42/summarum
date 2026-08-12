@@ -12,10 +12,10 @@ export function variants(category: string, key: string): string[] {
   const out: string[] = [];
   for (const loc of locales) {
     const raw = loc[category]?.[key];
-    if (!raw) continue;
+    if (!raw) {continue;}
     for (const v of raw.split(",")) {
       const t = v.trim();
-      if (t && !out.includes(t)) out.push(t);
+      if (t && !out.includes(t)) {out.push(t);}
     }
   }
   return out;
@@ -25,7 +25,7 @@ export function variants(category: string, key: string): string[] {
 export function entry(category: string, key: string): string | undefined {
   for (const loc of locales) {
     const raw = loc[category]?.[key];
-    if (raw !== undefined) return raw;
+    if (raw !== undefined) {return raw;}
   }
   return undefined;
 }
@@ -40,7 +40,7 @@ export function entriesAll(category: string, key: string): string[] {
   const out: string[] = [];
   for (const loc of locales) {
     const raw = loc[category]?.[key];
-    if (raw && !out.includes(raw)) out.push(raw);
+    if (raw && !out.includes(raw)) {out.push(raw);}
   }
   return out;
 }
@@ -50,9 +50,9 @@ export function idsOf(category: string): string[] {
   const ids = new Set<string>();
   for (const loc of locales) {
     const cat = loc[category];
-    if (!cat) continue;
+    if (!cat) {continue;}
     for (const k of Object.keys(cat)) {
-      if (k.endsWith(".variants")) ids.add(k.slice(0, -".variants".length));
+      if (k.endsWith(".variants")) {ids.add(k.slice(0, -".variants".length));}
     }
   }
   return [...ids];
@@ -63,9 +63,9 @@ export function idsWithSuffix(category: string, suffix: string): string[] {
   const ids = new Set<string>();
   for (const loc of locales) {
     const cat = loc[category];
-    if (!cat) continue;
+    if (!cat) {continue;}
     for (const k of Object.keys(cat)) {
-      if (k.endsWith(suffix)) ids.add(k.slice(0, -suffix.length));
+      if (k.endsWith(suffix)) {ids.add(k.slice(0, -suffix.length));}
     }
   }
   return [...ids];

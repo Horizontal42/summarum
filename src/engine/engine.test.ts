@@ -366,13 +366,13 @@ describe("cross-sheet references", () => {
   function resolver(sheet: string, key: string): XRefResolution {
     const s = sheet.toLowerCase();
     if (s === "budget") {
-      if (key === "total") return { ok: true, value: qty(150) };
-      if (key === "rent") return { ok: true, value: qty(500, eng.reg.unitsById.get("meter")!) };
-      if (key === "last") return { ok: true, value: qty(7) };
+      if (key === "total") {return { ok: true, value: qty(150) };}
+      if (key === "rent") {return { ok: true, value: qty(500, eng.reg.unitsById.get("meter")) };}
+      if (key === "last") {return { ok: true, value: qty(7) };}
       return { ok: false, reason: `no variable "${key}" in "${sheet}"` };
     }
     if (s === "trip to lisbon") {
-      if (key === "food") return { ok: true, value: qty(25) };
+      if (key === "food") {return { ok: true, value: qty(25) };}
       return { ok: false, reason: `no variable "${key}" in "${sheet}"` };
     }
     return { ok: false, reason: `sheet "${sheet}" not found` };

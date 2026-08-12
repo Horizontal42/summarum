@@ -1,7 +1,8 @@
 // Conversion ratios. Base units per dimension: length=meter, area=m²,
 // volume=m³, weight=gram, time=second, angle=radian, data=bit,
 // temperature=kelvin (ratio+offset).
-import { Decimal, Dimension } from "./types";
+import type { Dimension } from "./types";
+import { Decimal } from "./types";
 
 export interface UnitData {
   id: string;

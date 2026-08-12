@@ -1,13 +1,13 @@
 // Date helpers and a city → IANA timezone map for "time in Tokyo".
-import { DateOrder } from "./types";
+import type { DateOrder } from "./types";
 
 /** Does the OS locale write the day or the month first? (31.12 vs 12/31) */
 export function detectDateOrder(locale?: string): DateOrder {
   const parts = new Intl.DateTimeFormat(locale, { day: "numeric", month: "numeric", year: "numeric" })
     .formatToParts(new Date(2000, 11, 31));
   for (const p of parts) {
-    if (p.type === "day") return "dmy";
-    if (p.type === "month") return "mdy";
+    if (p.type === "day") {return "dmy";}
+    if (p.type === "month") {return "mdy";}
   }
   return "dmy";
 }
@@ -79,10 +79,10 @@ const Z: Record<string, string> = {
 /** Resolve a sequence of words to an IANA timezone. Tries longest run first. */
 export function resolveZone(words: string[]): string | null {
   const lower = words.map((w) => w.toLowerCase().replace(/[-.]/g, " ").trim());
-  if (lower[0] === "local") return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (lower[0] === "local") {return Intl.DateTimeFormat().resolvedOptions().timeZone;}
   for (let len = Math.min(lower.length, 3); len >= 1; len--) {
     const key = lower.slice(0, len).join(" ");
-    if (Z[key]) return Z[key];
+    if (Z[key]) {return Z[key];}
   }
   // direct IANA id like Europe/Berlin typed by hand
   const joined = words.join("/");

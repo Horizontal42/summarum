@@ -1,7 +1,7 @@
 // Full-text and numeric ("> 100", "~ 50") search across every open sheet.
 // Owns the #search-overlay DOM and its own input debounce.
-import { SumEngine, Value } from "../engine";
-import { Workspace } from "../workspace";
+import type { SumEngine, Value } from "../engine";
+import type { Workspace } from "../workspace";
 
 export interface SearchHit {
   docId: string;
@@ -34,15 +34,15 @@ const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel)
 
 function parseResultQuery(engine: SumEngine, q: string): { op: string; threshold: Value } | null {
   const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
-  if (!m) return null;
+  if (!m) {return null;}
   const v = engine.evaluateExpression(m[2].trim());
-  if (!v || v.kind !== "quantity") return null;
+  if (!v || v.kind !== "quantity") {return null;}
   return { op: m[1], threshold: v };
 }
 
 function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
   const q = query.trim();
-  if (!q) return [];
+  if (!q) {return [];}
   const docs = deps.docs();
   const rq = parseResultQuery(deps.engine, q);
   if (rq && rq.threshold.kind === "quantity") {
@@ -53,7 +53,7 @@ function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
       const lines = doc.text.split("\n");
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
-        if (!r.value || r.value.kind !== "quantity") continue;
+        if (!r.value || r.value.kind !== "quantity") {continue;}
         const v = r.value.value;
         let match = false;
         switch (rq.op) {
@@ -66,7 +66,7 @@ function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
         }
         if (match) {
           hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] ?? "", result: r.text ?? undefined });
-          if (hits.length >= 200) return hits;
+          if (hits.length >= 200) {return hits;}
         }
       }
     }
@@ -79,7 +79,7 @@ function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].toLowerCase().includes(ql)) {
         hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
-        if (hits.length >= 200) return hits;
+        if (hits.length >= 200) {return hits;}
       }
     }
   }
@@ -128,7 +128,7 @@ export function initSearch(deps: SearchDeps): SearchController {
   // doesn't recompute the whole workspace on every keystroke
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   input.addEventListener("input", () => {
-    if (searchTimer) clearTimeout(searchTimer);
+    if (searchTimer) {clearTimeout(searchTimer);}
     const q = input.value;
     searchTimer = setTimeout(() => render(q, searchAllSheets(deps, q)), 150);
   });
@@ -140,7 +140,7 @@ export function initSearch(deps: SearchDeps): SearchController {
     }
   });
   overlay.addEventListener("mousedown", (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay) {close();}
   });
 
   return {

@@ -2,8 +2,9 @@
 import "./ui/app.css";
 import { SumEngine } from "./engine";
 import { SumEditor } from "./ui/editor";
-import {
-  AppData, DocMeta, SettingsData, defaultSettingsData,
+import type {
+  AppData, DocMeta, SettingsData} from "./storage";
+import { defaultSettingsData,
   loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
   fetchRates, fetchMarketData, fetchHistoricalRatesBatch, loadExtensionScripts, openExtensionsFolder, isTauri,
   getLaunchFile, onOpenFile, onFileDrop,
@@ -17,7 +18,8 @@ import { checkForUpdate } from "./updater";
 import { Workspace } from "./workspace";
 import { EN, RU } from "./engine/vocab-data";
 import { exportSheetImage } from "./ui/export";
-import { initSearch, SearchController } from "./ui/search";
+import type { SearchController } from "./ui/search";
+import { initSearch } from "./ui/search";
 import pkg from "../package.json";
 
 function welcomeText(lang: string): string {
@@ -53,9 +55,9 @@ function titleFromContent(text: string): string {
   let start = 0;
   while (start < text.length) {
     let end = text.indexOf("\n", start);
-    if (end === -1) end = text.length;
+    if (end === -1) {end = text.length;}
     const s = text.slice(start, end).trim();
-    if (s.length > 0) return s.replace(/^#\s*/, "").slice(0, 30);
+    if (s.length > 0) {return s.replace(/^#\s*/, "").slice(0, 30);}
     start = end + 1;
   }
   return t("untitled");
@@ -63,12 +65,12 @@ function titleFromContent(text: string): string {
 
 function syncTitleField(): void {
   const field = $<HTMLInputElement>("#doc-title");
-  if (document.activeElement !== field) field.value = activeDoc()?.title ?? "";
+  if (document.activeElement !== field) {field.value = activeDoc()?.title ?? "";}
 }
 
 function pinDoc(id: string): void {
   const doc = data.docs.find((d) => d.id === id);
-  if (!doc) return;
+  if (!doc) {return;}
   doc.pinned = !doc.pinned;
   if (doc.pinned) {
     // move to end of pinned group
@@ -88,10 +90,10 @@ function pinDoc(id: string): void {
 
 /** drag id -> drop-target id; no-op across the pinned/unpinned boundary */
 function reorderDoc(srcId: string, targetId: string): void {
-  if (srcId === targetId) return;
+  if (srcId === targetId) {return;}
   const src = data.docs.find((d) => d.id === srcId);
   const target = data.docs.find((d) => d.id === targetId);
-  if (!src || !target || !!src.pinned !== !!target.pinned) return;
+  if (!src || !target || !!src.pinned !== !!target.pinned) {return;}
   data.docs = data.docs.filter((d) => d.id !== srcId);
   const targetIdx = data.docs.findIndex((d) => d.id === targetId);
   data.docs.splice(targetIdx, 0, src);
@@ -108,12 +110,12 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
   let dragging = false;
   let suppressClick = false;
   el.addEventListener("mousedown", (e) => {
-    if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("button")) {return;}
     const startY = e.clientY;
     let cachedItems: { el: HTMLElement, top: number, bottom: number }[] | null = null;
     const onMove = (ev: MouseEvent) => {
       if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < 4) return;
+        if (Math.abs(ev.clientY - startY) < 4) {return;}
         dragging = true;
         suppressClick = true;
         el.classList.add("dragging");
@@ -137,7 +139,7 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
       }
       if (over) {
         const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
-        if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
+        if (overDoc && !!overDoc.pinned === !!doc.pinned) {over.classList.add("drag-over");}
       }
     };
     const onScroll = () => { cachedItems = null; };
@@ -148,9 +150,9 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
       cachedItems = null;
       if (dragging) {
         const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
-        for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
+        for (const item of list.querySelectorAll(".doc-item")) {item.classList.remove("drag-over", "dragging");}
         document.body.style.cursor = "";
-        if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
+        if (target?.dataset.docId) {reorderDoc(doc.id, target.dataset.docId);}
       }
       dragging = false;
     };
@@ -181,7 +183,7 @@ function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: Setting
   let confirmTimer: ReturnType<typeof setTimeout> | null = null;
   del.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (appData.docs.length === 1) return;
+    if (appData.docs.length === 1) {return;}
     if (!del.classList.contains("confirm")) {
       del.classList.add("confirm");
       del.textContent = "✓";
@@ -191,12 +193,12 @@ function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: Setting
       }, 2000);
       return;
     }
-    if (confirmTimer) clearTimeout(confirmTimer);
+    if (confirmTimer) {clearTimeout(confirmTimer);}
     void backupDeletedSheet(appSettings.dataDir, doc.title, appData.contents[doc.id] ?? "");
     delete appData.contents[doc.id];
     appData.docs = appData.docs.filter((d) => d.id !== doc.id);
-    if (appData.activeId === doc.id) switchDoc(appData.docs[0].id);
-    else renderDocList();
+    if (appData.activeId === doc.id) {switchDoc(appData.docs[0].id);}
+    else {renderDocList();}
     saveAppData(appData);
   });
   return del;
@@ -244,13 +246,13 @@ function newDoc(content = ""): void {
 }
 
 async function closeActiveDoc(): Promise<void> {
-  if (data.docs.length <= 1) return;
+  if (data.docs.length <= 1) {return;}
   const doc = data.docs.find((d) => d.id === data.activeId);
-  if (!doc) return;
+  if (!doc) {return;}
   const content = data.contents[doc.id] ?? "";
   if (content.trim()) {
     const ans = await askModal(t("closeSheet"), t("close"), t("cancel"));
-    if (ans !== "a") return;
+    if (ans !== "a") {return;}
   }
   const idx = data.docs.findIndex((d) => d.id === doc.id);
   void backupDeletedSheet(settings.dataDir, doc.title, content);
@@ -328,7 +330,7 @@ function bindFormattingSettings(): void {
   resultsWidth.addEventListener("input", save); // live while sliding
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (settings.theme === "system") applySettings();
+    if (settings.theme === "system") {applySettings();}
   });
 }
 
@@ -361,9 +363,9 @@ function bindHotkeySettings(): void {
       hotkey.value = mods.length ? mods.join("+") + "+…" : "";
       return;
     }
-    if (mods.length === 0) return; // a bare key is not a global hotkey
+    if (mods.length === 0) {return;} // a bare key is not a global hotkey
     const keyName = normalizeKeyName(e);
-    if (!keyName) return;
+    if (!keyName) {return;}
     const combo = [...mods, keyName].join("+");
     const old = settings.hotkey;
     if (await registerHotkey(old, combo)) {
@@ -423,11 +425,11 @@ function bindDataDirSettings(): void {
   renderDataDir();
   dataDirBtn.addEventListener("click", async () => {
     const picked = await chooseFolder();
-    if (!picked || picked === settings.dataDir) return;
+    if (!picked || picked === settings.dataDir) {return;}
     let strategy: "move" | "overwrite" | "use_existing" = "move";
     if (await dataDirHasDocuments(picked)) {
       const ans = await askModal(t("folderConflict"), t("useExisting"), t("replaceMine"));
-      if (ans === null) return;
+      if (ans === null) {return;}
       strategy = ans === "a" ? "use_existing" : "overwrite";
     }
     try {
@@ -445,7 +447,7 @@ function bindDataDirSettings(): void {
       const fresh = await loadAppData(picked);
       if (fresh && fresh.docs.length > 0) {
         data = fresh;
-        if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
+        if (!data.docs.some((d) => d.id === data.activeId)) {data.activeId = data.docs[0].id;}
         switchDoc(data.activeId);
       }
     }
@@ -458,8 +460,8 @@ function bindSettingsNavigation(): void {
   const tabPanels = document.querySelectorAll<HTMLElement>(".settings-tabpanel");
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
-      for (const other of tabs) other.classList.toggle("active", other === tab);
-      for (const panel of tabPanels) panel.classList.toggle("hidden", panel.dataset.tabpanel !== tab.dataset.tab);
+      for (const other of tabs) {other.classList.toggle("active", other === tab);}
+      for (const panel of tabPanels) {panel.classList.toggle("hidden", panel.dataset.tabpanel !== tab.dataset.tab);}
     });
   }
 
@@ -495,10 +497,10 @@ async function showAppVersion(): Promise<void> {
 /** Physical key (e.code) → Tauri accelerator name, layout-independent (works on ru). */
 function normalizeKeyName(e: KeyboardEvent): string | null {
   const code = e.code;
-  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
-  if (/^Digit\d$/.test(code)) return code.slice(5);
-  if (/^Numpad\d$/.test(code)) return code;
-  if (/^F\d{1,2}$/.test(code)) return code;
+  if (/^Key[A-Z]$/.test(code)) {return code.slice(3);}
+  if (/^Digit\d$/.test(code)) {return code.slice(5);}
+  if (/^Numpad\d$/.test(code)) {return code;}
+  if (/^F\d{1,2}$/.test(code)) {return code;}
   const map: Record<string, string> = {
     Space: "Space", Enter: "Enter", Backspace: "Backspace", Delete: "Delete",
     Tab: "Tab", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
@@ -512,12 +514,12 @@ function normalizeKeyName(e: KeyboardEvent): string | null {
 // ---------- tauri integration
 
 async function registerHotkey(old: string | null, combo: string): Promise<boolean> {
-  if (!isTauri()) return true;
+  if (!isTauri()) {return true;}
   try {
     const gs = await import("@tauri-apps/plugin-global-shortcut");
-    if (old) await gs.unregister(old).catch(() => {});
+    if (old) {await gs.unregister(old).catch(() => {});}
     await gs.register(combo, async (e) => {
-      if (e.state !== "Pressed") return;
+      if (e.state !== "Pressed") {return;}
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const win = getCurrentWindow();
       if (await win.isVisible()) {
@@ -540,18 +542,18 @@ async function registerHotkey(old: string | null, combo: string): Promise<boolea
 }
 
 async function applyAutostart(enabled: boolean): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   try {
     const auto = await import("@tauri-apps/plugin-autostart");
-    if (enabled) await auto.enable();
-    else await auto.disable();
+    if (enabled) {await auto.enable();}
+    else {await auto.disable();}
   } catch (e) {
     console.warn("autostart failed", e);
   }
 }
 
 async function applyAlwaysOnTop(enabled: boolean): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {return;}
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   await getCurrentWindow().setAlwaysOnTop(enabled).catch((e) => console.warn("always-on-top failed", e));
 }
@@ -569,7 +571,7 @@ async function refreshRates(force = false): Promise<void> {
     workspace.invalidateAll();
     editor.refresh();
     ratesFetchedAt = payload.fetchedAt;
-    if (force) toast(t("ratesUpdated"));
+    if (force) {toast(t("ratesUpdated"));}
   }
   renderRatesInfo();
 }
@@ -585,14 +587,14 @@ let marketFetchedAt = 0;
 function applyAllRates(): void {
   const marketRates: Record<string, number> = {};
   for (const [sym, price] of Object.entries(marketPrices)) {
-    if (price > 0) marketRates[sym] = 1 / price;
+    if (price > 0) {marketRates[sym] = 1 / price;}
   }
   engine.setRates({ ...liveRates, ...marketRates });
 }
 
 async function refreshMarket(force = false): Promise<void> {
-  if (!isTauri()) return;
-  const info = $("#market-info") as HTMLElement;
+  if (!isTauri()) {return;}
+  const info = $("#market-info");
   info.style.display = "";
   info.classList.add("spin");
   info.textContent = t("market");
@@ -604,7 +606,7 @@ async function refreshMarket(force = false): Promise<void> {
     applyAllRates();
     workspace.invalidateAll();
     editor.refresh();
-    if (force) toast(t("marketUpdated"));
+    if (force) {toast(t("marketUpdated"));}
   }
   renderMarketInfo();
 }
@@ -615,7 +617,7 @@ const HIST_DATE_RE = /(?:on|на)\s+(\d{4}-\d{2}-\d{2})/gi;
 
 async function fetchNeededHistoricalRates(text: string): Promise<void> {
   const dates = new Set<string>();
-  for (const m of text.matchAll(HIST_DATE_RE)) dates.add(m[1]!);
+  for (const m of text.matchAll(HIST_DATE_RE)) {dates.add(m[1]);}
   const datesToFetch = Array.from(dates).filter((date) => !engine.hasHistoricalRates(date));
   let fetched = false;
   if (datesToFetch.length > 0) {
@@ -632,7 +634,7 @@ async function fetchNeededHistoricalRates(text: string): Promise<void> {
 }
 
 function renderMarketInfo(): void {
-  const el = $("#market-info") as HTMLElement;
+  const el = $("#market-info");
   if (marketFetchedAt === 0) { el.style.display = "none"; return; }
   el.style.display = "";
   el.textContent = `${t("market")}: ${agoText(marketFetchedAt)} ↺`;
@@ -667,9 +669,9 @@ function renderTotal(): void {
 
 function agoText(unixSec: number): string {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - unixSec);
-  if (s < 90) return t("justNow");
-  if (s < 3600) return t("minAgo").replace("{}", String(Math.round(s / 60)));
-  if (s < 86400) return t("hourAgo").replace("{}", String(Math.round(s / 3600)));
+  if (s < 90) {return t("justNow");}
+  if (s < 3600) {return t("minAgo").replace("{}", String(Math.round(s / 60)));}
+  if (s < 86400) {return t("hourAgo").replace("{}", String(Math.round(s / 3600)));}
   return t("dayAgo").replace("{}", String(Math.round(s / 86400)));
 }
 
@@ -718,7 +720,7 @@ function showModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "
       // a click that just refocused the window (native dialog closing, or
       // bringing a backgrounded tray window to front) lands on the backdrop
       // too — ignore a backdrop dismiss that arrives right after refocus
-      if (e.target === modal && performance.now() - lastWindowFocusAt > 300) done(null);
+      if (e.target === modal && performance.now() - lastWindowFocusAt > 300) {done(null);}
     };
   });
 }
@@ -730,7 +732,7 @@ function toast(msg: string): void {
   const el = $("#toast");
   el.textContent = msg;
   el.classList.remove("hidden");
-  if (toastTimer) clearTimeout(toastTimer);
+  if (toastTimer) {clearTimeout(toastTimer);}
   toastTimer = setTimeout(() => el.classList.add("hidden"), 1200);
 }
 
@@ -764,7 +766,7 @@ async function initDataAndEngine(): Promise<void> {
     const id = uid();
     data = { docs: [{ id, title: "Sample" }], activeId: id, contents: { [id]: welcomeText(settings.language) } };
   }
-  if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
+  if (!data.docs.some((d) => d.id === data.activeId)) {data.activeId = data.docs[0].id;}
 
   const scripts = await loadExtensionScripts();
   await runExtensions(engine, scripts);
@@ -816,7 +818,7 @@ async function initDataAndEngine(): Promise<void> {
     docs: () => data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),
     t,
     onOpen: (docId, line) => {
-      if (docId !== data.activeId) switchDoc(docId);
+      if (docId !== data.activeId) {switchDoc(docId);}
       editor.goToLine(line);
     },
   });
@@ -832,7 +834,7 @@ function bindTitleUI(): void {
       doc.title = v.slice(0, 60);
       doc.customTitle = true;
       const rewrites = workspace.renameSheet(doc.id, oldTitle, doc.title);
-      for (const r of rewrites) data.contents[r.id] = r.text;
+      for (const r of rewrites) {data.contents[r.id] = r.text;}
       workspace.invalidateAll();
     } else {
       doc.customTitle = false;
@@ -844,7 +846,7 @@ function bindTitleUI(): void {
     saveAppData(data);
   });
   titleField.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === "Escape") titleField.blur();
+    if (e.key === "Enter" || e.key === "Escape") {titleField.blur();}
   });
 }
 
@@ -887,8 +889,8 @@ function bindSidebarUI(): void {
     if (!panel.classList.contains("hidden") && !target.closest("#settings-panel") && !target.closest("#open-settings")) {
       panel.classList.add("hidden");
     }
-    if (!settings.sidebarVisible) return;
-    if (target.closest("#sidebar") || target.closest("#toggle-sidebar")) return;
+    if (!settings.sidebarVisible) {return;}
+    if (target.closest("#sidebar") || target.closest("#toggle-sidebar")) {return;}
     settings.sidebarVisible = false;
     $("#sidebar").classList.add("hidden");
     void saveSettings(settings);
@@ -957,7 +959,7 @@ function bindExportUI(): void {
   document.addEventListener("click", () => exportMenu.classList.add("hidden"));
   exportMenu.addEventListener("click", async (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
-    if (!btn) return;
+    if (!btn) {return;}
     exportMenu.classList.add("hidden");
     const action = btn.dataset.action;
     if (action === "image") {
@@ -999,9 +1001,9 @@ function bindRatesAndMarketUI(): void {
 async function bindLifecycle(): Promise<void> {
   void onFileDrop((content) => newDoc(content));
 
-  if (!(await registerHotkey(null, settings.hotkey))) toast(t("hotkeyFailed"));
-  if (settings.autostart) await applyAutostart(true);
-  if (settings.alwaysOnTop) await applyAlwaysOnTop(true);
+  if (!(await registerHotkey(null, settings.hotkey))) {toast(t("hotkeyFailed"));}
+  if (settings.autostart) {await applyAutostart(true);}
+  if (settings.alwaysOnTop) {await applyAlwaysOnTop(true);}
   void onAppQuit(() => flushAppData());
   void refreshRates();
   setInterval(() => void refreshRates(), 60 * 60 * 1000);
@@ -1009,7 +1011,7 @@ async function bindLifecycle(): Promise<void> {
   setInterval(() => void refreshMarket(), 15 * 60 * 1000);
 
   const launched = await getLaunchFile();
-  if (launched) newDoc(launched);
+  if (launched) {newDoc(launched);}
   void onOpenFile((content) => newDoc(content));
 
   editor.focus();
@@ -1023,12 +1025,12 @@ async function bindLifecycle(): Promise<void> {
     }
   }
 
-  if (settings.autoUpdateEnabled) void checkUpdate();
+  if (settings.autoUpdateEnabled) {void checkUpdate();}
   // a tray app can stay running for weeks without a cold restart, and the
   // update check above only ever runs once at boot — recheck periodically
   // so a long-lived process still notices new releases; re-read the setting
   // on every tick since the user can flip it while the app is running
-  setInterval(() => { if (settings.autoUpdateEnabled) void checkUpdate(); }, 6 * 60 * 60 * 1000);
+  setInterval(() => { if (settings.autoUpdateEnabled) {void checkUpdate();} }, 6 * 60 * 60 * 1000);
 }
 
 async function initUI(): Promise<void> {
@@ -1059,15 +1061,15 @@ async function boot(): Promise<void> {
 async function checkUpdate(manual = false): Promise<void> {
   const result = await checkForUpdate();
   if (result === "error") {
-    if (manual) toast(t("updateCheckFailed"));
+    if (manual) {toast(t("updateCheckFailed"));}
     return;
   }
   if (!result) {
-    if (manual) toast(t("upToDate"));
+    if (manual) {toast(t("upToDate"));}
     return;
   }
   const choice = await askModal(t("updateAvailable").replace("{}", result.version), t("updateInstall"), t("updateLater"));
-  if (choice !== "a") return;
+  if (choice !== "a") {return;}
   toast(t("updateInstalling"));
   try {
     await result.install();

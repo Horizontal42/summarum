@@ -1,6 +1,7 @@
 // Splits a line into raw lexemes (numbers, words, symbols). Shared by the
 // tokenizer and the phrase registry so both segment text the same way.
-import { DateOrder, Decimal, NumeralRepr } from "./types";
+import type { DateOrder, NumeralRepr } from "./types";
+import { Decimal } from "./types";
 
 export interface Lex {
   type: "num" | "word" | "sym" | "date" | "xref";

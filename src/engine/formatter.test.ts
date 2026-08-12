@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { formatNumber, formatValue } from "./formatter";
-import { Decimal, defaultSettings, qty, pct, DateVal, ChartValue, EngineSettings } from "./types";
+import type { DateVal, ChartValue, EngineSettings } from "./types";
+import { Decimal, defaultSettings, qty, pct } from "./types";
 
 describe("formatNumber", () => {
   it("formats standard numbers", () => {

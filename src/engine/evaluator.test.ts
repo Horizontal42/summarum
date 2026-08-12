@@ -6,7 +6,7 @@ import { buildRegistry } from "./registry";
 const reg = buildRegistry();
 const getUnit = (id: string) => {
   const u = reg.unitsById.get(id);
-  if (!u) throw new Error(`unit ${id} not found`);
+  if (!u) {throw new Error(`unit ${id} not found`);}
   return u;
 };
 

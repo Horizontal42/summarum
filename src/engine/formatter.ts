@@ -1,6 +1,7 @@
 // Turns values into display strings: unit/currency formats plus
 // precision and grouping settings.
-import { Decimal, DateVal, EngineSettings, Value } from "./types";
+import type { DateVal, EngineSettings, Value } from "./types";
+import { Decimal } from "./types";
 
 // Intl.DateTimeFormat construction is relatively expensive and every line with
 // a date rebuilds one on each render — cache by locale+options instead.
@@ -28,10 +29,10 @@ function formatDateFixed(v: DateVal, fmt: "iso" | "dmy" | "mdy"): string {
 }
 
 function group(intPart: string, sep: string): string {
-  if (!sep) return intPart;
+  if (!sep) {return intPart;}
   const neg = intPart.startsWith("-");
   const digits = neg ? intPart.slice(1) : intPart;
-  if (digits.length < 4) return intPart;
+  if (digits.length < 4) {return intPart;}
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
   return (neg ? "-" : "") + grouped;
 }
@@ -44,14 +45,14 @@ export function formatNumber(v: Decimal, s: EngineSettings): string {
     rounded = v.toSignificantDigits(Math.max(s.precision, 1));
   }
   const str = rounded.toString();
-  if (str.includes("e") || str.includes("E")) return str;
+  if (str.includes("e") || str.includes("E")) {return str;}
   const [int, frac] = str.split(".");
   const intG = group(int, s.groupSeparator);
   return frac !== undefined ? intG + s.decimalSeparator + frac : intG;
 }
 
 export function formatValue(v: Value, s: EngineSettings): string {
-  if (v.kind === "chart") return "";
+  if (v.kind === "chart") {return "";}
 
   if (v.kind === "percent") {
     return formatNumber(v.value, s) + "%";
@@ -62,7 +63,7 @@ export function formatValue(v: Value, s: EngineSettings): string {
     if (v.timeOnly) {
       return dtf(undefined, { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).format(v.ms);
     }
-    if (s.dateFormat !== "system") return formatDateFixed(v, s.dateFormat);
+    if (s.dateFormat !== "system") {return formatDateFixed(v, s.dateFormat);}
     if (v.hasTime) {
       return dtf(undefined, {
         ...opts, hour: "2-digit", minute: "2-digit", hour12: false,
@@ -96,7 +97,7 @@ export function formatValue(v: Value, s: EngineSettings): string {
   }
 
   const num = formatNumber(v.value, s);
-  if (!v.unit) return num;
+  if (!v.unit) {return num;}
   return withUnit(num, v.unit.format);
 }
 
@@ -112,27 +113,27 @@ function withUnit(num: string, f: string): string {
 function formatFraction(v: Decimal): string {
   const neg = v.isNegative();
   const x = v.abs().toNumber();
-  if (!Number.isFinite(x)) return v.toString();
+  if (!Number.isFinite(x)) {return v.toString();}
   let h1 = 1, h0 = 0, k1 = 0, k0 = 1, b = x;
   for (let i = 0; i < 40; i++) {
     const a = Math.floor(b);
     [h1, h0] = [a * h1 + h0, h1];
     [k1, k0] = [a * k1 + k0, k1];
-    if (k1 > 10000) break;
-    if (Math.abs(x - h1 / k1) < 1e-12) break;
+    if (k1 > 10000) {break;}
+    if (Math.abs(x - h1 / k1) < 1e-12) {break;}
     const frac = b - a;
-    if (frac < 1e-12) break;
+    if (frac < 1e-12) {break;}
     b = 1 / frac;
   }
   const sign = neg ? "-" : "";
-  if (k1 === 1) return sign + String(h1);
+  if (k1 === 1) {return sign + String(h1);}
   const whole = Math.floor(h1 / k1);
   const rem = h1 - whole * k1;
   return whole > 0 ? `${sign}${whole} ${rem}/${k1}` : `${sign}${rem}/${k1}`;
 }
 
 function formatRoman(v: Decimal): string | null {
-  if (!v.isInteger() || v.lt(1) || v.gt(3999)) return null;
+  if (!v.isInteger() || v.lt(1) || v.gt(3999)) {return null;}
   let n = v.toNumber();
   const table: Array<[number, string]> = [
     [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],

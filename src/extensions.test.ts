@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeApi, runExtensions } from "./extensions";
-import { SumEngine } from "./engine";
+import type { SumEngine } from "./engine";
 
 describe("extensions", () => {
   let mockEngine: any;

@@ -58,7 +58,7 @@ export class Workspace {
     while (changed) {
       changed = false;
       for (const s of this.sheets()) {
-        if (dirty.has(s.id)) continue;
+        if (dirty.has(s.id)) {continue;}
         for (const title of this.referencedTitles(s.text, s.id)) {
           const target = this.findSheetByTitle(title);
           if (target && dirty.has(target.id)) {
@@ -69,7 +69,7 @@ export class Workspace {
         }
       }
     }
-    for (const id of dirty) this.cache.delete(id);
+    for (const id of dirty) {this.cache.delete(id);}
   }
 
   invalidateAll(): void {
@@ -90,9 +90,9 @@ export class Workspace {
     const replacement = /^[\p{L}_][\p{L}\d_]*$/u.test(trimmedNew) ? `@${trimmedNew}.` : `@[${trimmedNew}].`;
     const out: { id: string; text: string }[] = [];
     for (const s of this.sheets()) {
-      if (s.id === renamedId) continue;
+      if (s.id === renamedId) {continue;}
       const rewritten = s.text.replace(bareRe, replacement).replace(bracketRe, replacement);
-      if (rewritten !== s.text) out.push({ id: s.id, text: rewritten });
+      if (rewritten !== s.text) {out.push({ id: s.id, text: rewritten });}
     }
     return out;
   }
@@ -100,10 +100,10 @@ export class Workspace {
   private referencedTitles(text: string, id?: string): string[] {
     if (id) {
       const cached = this.parsedRefsCache.get(id);
-      if (cached && cached.text === text) return cached.refs;
+      if (cached && cached.text === text) {return cached.refs;}
     }
     const out: string[] = [];
-    for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
+    for (const m of text.matchAll(XREF_SCAN_RE)) {out.push((m[1] ?? m[2]).trim());}
     if (id) {
       this.parsedRefsCache.set(id, { text, refs: out });
     }
@@ -126,7 +126,7 @@ export class Workspace {
 
   private resolveXRef(sheetTitle: string, key: string): XRefResolution {
     const target = this.findSheetByTitle(sheetTitle);
-    if (!target) return { ok: false, reason: `sheet "${sheetTitle}" not found` };
+    if (!target) {return { ok: false, reason: `sheet "${sheetTitle}" not found` };}
     if (this.resolving.has(target.id)) {
       return { ok: false, reason: "circular reference" };
     }
@@ -142,17 +142,17 @@ export class Workspace {
         : { ok: false, reason: `sheet "${sheetTitle}" has no result` };
     }
     const v = exports.vars.get(key);
-    if (!v) return { ok: false, reason: `no variable "${key}" in "${sheetTitle}"` };
+    if (!v) {return { ok: false, reason: `no variable "${key}" in "${sheetTitle}"` };}
     return { ok: true, value: v };
   }
 
   private exportsFor(sheet: SheetSource): SheetExports {
     const cached = this.cache.get(sheet.id);
-    if (cached) return cached;
+    if (cached) {return cached;}
     const results = this.doEvaluate(sheet.id, sheet.text);
     const vars = new Map<string, Value>();
     for (const r of results) {
-      if (r.assign && r.value) vars.set(r.assign, r.value);
+      if (r.assign && r.value) {vars.set(r.assign, r.value);}
     }
     let last: Value | null = null;
     for (let i = results.length - 1; i >= 0; i--) {

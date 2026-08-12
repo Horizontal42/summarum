@@ -1,10 +1,12 @@
 // CodeMirror editor wired to the engine: evaluates on change, highlights
 // engine tokens, renders the results overlay, autocompletes phrases.
-import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, keymap, drawSelection } from "@codemirror/view";
+import type { ViewUpdate, DecorationSet} from "@codemirror/view";
+import { EditorView, ViewPlugin, Decoration, keymap, drawSelection } from "@codemirror/view";
 import { EditorState, StateEffect, StateField, RangeSetBuilder } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { autocompletion, CompletionContext, CompletionResult, acceptCompletion } from "@codemirror/autocomplete";
-import { SumEngine, LineResult } from "../engine";
+import type { CompletionContext, CompletionResult} from "@codemirror/autocomplete";
+import { autocompletion, acceptCompletion } from "@codemirror/autocomplete";
+import type { SumEngine, LineResult } from "../engine";
 import { buildSparkline } from "./sparkline";
 
 export interface EditorCallbacks {
@@ -20,7 +22,7 @@ const setResults = StateEffect.define<LineResult[]>();
 const resultsField = StateField.define<LineResult[]>({
   create: () => [],
   update(value, tr) {
-    for (const e of tr.effects) if (e.is(setResults)) value = e.value;
+    for (const e of tr.effects) {if (e.is(setResults)) {value = e.value;}}
     return value;
   },
 });
@@ -56,7 +58,7 @@ function buildDecorations(state: EditorState): DecorationSet {
     marks.sort((a, b) => a.from - b.from);
     let last = line.from;
     for (const m of marks) {
-      if (m.from < last) continue; // overlapping (comment vs tokens) — first wins
+      if (m.from < last) {continue;} // overlapping (comment vs tokens) — first wins
       builder.add(m.from, m.to, Decoration.mark({ class: m.cls }));
       last = m.to;
     }
@@ -68,8 +70,8 @@ const highlightField = StateField.define<DecorationSet>({
   create: buildDecorations,
   update(value, tr) {
     const hasResults = tr.effects.some((e) => e.is(setResults));
-    if (hasResults) return buildDecorations(tr.state);
-    if (tr.docChanged) return value.map(tr.changes);
+    if (hasResults) {return buildDecorations(tr.state);}
+    if (tr.docChanged) {return value.map(tr.changes);}
     return value;
   },
   provide: (f) => EditorView.decorations.from(f),
@@ -79,20 +81,20 @@ const highlightField = StateField.define<DecorationSet>({
 function buildVarHighlight(state: EditorState): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const sel = state.selection.main;
-  if (!sel.empty) return builder.finish();
+  if (!sel.empty) {return builder.finish();}
   const text = state.doc.toString();
   // expand a word around the cursor
   const isWordCh = (ch: string) => /[\p{L}\d_]/u.test(ch);
   let a = sel.head;
   let b = sel.head;
-  while (a > 0 && isWordCh(text[a - 1])) a--;
-  while (b < text.length && isWordCh(text[b])) b++;
-  if (a === b) return builder.finish();
+  while (a > 0 && isWordCh(text[a - 1])) {a--;}
+  while (b < text.length && isWordCh(text[b])) {b++;}
+  if (a === b) {return builder.finish();}
   const word = text.slice(a, b);
-  if (!/^[\p{L}_][\p{L}\d_]*$/u.test(word)) return builder.finish();
+  if (!/^[\p{L}_][\p{L}\d_]*$/u.test(word)) {return builder.finish();}
   // only highlight if the word is actually assigned somewhere in the document
   const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp(`^\\s*${esc}\\s*=`, "mu").test(text)) return builder.finish();
+  if (!new RegExp(`^\\s*${esc}\\s*=`, "mu").test(text)) {return builder.finish();}
   const re = new RegExp(`(?<![\\p{L}\\d_])${esc}(?![\\p{L}\\d_])`, "gu");
   for (const m of text.matchAll(re)) {
     builder.add(m.index, m.index + word.length, Decoration.mark({ class: "tok-var-active" }));
@@ -106,9 +108,9 @@ const varHighlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, tr) {
     for (const e of tr.effects) {
-      if (e.is(setVarHighlight)) return e.value;
+      if (e.is(setVarHighlight)) {return e.value;}
     }
-    if (tr.docChanged) return value.map(tr.changes);
+    if (tr.docChanged) {return value.map(tr.changes);}
     return value;
   },
   provide: (f) => EditorView.decorations.from(f),
@@ -129,7 +131,7 @@ const varHighlightPlugin = ViewPlugin.fromClass(
     }
 
     schedule(view: EditorView) {
-      if (this.timeout) clearTimeout(this.timeout);
+      if (this.timeout) {clearTimeout(this.timeout);}
       this.timeout = setTimeout(() => {
         const decos = buildVarHighlight(view.state);
         view.dispatch({ effects: setVarHighlight.of(decos) });
@@ -137,7 +139,7 @@ const varHighlightPlugin = ViewPlugin.fromClass(
     }
 
     destroy() {
-      if (this.timeout) clearTimeout(this.timeout);
+      if (this.timeout) {clearTimeout(this.timeout);}
     }
   }
 );
@@ -160,8 +162,8 @@ export class SumEditor {
     let engineOptions: { label: string; type: string; detail?: string }[] | null = null;
     const completionSource = (ctx: CompletionContext): CompletionResult | null => {
       const word = ctx.matchBefore(/[\p{L}_]+$/u);
-      if (!word || (word.from === word.to && !ctx.explicit)) return null;
-      if (word.to - word.from < 2 && !ctx.explicit) return null;
+      if (!word || (word.from === word.to && !ctx.explicit)) {return null;}
+      if (word.to - word.from < 2 && !ctx.explicit) {return null;}
       // the engine's phrase list is fixed after boot — map it once
       engineOptions ??= this.engine.completions().map((c) => ({
         label: c.label,
@@ -243,7 +245,7 @@ export class SumEditor {
       const lineTo = doc.lineAt(sel.to);
       const multiLine = lineFrom.number !== lineTo.number;
       const coversLine = sel.from <= lineFrom.from && sel.to >= lineTo.to && !sel.empty;
-      if (!sel.empty && !multiLine && !coversLine) return;
+      if (!sel.empty && !multiLine && !coversLine) {return;}
       const lines: string[] = [];
       for (let n = lineFrom.number; n <= lineTo.number; n++) {
         const line = doc.line(n);
@@ -255,8 +257,8 @@ export class SumEditor {
     });
 
     this.resultsEl.addEventListener("click", (e) => {
-      const el = (e.target as HTMLElement).closest(".result-line") as HTMLElement | null;
-      if (el?.dataset.value) this.cb.onCopy(el.dataset.value);
+      const el = (e.target as HTMLElement).closest(".result-line");
+      if (el?.dataset.value) {this.cb.onCopy(el.dataset.value);}
     });
   }
 
@@ -318,19 +320,19 @@ export class SumEditor {
       const r = this.results[i];
       const isChart = r.value?.kind === "chart";
       const isError = !!r.error;
-      if (!r.text && !isChart && !isError) continue;
+      if (!r.text && !isChart && !isError) {continue;}
       const line = doc.line(i + 1);
       const block = this.view.lineBlockAt(line.from);
       const top = docTop + block.top - overlayTop;
-      if (top < -40 || top > this.resultsEl.clientHeight + 40) continue;
+      if (top < -40 || top > this.resultsEl.clientHeight + 40) {continue;}
       if (isChart && r.value?.kind === "chart") {
         frag.appendChild(buildSparkline(r.value.points.map((p) => p.toNumber()), top));
       } else {
         const el = document.createElement("div");
         el.className = "result-line" + (isError ? " result-error" : "");
         el.textContent = isError ? "#ref?" : r.text;
-        if (!isError) el.dataset.value = r.text!;
-        if (isError) el.title = r.error!;
+        if (!isError) {el.dataset.value = r.text!;}
+        if (isError) {el.title = r.error!;}
         el.style.top = `${top}px`;
         frag.appendChild(el);
       }

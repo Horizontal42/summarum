@@ -1,12 +1,13 @@
 // JS extensions runtime: numi.setVariable, numi.addUnit, numi.addFunction.
 // Scripts run inside a QuickJS WASM sandbox — no DOM, no Tauri IPC, no host globals.
-import {
-  newQuickJSWASMModuleFromVariant,
+import type {
   QuickJSContext,
-  QuickJSHandle,
+  QuickJSHandle} from "quickjs-emscripten-core";
+import {
+  newQuickJSWASMModuleFromVariant
 } from "quickjs-emscripten-core";
 import releaseSyncVariant from "@jitl/quickjs-singlefile-browser-release-sync";
-import { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
+import type { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
 
 interface ExtensionApi {
   setVariable(name: string, value: number | ExtensionValue): void;
@@ -40,7 +41,7 @@ const now = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
 function toExtValue(v: unknown, what: string): ExtensionValue | number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "number" && Number.isFinite(v)) {return v;}
   if (v && typeof v === "object") {
     const o = v as { double?: unknown; unitId?: unknown };
     if (typeof o.double === "number" && Number.isFinite(o.double)) {
@@ -53,7 +54,7 @@ function toExtValue(v: unknown, what: string): ExtensionValue | number {
 }
 
 function message(e: unknown): string {
-  if (e instanceof Error) return e.message;
+  if (e instanceof Error) {return e.message;}
   if (
     e &&
     typeof e === "object" &&
@@ -71,7 +72,7 @@ export async function runExtensions(
   engine: SumEngine,
   scripts: { name: string; code: string }[],
 ): Promise<void> {
-  if (scripts.length === 0) return;
+  if (scripts.length === 0) {return;}
   try {
     await load(engine, scripts);
   } catch (e) {
@@ -141,7 +142,7 @@ function exposeApi(
   define("setVariable", (nameHandle, valueHandle) => {
     const name = vm.dump(nameHandle);
     if (typeof name !== "string" || !name)
-      throw new Error("expects a variable name");
+      {throw new Error("expects a variable name");}
     api.setVariable(name, toExtValue(vm.dump(valueHandle), "value"));
   });
 
@@ -167,9 +168,9 @@ function exposeApi(
   define("addFunction", (specHandle, fnHandle) => {
     const spec = vm.dump(specHandle);
     if (!spec || typeof spec.id !== "string")
-      throw new Error("expects { id, phrases }");
+      {throw new Error("expects { id, phrases }");}
     if (!fnHandle || vm.typeof(fnHandle) !== "function")
-      throw new Error("expects a function");
+      {throw new Error("expects a function");}
     // outlives this callback, so it needs its own reference; the context is never disposed
     const guestFn = fnHandle.dup();
     const id = spec.id;
