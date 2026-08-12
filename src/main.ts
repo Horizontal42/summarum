@@ -1,3 +1,5 @@
+import { logger } from "./utils/logger";
+
 /** App bootstrap: engine + editor + documents + settings + Tauri glue. */
 import "./ui/app.css";
 import { SumEngine } from "./engine";
@@ -433,7 +435,7 @@ function bindDataDirSettings(): void {
     try {
       await migrateDataDir(settings.dataDir, picked, strategy);
     } catch (e) {
-      console.warn("migrate failed", e);
+      logger.warn("migrate failed", e);
       toast(t("folderError"));
       return;
     }
@@ -534,7 +536,7 @@ async function registerHotkey(old: string | null, combo: string): Promise<boolea
     });
     return true;
   } catch (e) {
-    console.warn("hotkey registration failed", e);
+    logger.warn("hotkey registration failed", e);
     return false;
   }
 }
@@ -546,14 +548,14 @@ async function applyAutostart(enabled: boolean): Promise<void> {
     if (enabled) await auto.enable();
     else await auto.disable();
   } catch (e) {
-    console.warn("autostart failed", e);
+    logger.warn("autostart failed", e);
   }
 }
 
 async function applyAlwaysOnTop(enabled: boolean): Promise<void> {
   if (!isTauri()) return;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().setAlwaysOnTop(enabled).catch((e) => console.warn("always-on-top failed", e));
+  await getCurrentWindow().setAlwaysOnTop(enabled).catch((e) => logger.warn("always-on-top failed", e));
 }
 
 async function refreshRates(force = false): Promise<void> {

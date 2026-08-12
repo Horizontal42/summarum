@@ -1,3 +1,5 @@
+import { logger } from "./utils/logger";
+
 // JS extensions runtime: numi.setVariable, numi.addUnit, numi.addFunction.
 // Scripts run inside a QuickJS WASM sandbox — no DOM, no Tauri IPC, no host globals.
 import {
@@ -75,7 +77,7 @@ export async function runExtensions(
   try {
     await load(engine, scripts);
   } catch (e) {
-    console.warn("extensions disabled: QuickJS sandbox unavailable:", e);
+    logger.warn("extensions disabled: QuickJS sandbox unavailable:", e);
   }
 }
 
@@ -200,7 +202,7 @@ function evaluateScripts(
       }
       res.value.dispose();
     } catch (e) {
-      console.error(`extension ${s.name} failed:`, e);
+      logger.error(`extension ${s.name} failed:`, e);
     }
   }
 }

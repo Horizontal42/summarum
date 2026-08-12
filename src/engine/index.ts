@@ -1,3 +1,5 @@
+import { logger } from "../utils/logger";
+
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
 import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
@@ -144,7 +146,7 @@ export class SumEngine {
           } else {
             // Surface unexpected bugs/BigInt errors and log them
             lineError = e instanceof Error ? e.message : String(e);
-            console.warn("evaluate failed:", e);
+            logger.warn("evaluate failed:", e);
           }
           value = null;
         }

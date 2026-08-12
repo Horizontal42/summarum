@@ -1,3 +1,5 @@
+import { logger } from "./utils/logger";
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkForUpdate } from './updater';
 import * as storage from './storage';
@@ -22,8 +24,8 @@ vi.mock('@tauri-apps/plugin-process', () => ({
 describe('checkForUpdate', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
   });
 
   it('should return null if not in Tauri', async () => {
@@ -39,7 +41,7 @@ describe('checkForUpdate', () => {
 
     const result = await checkForUpdate();
     expect(result).toBe('error');
-    expect(console.warn).toHaveBeenCalledWith('update check failed', expect.any(Error));
+    expect(logger.warn).toHaveBeenCalledWith('update check failed', expect.any(Error));
   });
 
   it('should return null if no update is available', async () => {
@@ -52,7 +54,7 @@ describe('checkForUpdate', () => {
 
     const result = await checkForUpdate();
     expect(result).toBeNull();
-    expect(console.info).toHaveBeenCalledWith("no update: running 1.0.0, that's the latest published release");
+    expect(logger.info).toHaveBeenCalledWith("no update: running 1.0.0, that's the latest published release");
   });
 
   it('should return an update object if an update is available', async () => {

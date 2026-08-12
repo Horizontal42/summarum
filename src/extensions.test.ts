@@ -1,3 +1,5 @@
+import { logger } from "./utils/logger";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeApi, runExtensions } from "./extensions";
 import { SumEngine } from "./engine";
@@ -37,17 +39,17 @@ describe("extensions", () => {
   });
 
   describe("runExtensions", () => {
-    let consoleErrorSpy: any;
-    let consoleWarnSpy: any;
+    let loggerErrorSpy: any;
+    let loggerWarnSpy: any;
 
     beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      loggerErrorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      loggerWarnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleErrorSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
+      loggerWarnSpy.mockRestore();
       vi.resetModules();
       vi.doUnmock("quickjs-emscripten-core");
     });
@@ -65,14 +67,14 @@ describe("extensions", () => {
         baseUnitId: "USD",
         ratio: 1,
       });
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
-    it("swallows errors and logs to console.error", async () => {
+    it("swallows errors and logs to logger.error", async () => {
       await runExtensions(mockEngine as SumEngine, [{ name: "script1", code: "throw new Error('test error');" }]);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("extension script1 failed:", expect.any(Error));
-      expect(consoleErrorSpy.mock.calls[0][1].message).toContain("test error");
+      expect(loggerErrorSpy).toHaveBeenCalledWith("extension script1 failed:", expect.any(Error));
+      expect(loggerErrorSpy.mock.calls[0][1].message).toContain("test error");
     });
 
     it("continues running other scripts if one fails", async () => {
@@ -84,7 +86,7 @@ describe("extensions", () => {
 
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var1", 10);
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var3", 30);
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
     });
 
     it("passes unit-carrying values through setVariable", async () => {
@@ -99,7 +101,7 @@ describe("extensions", () => {
       await runExtensions(mockEngine as SumEngine, [{ name: "bad", code: "numi.setVariable('x', 'nope');" }]);
 
       expect(mockEngine.setVariable).not.toHaveBeenCalled();
-      expect(consoleErrorSpy.mock.calls[0][1].message).toContain("numi.setVariable");
+      expect(loggerErrorSpy.mock.calls[0][1].message).toContain("numi.setVariable");
     });
 
     it("registers a function callable with one array of values", async () => {
@@ -133,7 +135,7 @@ describe("extensions", () => {
         { name: "probe", code: "if (typeof window !== 'undefined' || typeof fetch !== 'undefined' || typeof console !== 'undefined') throw new Error('leak');" },
       ]);
 
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
     it("interrupts an infinite loop at load time", async () => {
@@ -142,8 +144,8 @@ describe("extensions", () => {
         { name: "after", code: "numi.setVariable('ok', 1);" },
       ]);
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy.mock.calls[0][0]).toBe("extension spin failed:");
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy.mock.calls[0][0]).toBe("extension spin failed:");
       // the runtime survives the interrupt and keeps loading scripts
       expect(mockEngine.setVariable).toHaveBeenCalledWith("ok", 1);
     });
@@ -184,12 +186,13 @@ describe("extensions", () => {
       vi.doMock("quickjs-emscripten-core", () => ({
         newQuickJSWASMModuleFromVariant: () => Promise.reject(new Error("no WebAssembly")),
       }));
+      vi.doMock("./utils/logger", () => ({ logger: { warn: loggerWarnSpy, error: loggerErrorSpy } }));
       const { runExtensions: run } = await import("./extensions");
 
       await run(mockEngine as SumEngine, [{ name: "s", code: "numi.setVariable('x', 1);" }]);
 
       expect(mockEngine.setVariable).not.toHaveBeenCalled();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
         "extensions disabled: QuickJS sandbox unavailable:",
         expect.any(Error),
       );
@@ -197,8 +200,8 @@ describe("extensions", () => {
 
     it("does not load the sandbox when there are no scripts", async () => {
       await runExtensions(mockEngine as SumEngine, []);
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
   });
 });

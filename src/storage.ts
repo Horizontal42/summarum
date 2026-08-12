@@ -1,3 +1,5 @@
+import { logger } from "./utils/logger";
+
 // Storage: Tauri commands in the app, localStorage fallback for `vite dev`.
 
 export interface DocMeta {
@@ -79,7 +81,7 @@ export async function loadSettings(): Promise<SettingsData> {
       : localStorage.getItem("summarum.settings");
     if (raw) return { ...defaultSettingsData, ...JSON.parse(raw) };
   } catch (e) {
-    console.warn("loadSettings failed", e);
+    logger.warn("loadSettings failed", e);
   }
   return { ...defaultSettingsData };
 }
@@ -99,7 +101,7 @@ export async function loadAppData(dataDir: string): Promise<AppData | null> {
       : localStorage.getItem("summarum.documents");
     if (raw) return JSON.parse(raw);
   } catch (e) {
-    console.warn("loadAppData failed", e);
+    logger.warn("loadAppData failed", e);
   }
   return null;
 }
@@ -132,7 +134,7 @@ export async function flushAppData(): Promise<void> {
     if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
     else localStorage.setItem("summarum.documents", raw);
   } catch (e) {
-    console.warn("saveAppData failed", e);
+    logger.warn("saveAppData failed", e);
   }
 }
 
@@ -150,7 +152,7 @@ export async function runBackups(dataDir: string, retentionDays: number): Promis
   try {
     await invoke("run_backups", { dir: dirArg(dataDir), retentionDays });
   } catch (e) {
-    console.warn("runBackups failed", e);
+    logger.warn("runBackups failed", e);
   }
 }
 
@@ -159,7 +161,7 @@ export async function backupDeletedSheet(dataDir: string, title: string, content
   try {
     await invoke("backup_deleted_sheet", { dir: dirArg(dataDir), title, contents });
   } catch (e) {
-    console.warn("backupDeletedSheet failed", e);
+    logger.warn("backupDeletedSheet failed", e);
   }
 }
 
@@ -205,7 +207,7 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
       return { date: json.time_last_update_utc, rates: json.rates, fetchedAt: Math.floor(Date.now() / 1000) };
     }
   } catch (e) {
-    console.warn("fetchRates failed", e);
+    logger.warn("fetchRates failed", e);
   }
   return null;
 }
@@ -227,7 +229,7 @@ export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record
     );
     return results;
   } catch (e) {
-    console.warn("fetchHistoricalRatesBatch failed", e);
+    logger.warn("fetchHistoricalRatesBatch failed", e);
     return {};
   }
 }
@@ -246,7 +248,7 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
     }
     return out;
   } catch (e) {
-    console.warn("fetchHistoricalRates failed", date, e);
+    logger.warn("fetchHistoricalRates failed", date, e);
     return null;
   }
 }
@@ -265,7 +267,7 @@ export async function fetchMarketData(symbols: string[]): Promise<Record<string,
   try {
     return await invoke<Record<string, number>>("fetch_market_data", { symbols });
   } catch (e) {
-    console.warn("fetchMarketData failed", e);
+    logger.warn("fetchMarketData failed", e);
     return {};
   }
 }
@@ -277,7 +279,7 @@ export async function loadExtensionScripts(): Promise<{ name: string; code: stri
   try {
     return await invoke<{ name: string; code: string }[]>("load_extensions");
   } catch (e) {
-    console.warn("loadExtensions failed", e);
+    logger.warn("loadExtensions failed", e);
     return [];
   }
 }
@@ -314,7 +316,7 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
           const content = await invoke<string>("read_text_file", { path });
           cb(content);
         } catch (e) {
-          console.warn("file drop rejected", path, e);
+          logger.warn("file drop rejected", path, e);
         }
       }
     });
