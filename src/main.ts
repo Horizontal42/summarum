@@ -655,7 +655,7 @@ function renderTotal(): void {
   }
   const total = engine.totalOf(results);
   if (total) {
-    line.innerHTML = "";
+    line.replaceChildren();
     const lbl = document.createElement("span");
     lbl.className = "total-label";
     lbl.textContent = label;
