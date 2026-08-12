@@ -9,6 +9,7 @@ import { formatValue } from "./formatter";
 import { detectDateOrder } from "./datetime";
 import snapshot from "./rates-snapshot.json";
 import { CRYPTO } from "./extraunits";
+import { logger } from "../logger";
 
 const cryptoSnapshot: Record<string, number> = {};
 for (const c of CRYPTO) cryptoSnapshot[c.code] = 1 / c.snapshotUsd;
@@ -144,7 +145,7 @@ export class SumEngine {
           } else {
             // Surface unexpected bugs/BigInt errors and log them
             lineError = e instanceof Error ? e.message : String(e);
-            console.warn("evaluate failed:", e);
+            logger.warn("evaluate failed:", e);
           }
           value = null;
         }

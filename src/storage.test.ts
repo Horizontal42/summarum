@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
 import { invoke } from '@tauri-apps/api/core';
+import { logger } from './logger';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock('./logger', () => ({
+  logger: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 describe('storage', () => {
@@ -14,7 +23,6 @@ describe('storage', () => {
       getItem: vi.fn(),
       setItem: vi.fn(),
     });
-    vi.stubGlobal('console', { warn: vi.fn() });
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -54,7 +62,7 @@ describe('storage', () => {
     it('falls back to defaultSettingsData if localStorage throws', async () => {
       vi.mocked(localStorage.getItem).mockImplementation(() => { throw new Error('localStorage error'); });
       const settings = await loadSettings();
-      expect(console.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
       expect(settings).toEqual(defaultSettingsData);
     });
 
@@ -62,7 +70,7 @@ describe('storage', () => {
       vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
       vi.mocked(invoke).mockRejectedValue(new Error('invoke error'));
       const settings = await loadSettings();
-      expect(console.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
       expect(settings).toEqual(defaultSettingsData);
     });
 
@@ -75,7 +83,7 @@ describe('storage', () => {
     it('falls back to defaultSettingsData if JSON is invalid', async () => {
       vi.mocked(localStorage.getItem).mockReturnValue("invalid json");
       const settings = await loadSettings();
-      expect(console.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadSettings failed', expect.any(Error));
       expect(settings).toEqual(defaultSettingsData);
     });
   });
@@ -124,7 +132,7 @@ describe('storage', () => {
     it('returns null if localStorage throws', async () => {
       vi.mocked(localStorage.getItem).mockImplementation(() => { throw new Error('localStorage error'); });
       const data = await loadAppData('');
-      expect(console.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
       expect(data).toBeNull();
     });
 
@@ -132,7 +140,7 @@ describe('storage', () => {
       vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
       vi.mocked(invoke).mockRejectedValue(new Error('invoke error'));
       const data = await loadAppData('');
-      expect(console.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
       expect(data).toBeNull();
     });
 
@@ -145,7 +153,7 @@ describe('storage', () => {
     it('returns null if JSON is invalid', async () => {
       vi.mocked(localStorage.getItem).mockReturnValue("invalid json");
       const data = await loadAppData('');
-      expect(console.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('loadAppData failed', expect.any(Error));
       expect(data).toBeNull();
     });
   });
@@ -223,7 +231,7 @@ describe('storage', () => {
 
       await flushAppData();
 
-      expect(console.warn).toHaveBeenCalledWith('saveAppData failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('saveAppData failed', expect.any(Error));
     });
 
     it('handles invoke throw gracefully in flushAppData', async () => {
@@ -234,7 +242,7 @@ describe('storage', () => {
 
       await flushAppData();
 
-      expect(console.warn).toHaveBeenCalledWith('saveAppData failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('saveAppData failed', expect.any(Error));
     });
   });
 
@@ -255,7 +263,7 @@ describe('storage', () => {
         vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
         vi.mocked(invoke).mockRejectedValue(new Error('invoke error'));
         await runBackups('dir', 10);
-        expect(console.warn).toHaveBeenCalledWith('runBackups failed', expect.any(Error));
+        expect(logger.warn).toHaveBeenCalledWith('runBackups failed', expect.any(Error));
       });
     });
 
@@ -281,7 +289,7 @@ describe('storage', () => {
         vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
         vi.mocked(invoke).mockRejectedValue(new Error('invoke error'));
         await backupDeletedSheet('dir', 'title', 'contents');
-        expect(console.warn).toHaveBeenCalledWith('backupDeletedSheet failed', expect.any(Error));
+        expect(logger.warn).toHaveBeenCalledWith('backupDeletedSheet failed', expect.any(Error));
       });
     });
 
@@ -369,7 +377,7 @@ describe('storage', () => {
     it('returns null if fetch fails', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
       const result = await fetchRates();
-      expect(console.warn).toHaveBeenCalledWith('fetchRates failed', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('fetchRates failed', expect.any(Error));
       expect(result).toBeNull();
     });
 
@@ -404,7 +412,7 @@ describe('storage', () => {
     it('returns null if fetch fails', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
       const result = await fetchHistoricalRates('2024-01-01');
-      expect(console.warn).toHaveBeenCalledWith('fetchHistoricalRates failed', '2024-01-01', expect.any(Error));
+      expect(logger.warn).toHaveBeenCalledWith('fetchHistoricalRates failed', '2024-01-01', expect.any(Error));
       expect(result).toBeNull();
     });
 
