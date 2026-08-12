@@ -27,14 +27,28 @@ AAPL в USD                     → $213.55
 
 ## Установка
 
-Скачай последний `Summarum_*_x64-setup.exe` (или `arm64-setup.exe` для Windows on ARM) из [Releases](../../releases), запусти — готово. Весь установщик около 2 МБ. Дальше обновления проверяются сами.
+Скачай сборку под свою систему из [Releases](../../releases). Приложение весит
+около 2 МБ, дальше обновления проверяются сами.
+
+- **Windows** — `Summarum_*_x64-setup.exe` (или `arm64-setup.exe` для Windows on
+  ARM). Запусти — готово.
+- **Linux** — `.AppImage` (`chmod +x` и запускай) либо `.deb`/`.rpm`, если хочется
+  поставить нормальным пакетом. Самообновление работает только у AppImage, deb и
+  rpm обновляются скачиванием следующей версии.
+- **macOS** — `.dmg` для Apple Silicon или Intel. Сборки не подписаны сертификатом
+  Apple Developer, поэтому первый запуск — правый клик → **Открыть**, а не двойной
+  клик (либо один раз выполнить `xattr -cr /Applications/Summarum.app` в терминале).
+  Дальше запускается как обычно.
 
 Требования:
 
-- **Windows 10 (1803+) или Windows 11**, 64-бит.
-- **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** —
+- **Windows 10 (1803+) или Windows 11**, 64-бит, и
+  **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** —
   уже встроен в Windows 11 и большинство обновлённых Windows 10; если отсутствует,
   установщик скачает его автоматически.
+- **Linux** с `webkit2gtk-4.1` (Ubuntu 22.04+, Debian 12+, Fedora 36+) и
+  `libayatana-appindicator3` для иконки в трее.
+- **macOS 10.13** или новее.
 - Интернет нужен только для живых курсов и рыночных данных — всё остальное работает офлайн
   (курсы берутся из кэша или встроенного снимка).
 
@@ -159,17 +173,25 @@ npm run tauri build    # собрать установщик
 Для сборки нужны:
 
 - [Node.js](https://nodejs.org/) 22.6 или новее
-- [Rust](https://rustup.rs/) (stable, MSVC toolchain)
-- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- [Rust](https://rustup.rs/), stable
+- На Windows: toolchain MSVC и
+  [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
   с компонентом «Desktop development with C++» (нужен линковщик MSVC)
+- На Linux: `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`,
+  `librsvg2-dev`, `libxdo-dev`, `libssl-dev`, `patchelf` и компилятор C
+- На macOS: Xcode Command Line Tools
 - Если что-то не собирается — см. [Tauri prerequisites](https://tauri.app/start/prerequisites/)
+
+`npm run tauri build` собирает то, что умеет хост-платформа: NSIS на Windows,
+deb/rpm/AppImage на Linux, .app/.dmg на macOS. Кросс-компиляция между ними не
+поддерживается — релизный workflow собирает каждую платформу на своём раннере.
 
 Стек: [Tauri 2](https://tauri.app) + TypeScript + CodeMirror 6.
 
 ## Благодарность
 
 Вдохновлён [Numi](https://numi.app) от Дмитрия Николаева —
-если ты на macOS, купи его. Summarum — независимый проект, написанный с нуля для Windows.
+если ты на macOS, купи его. Summarum — независимый проект, написанный с нуля для Windows, Linux и macOS.
 
 ## Лицензия
 

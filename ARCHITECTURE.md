@@ -215,6 +215,40 @@ recursing forever.
   deleted sheets become `.numi` files under `backups/deleted/` and are pruned
   by age. Saving is debounced at 400 ms.
 
+## Platforms and packaging
+
+- One codebase, three desktop targets. `tauri.conf.json` holds everything
+  shared; the per-platform bits live in `tauri.windows.conf.json`,
+  `tauri.linux.conf.json` and `tauri.macos.conf.json`, which Tauri merges over
+  the base config (JSON Merge Patch) according to the target being built. Each
+  one only sets `bundle.targets` and that platform's bundler options — NSIS on
+  Windows, deb/rpm/AppImage on Linux, .app/.dmg on macOS.
+- `release.yml` builds five artifacts on three runner families: Windows x64 and
+  arm64, Linux x64 (`ubuntu-22.04` — the oldest runner carrying webkit2gtk-4.1,
+  which keeps the glibc floor low), macOS arm64 and x64. Two separate macOS
+  targets rather than `universal-apple-darwin`: it matches how Windows already
+  ships per-architecture, halves each download, and gives the updater the
+  `darwin-aarch64`/`darwin-x86_64` keys it looks up by default.
+- The whole matrix stays `max-parallel: 1`. Every job hands its assets to the
+  *same* GitHub Release object, and tauri-action's find-or-create check races if
+  two jobs reach it at once — adding platforms did not change that constraint,
+  it made it apply to more jobs.
+- No OS code signing anywhere. Windows ships unsigned; macOS is *ad-hoc* signed
+  (`bundle.macOS.signingIdentity: "-"`), which needs no Apple certificate but is
+  required for Apple Silicon to run a downloaded binary at all — without it the
+  arm64 build is rejected as damaged rather than merely warned about. Gatekeeper
+  still asks the user to allow the app on first launch either way.
+- `bundle.fileAssociations` covers `.numi`/`.sum` on Windows (NSIS registry
+  entries) and macOS (`CFBundleDocumentTypes`). On Linux it writes nothing
+  useful: registering an extension there also needs a shared-mime-info XML that
+  Tauri does not generate, so `.numi` files are opened by dragging them into the
+  window rather than from the file manager.
+- `icons/icon.icns` is emitted by `scripts/gen-icon.ts` alongside the PNGs and
+  the `.ico`, hand-rolled the same dependency-free way: `icns` magic + total
+  length, then one `[OSType][length][PNG]` chunk per size, using the modern
+  PNG-payload tags `iconutil` produces (`icp4`/`icp5`, `ic07`–`ic14`). Rerun it
+  with `npm run icons` after touching the artwork.
+
 ## Auto-update
 
 - `updater.ts` calls `tauri-plugin-updater`'s `check()` on boot; if a signed
@@ -242,7 +276,9 @@ recursing forever.
   flipping it while the app is running takes effect immediately); the manual
   button ignores the toggle and always works.
 - The update endpoint is `latest.json` published alongside each GitHub
-  Release. `release.yml` signs both architectures with a minisign keypair:
+  Release. `release.yml` signs every platform's updater artifact with a
+  minisign keypair (this is Tauri's own update signing, unrelated to OS code
+  signing):
   the public half is embedded in `tauri.conf.json`; the private half + its
   password live only as `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)` repo secrets
   (write-only — there is no durable copy in the repo). Losing that key means

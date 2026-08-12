@@ -113,7 +113,7 @@ function draw(size: number): Buffer {
 
 fs.mkdirSync(outDir, { recursive: true });
 const pngs = new Map<number, Buffer>();
-for (const size of [16, 32, 48, 64, 128, 256, 512]) {
+for (const size of [16, 32, 48, 64, 128, 256, 512, 1024]) {
   pngs.set(size, encodePng(size, draw(size)));
 }
 
@@ -154,3 +154,38 @@ function buildIco(sizes: number[]): Buffer {
 
 fs.writeFileSync(path.join(outDir, "icon.ico"), buildIco([16, 32, 48, 64, 128, 256]));
 console.log("icon.ico (6 sizes)");
+
+// .icns: "icns" magic + total length, then [OSType][length incl. header][PNG].
+// Both lengths are big-endian and count their own 8-byte header. The tag set
+// mirrors what `iconutil` emits for a modern .iconset — every ic*/icp* entry
+// below carries a plain PNG payload (10.7+), so no JPEG 2000 encoder is needed.
+const ICNS_ENTRIES: Array<[string, number]> = [
+  ["icp4", 16],
+  ["icp5", 32],
+  ["ic11", 32], // 16@2x
+  ["ic12", 64], // 32@2x
+  ["ic07", 128],
+  ["ic13", 256], // 128@2x
+  ["ic08", 256],
+  ["ic14", 512], // 256@2x
+  ["ic09", 512],
+  ["ic10", 1024], // 512@2x
+];
+
+function buildIcns(): Buffer {
+  const parts = ICNS_ENTRIES.map(([tag, size]) => {
+    const data = pngs.get(size)!;
+    const head = Buffer.alloc(8);
+    head.write(tag, 0, 4, "ascii");
+    head.writeUInt32BE(8 + data.length, 4);
+    return Buffer.concat([head, data]);
+  });
+  const body = Buffer.concat(parts);
+  const header = Buffer.alloc(8);
+  header.write("icns", 0, 4, "ascii");
+  header.writeUInt32BE(8 + body.length, 4);
+  return Buffer.concat([header, body]);
+}
+
+fs.writeFileSync(path.join(outDir, "icon.icns"), buildIcns());
+console.log(`icon.icns (${ICNS_ENTRIES.length} entries)`);

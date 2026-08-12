@@ -1,6 +1,9 @@
 // Summarum — Tauri shell: tray, hide-to-tray window, app-data storage,
 // currency rates fetching with an on-disk cache, extension script loading.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;

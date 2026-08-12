@@ -1,7 +1,7 @@
 [package]
 name = "summarum"
 version = "1.2.6"
-description = "Summarum — natural language calculator notebook for Windows"
+description = "Summarum — natural language calculator notebook"
 edition = "2021"
 
 [build-dependencies]

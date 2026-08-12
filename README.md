@@ -29,16 +29,29 @@ Works in **English and Russian** at the same time: `5 метров в см`, `20
 
 ## Install
 
-Grab the latest `Summarum_*_x64-setup.exe` (or `arm64-setup.exe` on Windows
-on ARM) from [Releases](../../releases), run it, done. The whole app is
-about 2 MB. It checks for updates on its own after that.
+Grab the build for your system from [Releases](../../releases). The whole app
+is about 2 MB and checks for updates on its own after that.
+
+- **Windows** — `Summarum_*_x64-setup.exe` (or `arm64-setup.exe` on Windows on
+  ARM). Run it, done.
+- **Linux** — `.AppImage` (`chmod +x`, then run) or the `.deb`/`.rpm` if you'd
+  rather install it properly. Self-updating only works on the AppImage; deb and
+  rpm are updated by downloading the next one.
+- **macOS** — `.dmg`, Apple Silicon or Intel. These builds are not signed with
+  an Apple Developer certificate, so the first launch has to be a right-click →
+  **Open** rather than a double-click (or run
+  `xattr -cr /Applications/Summarum.app` once in a terminal). Every launch after
+  that is normal.
 
 Requirements:
 
-- **Windows 10 (1803+) or Windows 11**, 64-bit.
-- **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** —
+- **Windows 10 (1803+) or Windows 11**, 64-bit, plus the
+  **[WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** —
   already part of Windows 11 and most updated Windows 10 systems; if it's
   missing, the installer downloads it automatically.
+- **Linux** with `webkit2gtk-4.1` (Ubuntu 22.04+, Debian 12+, Fedora 36+) and
+  `libayatana-appindicator3` for the tray icon.
+- **macOS 10.13** or newer.
 - Internet connection is only needed for live rates and market data — everything
   else works offline (rates fall back to a cached/bundled snapshot).
 
@@ -165,11 +178,20 @@ To build from source you need:
 
 - [Node.js](https://nodejs.org/) 22.6 or newer (`npm run icons` relies on
   Node's built-in TypeScript support)
-- [Rust](https://rustup.rs/) (stable, MSVC toolchain)
-- [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- [Rust](https://rustup.rs/), stable
+- On Windows: the MSVC toolchain plus
+  [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
   with the "Desktop development with C++" workload (the MSVC linker)
+- On Linux: `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`,
+  `librsvg2-dev`, `libxdo-dev`, `libssl-dev`, `patchelf` and a C toolchain
+- On macOS: Xcode Command Line Tools
 - See the [Tauri prerequisites](https://tauri.app/start/prerequisites/) page
   if anything refuses to compile
+
+`npm run tauri build` produces whatever the host platform bundles — NSIS on
+Windows, deb/rpm/AppImage on Linux, .app/.dmg on macOS. Cross-compiling
+between the three is not supported; the release workflow builds each on its
+own runner.
 
 Stack: [Tauri 2](https://tauri.app) + TypeScript + CodeMirror 6.
 
@@ -177,7 +199,7 @@ Stack: [Tauri 2](https://tauri.app) + TypeScript + CodeMirror 6.
 
 Inspired by the excellent [Numi](https://numi.app) by Dmitry Nikolaev —
 if you're on macOS, buy it. Summarum is an independent project, built from
-scratch for Windows.
+scratch for Windows, Linux and macOS.
 
 ## License
 

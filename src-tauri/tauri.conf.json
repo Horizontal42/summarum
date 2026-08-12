@@ -28,14 +28,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.png",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/icon.icns"
     ],
     "fileAssociations": [
       {
@@ -44,13 +44,7 @@
         "description": "Summarum calculation sheet",
         "role": "Editor"
       }
-    ],
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser",
-        "languages": ["English", "Russian"]
-      }
-    }
+    ]
   },
   "plugins": {
     "updater": {
