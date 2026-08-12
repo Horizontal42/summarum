@@ -414,11 +414,31 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
   return qty(lo.plus(hi).div(2));
 }
 
+/** Lines whose unit shares the first line's dimension (mixed-dimension blocks skip the rest). */
+function filterSameDimension(block: Quantity[]): Quantity[] {
+  const refDim = block[0].unit?.dimension ?? null;
+  return block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+}
+
+/** Adds compatible lines left to right, silently skipping ones with an incompatible dimension. */
+function reduceCompatible(block: Quantity[]): { acc: Quantity; counted: number } {
+  let acc = block[0];
+  let counted = 1;
+  for (let i = 1; i < block.length; i++) {
+    try {
+      acc = numericAdd(acc, block[i], 1);
+      counted++;
+    } catch {
+      // skip lines with incompatible dimensions
+    }
+  }
+  return { acc, counted };
+}
+
 const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
   count: (block) => qty(new Decimal(block.length)),
   chart: (block) => {
-    const refDim = block[0].unit?.dimension ?? null;
-    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
+    const compatible = filterSameDimension(block);
     if (compatible.length < 2) throw new EvalError("need at least 2 values for chart");
     return {
       kind: "chart",
@@ -426,39 +446,12 @@ const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
       unitLabel: block[0].unit?.format ?? null,
     };
   },
-  min: (block) => {
-    const refDim = block[0].unit?.dimension ?? null;
-    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
-    return compatible.reduce((best, q) => toBase(q).lt(toBase(best)) ? q : best);
-  },
-  max: (block) => {
-    const refDim = block[0].unit?.dimension ?? null;
-    const compatible = block.filter((q) => (q.unit?.dimension ?? null) === refDim);
-    return compatible.reduce((best, q) => toBase(q).gt(toBase(best)) ? q : best);
-  },
+  min: (block) => filterSameDimension(block).reduce((best, q) => toBase(q).lt(toBase(best)) ? q : best),
+  max: (block) => filterSameDimension(block).reduce((best, q) => toBase(q).gt(toBase(best)) ? q : best),
   product: (block) => qty(block.reduce((acc, q) => acc.mul(q.value), new Decimal(1))),
-  sum: (block) => {
-    let acc = block[0];
-    for (let i = 1; i < block.length; i++) {
-      try {
-        acc = numericAdd(acc, block[i], 1);
-      } catch {
-        // skip lines with incompatible dimensions
-      }
-    }
-    return acc;
-  },
+  sum: (block) => reduceCompatible(block).acc,
   avg: (block) => {
-    let acc = block[0];
-    let counted = 1;
-    for (let i = 1; i < block.length; i++) {
-      try {
-        acc = numericAdd(acc, block[i], 1);
-        counted++;
-      } catch {
-        // skip lines with incompatible dimensions
-      }
-    }
+    const { acc, counted } = reduceCompatible(block);
     return qty(acc.value.div(counted), acc.unit);
   }
 };
