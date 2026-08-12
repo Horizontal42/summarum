@@ -30,12 +30,17 @@ export class Workspace {
   private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
   private titleCache: Map<string, SheetSource> | null = null;
 
-  constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
+  constructor(
+    private engine: SumEngine,
+    private sheets: () => SheetSource[],
+  ) {}
 
   private doEvaluate(sheetId: string, text: string): LineResult[] {
     this.resolving.add(sheetId);
     try {
-      return this.engine.evaluateDocument(text, (sheet, key) => this.resolveXRef(sheet, key));
+      return this.engine.evaluateDocument(text, (sheet, key) =>
+        this.resolveXRef(sheet, key),
+      );
     } finally {
       this.resolving.delete(sheetId);
     }
@@ -69,7 +74,19 @@ export class Workspace {
         }
       }
     }
-    for (const id of dirty) this.cache.delete(id);
+    if (dirty.size === this.cache.size) {
+      this.cache.clear();
+    } else if (dirty.size > this.cache.size / 2) {
+      const keep = new Map<string, SheetExports>();
+      for (const [k, v] of this.cache.entries()) {
+        if (!dirty.has(k)) {
+          keep.set(k, v);
+        }
+      }
+      this.cache = keep;
+    } else {
+      for (const id of dirty) this.cache.delete(id);
+    }
   }
 
   invalidateAll(): void {
@@ -82,16 +99,24 @@ export class Workspace {
    * Explicit rename: rewrite `@OldTitle.` / `@[Old Title].` to the new name
    * in every *other* sheet. Returns only the sheets whose text changed.
    */
-  renameSheet(renamedId: string, oldTitle: string, newTitle: string): { id: string; text: string }[] {
+  renameSheet(
+    renamedId: string,
+    oldTitle: string,
+    newTitle: string,
+  ): { id: string; text: string }[] {
     const oldEsc = escapeRegExp(oldTitle.trim());
     const bareRe = new RegExp(`@${oldEsc}\\.`, "gu");
     const bracketRe = new RegExp(`@\\[\\s*${oldEsc}\\s*\\]\\.`, "gu");
     const trimmedNew = newTitle.trim();
-    const replacement = /^[\p{L}_][\p{L}\d_]*$/u.test(trimmedNew) ? `@${trimmedNew}.` : `@[${trimmedNew}].`;
+    const replacement = /^[\p{L}_][\p{L}\d_]*$/u.test(trimmedNew)
+      ? `@${trimmedNew}.`
+      : `@[${trimmedNew}].`;
     const out: { id: string; text: string }[] = [];
     for (const s of this.sheets()) {
       if (s.id === renamedId) continue;
-      const rewritten = s.text.replace(bareRe, replacement).replace(bracketRe, replacement);
+      const rewritten = s.text
+        .replace(bareRe, replacement)
+        .replace(bracketRe, replacement);
       if (rewritten !== s.text) out.push({ id: s.id, text: rewritten });
     }
     return out;
@@ -103,7 +128,8 @@ export class Workspace {
       if (cached && cached.text === text) return cached.refs;
     }
     const out: string[] = [];
-    for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
+    for (const m of text.matchAll(XREF_SCAN_RE))
+      out.push((m[1] ?? m[2]).trim());
     if (id) {
       this.parsedRefsCache.set(id, { text, refs: out });
     }
@@ -126,7 +152,8 @@ export class Workspace {
 
   private resolveXRef(sheetTitle: string, key: string): XRefResolution {
     const target = this.findSheetByTitle(sheetTitle);
-    if (!target) return { ok: false, reason: `sheet "${sheetTitle}" not found` };
+    if (!target)
+      return { ok: false, reason: `sheet "${sheetTitle}" not found` };
     if (this.resolving.has(target.id)) {
       return { ok: false, reason: "circular reference" };
     }
@@ -142,7 +169,8 @@ export class Workspace {
         : { ok: false, reason: `sheet "${sheetTitle}" has no result` };
     }
     const v = exports.vars.get(key);
-    if (!v) return { ok: false, reason: `no variable "${key}" in "${sheetTitle}"` };
+    if (!v)
+      return { ok: false, reason: `no variable "${key}" in "${sheetTitle}"` };
     return { ok: true, value: v };
   }
 
@@ -161,7 +189,12 @@ export class Workspace {
         break;
       }
     }
-    const exports: SheetExports = { vars, total: this.engine.totalValueOf(results), last, results };
+    const exports: SheetExports = {
+      vars,
+      total: this.engine.totalValueOf(results),
+      last,
+      results,
+    };
     // A cycle-interrupted pass produces incomplete/wrong exports (dropped
     // assignments, missing total) — don't let it poison the cache. Re-evaluate
     // fresh on every query until the cycle is actually broken by an edit.
