@@ -76,13 +76,7 @@ fn write_image_file(app: AppHandle, data_base64: String) -> Result<bool, String>
         .blocking_save_file()
     {
         let path = p.into_path().map_err(|e| e.to_string())?;
-        use std::io::Write;
-        let bytes = base64_decode(&data_base64)?;
-        let tmp = path.with_extension("tmp");
-        std::fs::File::create(&tmp)
-            .and_then(|mut f| f.write_all(&bytes))
-            .map_err(|e| e.to_string())?;
-        fs::rename(&tmp, path).map_err(|e| e.to_string())?;
+        write_atomic_bytes(&path, &base64_decode(&data_base64)?)?;
         Ok(true)
     } else {
         Ok(false)
@@ -123,10 +117,14 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
 }
 
 /// write via a temp file + rename so a crash mid-write cannot corrupt the target
-fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+fn write_atomic_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, contents).map_err(|e| e.to_string())?;
     fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+    write_atomic_bytes(path, contents.as_bytes())
 }
 
 #[tauri::command]
