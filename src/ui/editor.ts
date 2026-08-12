@@ -75,6 +75,8 @@ const highlightField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+const varHighlightReCache = new Map<string, { assignment: RegExp; highlight: RegExp }>();
+
 /** Highlights every occurrence of the variable under the cursor. */
 function buildVarHighlight(state: EditorState): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
@@ -90,11 +92,21 @@ function buildVarHighlight(state: EditorState): DecorationSet {
   if (a === b) return builder.finish();
   const word = text.slice(a, b);
   if (!/^[\p{L}_][\p{L}\d_]*$/u.test(word)) return builder.finish();
+
+  let cachedRe = varHighlightReCache.get(word);
+  if (!cachedRe) {
+    const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    cachedRe = {
+      assignment: new RegExp(`^\\s*${esc}\\s*=`, "mu"),
+      highlight: new RegExp(`(?<![\\p{L}\\d_])${esc}(?![\\p{L}\\d_])`, "gu"),
+    };
+    if (varHighlightReCache.size > 1000) varHighlightReCache.clear();
+    varHighlightReCache.set(word, cachedRe);
+  }
+
   // only highlight if the word is actually assigned somewhere in the document
-  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp(`^\\s*${esc}\\s*=`, "mu").test(text)) return builder.finish();
-  const re = new RegExp(`(?<![\\p{L}\\d_])${esc}(?![\\p{L}\\d_])`, "gu");
-  for (const m of text.matchAll(re)) {
+  if (!cachedRe.assignment.test(text)) return builder.finish();
+  for (const m of text.matchAll(cachedRe.highlight)) {
     builder.add(m.index, m.index + word.length, Decoration.mark({ class: "tok-var-active" }));
   }
   return builder.finish();
