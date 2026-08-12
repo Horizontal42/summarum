@@ -1,6 +1,6 @@
 [package]
 name = "summarum"
-version = "1.2.6"
+version = "1.2.7"
 description = "Summarum — natural language calculator notebook"
 edition = "2021"
 
