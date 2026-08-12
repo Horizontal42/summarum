@@ -1,3 +1,12 @@
+import { logger } from "./logger";
+
+vi.mock("./logger", () => ({
+  logger: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeApi, runExtensions } from "./extensions";
 import { SumEngine } from "./engine";
@@ -6,6 +15,7 @@ describe("extensions", () => {
   let mockEngine: any;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mockEngine = {
       setVariable: vi.fn(),
       addUnit: vi.fn(),
@@ -22,7 +32,12 @@ describe("extensions", () => {
 
     it("delegates addUnit to engine", () => {
       const api = makeApi(mockEngine as SumEngine);
-      const spec = { id: "testUnit", phrases: "tests", baseUnitId: "USD", ratio: 1 };
+      const spec = {
+        id: "testUnit",
+        phrases: "tests",
+        baseUnitId: "USD",
+        ratio: 1,
+      };
       api.addUnit(spec);
       expect(mockEngine.addUnit).toHaveBeenCalledWith(spec);
     });
@@ -37,17 +52,11 @@ describe("extensions", () => {
   });
 
   describe("runExtensions", () => {
-    let consoleErrorSpy: any;
-    let consoleWarnSpy: any;
-
-    beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    });
+    beforeEach(() => {});
 
     afterEach(() => {
-      consoleErrorSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
+      vi.mocked(logger.error).mockRestore();
+      vi.mocked(logger.warn).mockRestore();
       vi.resetModules();
       vi.doUnmock("quickjs-emscripten-core");
     });
@@ -55,7 +64,10 @@ describe("extensions", () => {
     it("runs scripts successfully using numi api", async () => {
       await runExtensions(mockEngine as SumEngine, [
         { name: "script1", code: "numi.setVariable('var1', 10);" },
-        { name: "script2", code: "numi.addUnit({ id: 'unit1', phrases: 'u', baseUnitId: 'USD', ratio: 1 });" },
+        {
+          name: "script2",
+          code: "numi.addUnit({ id: 'unit1', phrases: 'u', baseUnitId: 'USD', ratio: 1 });",
+        },
       ]);
 
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var1", 10);
@@ -65,14 +77,21 @@ describe("extensions", () => {
         baseUnitId: "USD",
         ratio: 1,
       });
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(vi.mocked(logger.error)).not.toHaveBeenCalled();
     });
 
-    it("swallows errors and logs to console.error", async () => {
-      await runExtensions(mockEngine as SumEngine, [{ name: "script1", code: "throw new Error('test error');" }]);
+    it("swallows errors and logs to logger.error", async () => {
+      await runExtensions(mockEngine as SumEngine, [
+        { name: "script1", code: "throw new Error('test error');" },
+      ]);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("extension script1 failed:", expect.any(Error));
-      expect(consoleErrorSpy.mock.calls[0][1].message).toContain("test error");
+      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+        "extension script1 failed:",
+        expect.any(Error),
+      );
+      expect(vi.mocked(logger.error).mock.calls[0][1].message).toContain(
+        "test error",
+      );
     });
 
     it("continues running other scripts if one fails", async () => {
@@ -84,22 +103,32 @@ describe("extensions", () => {
 
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var1", 10);
       expect(mockEngine.setVariable).toHaveBeenCalledWith("var3", 30);
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logger.error)).toHaveBeenCalledTimes(1);
     });
 
     it("passes unit-carrying values through setVariable", async () => {
       await runExtensions(mockEngine as SumEngine, [
-        { name: "s", code: "numi.setVariable('rent', { double: 1200, unitId: 'USD' });" },
+        {
+          name: "s",
+          code: "numi.setVariable('rent', { double: 1200, unitId: 'USD' });",
+        },
       ]);
 
-      expect(mockEngine.setVariable).toHaveBeenCalledWith("rent", { double: 1200, unitId: "USD" });
+      expect(mockEngine.setVariable).toHaveBeenCalledWith("rent", {
+        double: 1200,
+        unitId: "USD",
+      });
     });
 
     it("rejects malformed api arguments as a script error", async () => {
-      await runExtensions(mockEngine as SumEngine, [{ name: "bad", code: "numi.setVariable('x', 'nope');" }]);
+      await runExtensions(mockEngine as SumEngine, [
+        { name: "bad", code: "numi.setVariable('x', 'nope');" },
+      ]);
 
       expect(mockEngine.setVariable).not.toHaveBeenCalled();
-      expect(consoleErrorSpy.mock.calls[0][1].message).toContain("numi.setVariable");
+      expect(vi.mocked(logger.error).mock.calls[0][1].message).toContain(
+        "numi.setVariable",
+      );
     });
 
     it("registers a function callable with one array of values", async () => {
@@ -110,7 +139,10 @@ describe("extensions", () => {
         },
       ]);
 
-      expect(mockEngine.addFunction).toHaveBeenCalledWith({ id: "hyp", phrases: "hyp" }, expect.any(Function));
+      expect(mockEngine.addFunction).toHaveBeenCalledWith(
+        { id: "hyp", phrases: "hyp" },
+        expect.any(Function),
+      );
       const fn = mockEngine.addFunction.mock.calls[0][1];
       expect(fn([{ double: 3 }, { double: 4 }])).toEqual({ double: 5 });
       expect(fn([{ double: 6 }, { double: 8 }])).toEqual({ double: 10 });
@@ -125,15 +157,21 @@ describe("extensions", () => {
       ]);
 
       const fn = mockEngine.addFunction.mock.calls[0][1];
-      expect(fn([{ double: 5, unitId: "meter" }])).toEqual({ double: 10, unitId: "meter" });
+      expect(fn([{ double: 5, unitId: "meter" }])).toEqual({
+        double: 10,
+        unitId: "meter",
+      });
     });
 
     it("has no host globals inside the sandbox", async () => {
       await runExtensions(mockEngine as SumEngine, [
-        { name: "probe", code: "if (typeof window !== 'undefined' || typeof fetch !== 'undefined' || typeof console !== 'undefined') throw new Error('leak');" },
+        {
+          name: "probe",
+          code: "if (typeof window !== 'undefined' || typeof fetch !== 'undefined' || typeof console !== 'undefined') throw new Error('leak');",
+        },
       ]);
 
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(vi.mocked(logger.error)).not.toHaveBeenCalled();
     });
 
     it("interrupts an infinite loop at load time", async () => {
@@ -142,8 +180,10 @@ describe("extensions", () => {
         { name: "after", code: "numi.setVariable('ok', 1);" },
       ]);
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy.mock.calls[0][0]).toBe("extension spin failed:");
+      expect(vi.mocked(logger.error)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logger.error).mock.calls[0][0]).toBe(
+        "extension spin failed:",
+      );
       // the runtime survives the interrupt and keeps loading scripts
       expect(mockEngine.setVariable).toHaveBeenCalledWith("ok", 1);
     });
@@ -172,7 +212,10 @@ describe("extensions", () => {
 
     it("surfaces a bad return value as a function error", async () => {
       await runExtensions(mockEngine as SumEngine, [
-        { name: "bad", code: "numi.addFunction({ id: 'bad', phrases: 'bad' }, function () { return 'nope'; });" },
+        {
+          name: "bad",
+          code: "numi.addFunction({ id: 'bad', phrases: 'bad' }, function () { return 'nope'; });",
+        },
       ]);
 
       const fn = mockEngine.addFunction.mock.calls[0][1];
@@ -182,14 +225,17 @@ describe("extensions", () => {
     it("skips extensions when the sandbox fails to load", async () => {
       vi.resetModules();
       vi.doMock("quickjs-emscripten-core", () => ({
-        newQuickJSWASMModuleFromVariant: () => Promise.reject(new Error("no WebAssembly")),
+        newQuickJSWASMModuleFromVariant: () =>
+          Promise.reject(new Error("no WebAssembly")),
       }));
       const { runExtensions: run } = await import("./extensions");
 
-      await run(mockEngine as SumEngine, [{ name: "s", code: "numi.setVariable('x', 1);" }]);
+      await run(mockEngine as SumEngine, [
+        { name: "s", code: "numi.setVariable('x', 1);" },
+      ]);
 
       expect(mockEngine.setVariable).not.toHaveBeenCalled();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
         "extensions disabled: QuickJS sandbox unavailable:",
         expect.any(Error),
       );
@@ -197,8 +243,8 @@ describe("extensions", () => {
 
     it("does not load the sandbox when there are no scripts", async () => {
       await runExtensions(mockEngine as SumEngine, []);
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(vi.mocked(logger.warn)).not.toHaveBeenCalled();
+      expect(vi.mocked(logger.error)).not.toHaveBeenCalled();
     });
   });
 });

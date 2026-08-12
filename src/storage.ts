@@ -1,3 +1,4 @@
+import { logger } from "./logger";
 // Storage: Tauri commands in the app, localStorage fallback for `vite dev`.
 
 export interface DocMeta {
@@ -65,7 +66,10 @@ export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+async function invoke<T>(
+  cmd: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
 }
@@ -79,14 +83,15 @@ export async function loadSettings(): Promise<SettingsData> {
       : localStorage.getItem("summarum.settings");
     if (raw) return { ...defaultSettingsData, ...JSON.parse(raw) };
   } catch (e) {
-    console.warn("loadSettings failed", e);
+    logger.warn("loadSettings failed", e);
   }
   return { ...defaultSettingsData };
 }
 
 export async function saveSettings(s: SettingsData): Promise<void> {
   const raw = JSON.stringify(s, null, 2);
-  if (isTauri()) await invoke("save_file", { name: "settings.json", contents: raw });
+  if (isTauri())
+    await invoke("save_file", { name: "settings.json", contents: raw });
   else localStorage.setItem("summarum.settings", raw);
 }
 
@@ -99,7 +104,7 @@ export async function loadAppData(dataDir: string): Promise<AppData | null> {
       : localStorage.getItem("summarum.documents");
     if (raw) return JSON.parse(raw);
   } catch (e) {
-    console.warn("loadAppData failed", e);
+    logger.warn("loadAppData failed", e);
   }
   return null;
 }
@@ -129,10 +134,14 @@ export async function flushAppData(): Promise<void> {
   const raw = JSON.stringify(pendingData);
   pendingData = null;
   try {
-    if (isTauri()) await invoke("save_documents", { dir: dirArg(currentDataDir), contents: raw });
+    if (isTauri())
+      await invoke("save_documents", {
+        dir: dirArg(currentDataDir),
+        contents: raw,
+      });
     else localStorage.setItem("summarum.documents", raw);
   } catch (e) {
-    console.warn("saveAppData failed", e);
+    logger.warn("saveAppData failed", e);
   }
 }
 
@@ -140,26 +149,40 @@ export async function flushAppData(): Promise<void> {
 export async function onAppQuit(cb: () => Promise<void>): Promise<void> {
   if (!isTauri()) return;
   const { listen } = await import("@tauri-apps/api/event");
-  await listen("app-quit", () => void cb().finally(() => void invoke("exit_app")));
+  await listen(
+    "app-quit",
+    () => void cb().finally(() => void invoke("exit_app")),
+  );
 }
 
 // ---------- backups & data folder
 
-export async function runBackups(dataDir: string, retentionDays: number): Promise<void> {
+export async function runBackups(
+  dataDir: string,
+  retentionDays: number,
+): Promise<void> {
   if (!isTauri()) return;
   try {
     await invoke("run_backups", { dir: dirArg(dataDir), retentionDays });
   } catch (e) {
-    console.warn("runBackups failed", e);
+    logger.warn("runBackups failed", e);
   }
 }
 
-export async function backupDeletedSheet(dataDir: string, title: string, contents: string): Promise<void> {
+export async function backupDeletedSheet(
+  dataDir: string,
+  title: string,
+  contents: string,
+): Promise<void> {
   if (!isTauri() || !contents.trim()) return;
   try {
-    await invoke("backup_deleted_sheet", { dir: dirArg(dataDir), title, contents });
+    await invoke("backup_deleted_sheet", {
+      dir: dirArg(dataDir),
+      title,
+      contents,
+    });
   } catch (e) {
-    console.warn("backupDeletedSheet failed", e);
+    logger.warn("backupDeletedSheet failed", e);
   }
 }
 
@@ -180,9 +203,17 @@ export async function dataDirHasDocuments(dir: string): Promise<boolean> {
 
 export type MigrateStrategy = "move" | "overwrite" | "use_existing";
 
-export async function migrateDataDir(oldDir: string, newDir: string, strategy: MigrateStrategy): Promise<void> {
+export async function migrateDataDir(
+  oldDir: string,
+  newDir: string,
+  strategy: MigrateStrategy,
+): Promise<void> {
   if (!isTauri()) return;
-  await invoke("migrate_data_dir", { oldDir: dirArg(oldDir), newDir, strategy });
+  await invoke("migrate_data_dir", {
+    oldDir: dirArg(oldDir),
+    newDir,
+    strategy,
+  });
 }
 
 // ---------- rates
@@ -202,40 +233,53 @@ export async function fetchRates(force = false): Promise<RatesPayload | null> {
     const res = await fetch("https://open.er-api.com/v6/latest/USD");
     const json = await res.json();
     if (json?.result === "success") {
-      return { date: json.time_last_update_utc, rates: json.rates, fetchedAt: Math.floor(Date.now() / 1000) };
+      return {
+        date: json.time_last_update_utc,
+        rates: json.rates,
+        fetchedAt: Math.floor(Date.now() / 1000),
+      };
     }
   } catch (e) {
-    console.warn("fetchRates failed", e);
+    logger.warn("fetchRates failed", e);
   }
   return null;
 }
 
 // ---------- historical rates
 
-export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record<string, Record<string, number>>> {
+export async function fetchHistoricalRatesBatch(
+  dates: string[],
+): Promise<Record<string, Record<string, number>>> {
   if (dates.length === 0) return {};
   try {
     if (isTauri()) {
-      return await invoke<Record<string, Record<string, number>>>("fetch_historical_rates_batch", { dates });
+      return await invoke<Record<string, Record<string, number>>>(
+        "fetch_historical_rates_batch",
+        { dates },
+      );
     }
     const results: Record<string, Record<string, number>> = {};
     await Promise.all(
       dates.map(async (date) => {
         const rates = await fetchHistoricalRates(date);
         if (rates) results[date] = rates;
-      })
+      }),
     );
     return results;
   } catch (e) {
-    console.warn("fetchHistoricalRatesBatch failed", e);
+    logger.warn("fetchHistoricalRatesBatch failed", e);
     return {};
   }
 }
 
-export async function fetchHistoricalRates(date: string): Promise<Record<string, number> | null> {
+export async function fetchHistoricalRates(
+  date: string,
+): Promise<Record<string, number> | null> {
   try {
     if (isTauri()) {
-      return await invoke<Record<string, number>>("fetch_historical_rates", { date });
+      return await invoke<Record<string, number>>("fetch_historical_rates", {
+        date,
+      });
     }
     const res = await fetch(`https://api.frankfurter.dev/v1/${date}?from=USD`);
     const json = await res.json();
@@ -246,7 +290,7 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
     }
     return out;
   } catch (e) {
-    console.warn("fetchHistoricalRates failed", date, e);
+    logger.warn("fetchHistoricalRates failed", date, e);
     return null;
   }
 }
@@ -260,24 +304,30 @@ export async function writeImageFile(dataBase64: string): Promise<boolean> {
 
 // ---------- market data
 
-export async function fetchMarketData(symbols: string[]): Promise<Record<string, number>> {
+export async function fetchMarketData(
+  symbols: string[],
+): Promise<Record<string, number>> {
   if (!isTauri() || symbols.length === 0) return {};
   try {
-    return await invoke<Record<string, number>>("fetch_market_data", { symbols });
+    return await invoke<Record<string, number>>("fetch_market_data", {
+      symbols,
+    });
   } catch (e) {
-    console.warn("fetchMarketData failed", e);
+    logger.warn("fetchMarketData failed", e);
     return {};
   }
 }
 
 // ---------- extensions
 
-export async function loadExtensionScripts(): Promise<{ name: string; code: string }[]> {
+export async function loadExtensionScripts(): Promise<
+  { name: string; code: string }[]
+> {
   if (!isTauri()) return [];
   try {
     return await invoke<{ name: string; code: string }[]>("load_extensions");
   } catch (e) {
-    console.warn("loadExtensions failed", e);
+    logger.warn("loadExtensions failed", e);
     return [];
   }
 }
@@ -314,7 +364,7 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
           const content = await invoke<string>("read_text_file", { path });
           cb(content);
         } catch (e) {
-          console.warn("file drop rejected", path, e);
+          logger.warn("file drop rejected", path, e);
         }
       }
     });

@@ -1,6 +1,18 @@
+import { logger } from "../logger";
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
+import {
+  DateOrder,
+  Decimal,
+  EngineSettings,
+  EvalError,
+  Quantity,
+  Unit,
+  Value,
+  XRefError,
+  defaultSettings,
+  qty,
+} from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine } from "./parser";
@@ -84,7 +96,8 @@ export class SumEngine {
 
   updateSettings(patch: Partial<EngineSettings>): void {
     this.settings = { ...this.settings, ...patch };
-    if (patch.dateFormat) this.dateOrder = resolveDateOrder(this.settings.dateFormat);
+    if (patch.dateFormat)
+      this.dateOrder = resolveDateOrder(this.settings.dateFormat);
   }
 
   completions(): Completion[] {
@@ -106,13 +119,25 @@ export class SumEngine {
 
       if (trimmed.length === 0) {
         const kind = commentStart >= 0 ? "comment" : "empty";
-        results.push({ text: null, value: null, kind, tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
+        results.push({
+          text: null,
+          value: null,
+          kind,
+          tokens: [],
+          commentStart: commentStart >= 0 ? commentStart : null,
+        });
         lineValues.push(null);
         lineKinds.push("empty");
         continue;
       }
       if (trimmed.startsWith("#")) {
-        results.push({ text: null, value: null, kind: "header", tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
+        results.push({
+          text: null,
+          value: null,
+          kind: "header",
+          tokens: [],
+          commentStart: commentStart >= 0 ? commentStart : null,
+        });
         lineValues.push(null);
         lineKinds.push("header");
         continue;
@@ -144,7 +169,7 @@ export class SumEngine {
           } else {
             // Surface unexpected bugs/BigInt errors and log them
             lineError = e instanceof Error ? e.message : String(e);
-            console.warn("evaluate failed:", e);
+            logger.warn("evaluate failed:", e);
           }
           value = null;
         }
@@ -155,7 +180,10 @@ export class SumEngine {
       lineValues.push(value);
       lineKinds.push("normal");
       results.push({
-        text: (value && value.kind !== "chart") ? formatValue(value, this.settings) : null,
+        text:
+          value && value.kind !== "chart"
+            ? formatValue(value, this.settings)
+            : null,
         value,
         kind: "normal",
         tokens,
@@ -213,8 +241,11 @@ export class SumEngine {
   }
 
   addUnit(spec: ExtensionUnitSpec): void {
-    const base = this.reg.unitsById.get(spec.baseUnitId) ?? this.currencyBase(spec.baseUnitId);
-    if (!base) throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
+    const base =
+      this.reg.unitsById.get(spec.baseUnitId) ??
+      this.currencyBase(spec.baseUnitId);
+    if (!base)
+      throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
     const unit: Unit = {
       id: spec.id,
       dimension: base.dimension,
@@ -225,12 +256,24 @@ export class SumEngine {
     this.reg.unitsById.set(unit.id, unit);
     for (const p of spec.phrases.split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "unit", unit }, { caseSensitive: false });
+      if (phrase)
+        this.reg.addPhrase(
+          phrase,
+          { t: "unit", unit },
+          { caseSensitive: false },
+        );
     }
-    this.reg.completions.push({ label: spec.id, type: "unit", detail: "extension" });
+    this.reg.completions.push({
+      label: spec.id,
+      type: "unit",
+      detail: "extension",
+    });
   }
 
-  addFunction(spec: { id: string; phrases: string }, fn: (values: ExtensionValue[]) => ExtensionValue | number): void {
+  addFunction(
+    spec: { id: string; phrases: string },
+    fn: (values: ExtensionValue[]) => ExtensionValue | number,
+  ): void {
     const name = spec.id;
     this.reg.customFuncs.set(name, (args: Value[]) => {
       const mapped = args.map((a) => this.fromValue(a));
@@ -238,26 +281,42 @@ export class SumEngine {
     });
     for (const p of (spec.phrases || spec.id).split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "func", name }, { caseSensitive: false });
+      if (phrase)
+        this.reg.addPhrase(
+          phrase,
+          { t: "func", name },
+          { caseSensitive: false },
+        );
     }
-    this.reg.completions.push({ label: name, type: "function", detail: "extension" });
+    this.reg.completions.push({
+      label: name,
+      type: "function",
+      detail: "extension",
+    });
   }
 
   private currencyBase(code: string): Unit | null {
-    return this.reg.currencyCodes.has(code) ? this.reg.makeCurrencyUnit(code) : null;
+    return this.reg.currencyCodes.has(code)
+      ? this.reg.makeCurrencyUnit(code)
+      : null;
   }
 
   private toValue(v: number | ExtensionValue): Value {
     if (typeof v === "number") return qty(v);
     const unit = v.unitId
-      ? this.reg.unitsById.get(v.unitId) ?? this.currencyBase(v.unitId) ?? null
+      ? (this.reg.unitsById.get(v.unitId) ??
+        this.currencyBase(v.unitId) ??
+        null)
       : null;
     return qty(new Decimal(v.double), unit);
   }
 
   private fromValue(v: Value): ExtensionValue {
     if (v.kind === "quantity") {
-      return { double: v.value.toNumber(), ...(v.unit ? { unitId: v.unit.id } : {}) };
+      return {
+        double: v.value.toNumber(),
+        ...(v.unit ? { unitId: v.unit.id } : {}),
+      };
     }
     if (v.kind === "percent") return { double: v.value.div(100).toNumber() };
     if (v.kind === "date") return { double: v.ms };

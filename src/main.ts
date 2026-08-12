@@ -1,14 +1,35 @@
+import { logger } from "./logger";
 /** App bootstrap: engine + editor + documents + settings + Tauri glue. */
 import "./ui/app.css";
 import { SumEngine } from "./engine";
 import { SumEditor } from "./ui/editor";
 import {
-  AppData, DocMeta, SettingsData, defaultSettingsData,
-  loadAppData, saveAppData, flushAppData, onAppQuit, loadSettings, saveSettings,
-  fetchRates, fetchMarketData, fetchHistoricalRatesBatch, loadExtensionScripts, openExtensionsFolder, isTauri,
-  getLaunchFile, onOpenFile, onFileDrop,
-  setDataDir, runBackups, backupDeletedSheet, openBackupsFolder,
-  chooseFolder, dataDirHasDocuments, migrateDataDir,
+  AppData,
+  DocMeta,
+  SettingsData,
+  defaultSettingsData,
+  loadAppData,
+  saveAppData,
+  flushAppData,
+  onAppQuit,
+  loadSettings,
+  saveSettings,
+  fetchRates,
+  fetchMarketData,
+  fetchHistoricalRatesBatch,
+  loadExtensionScripts,
+  openExtensionsFolder,
+  isTauri,
+  getLaunchFile,
+  onOpenFile,
+  onFileDrop,
+  setDataDir,
+  runBackups,
+  backupDeletedSheet,
+  openBackupsFolder,
+  chooseFolder,
+  dataDirHasDocuments,
+  migrateDataDir,
 } from "./storage";
 import type { LineResult } from "./engine";
 import { setLang, detectLang, t } from "./i18n";
@@ -22,10 +43,13 @@ import pkg from "../package.json";
 
 function welcomeText(lang: string): string {
   const sample = (lang === "ru" ? RU : EN).Samples?.["sample.welcome"];
-  return (sample ?? "# Sample\n8 / (45 - 20%)\n5 inches in cm\n$9 in Euro") + "\n";
+  return (
+    (sample ?? "# Sample\n8 / (45 - 20%)\n5 inches in cm\n$9 in Euro") + "\n"
+  );
 }
 
-const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
+const $ = <T extends HTMLElement>(sel: string): T =>
+  document.querySelector(sel) as T;
 
 let engine: SumEngine;
 let editor: SumEditor;
@@ -74,13 +98,22 @@ function pinDoc(id: string): void {
     // move to end of pinned group
     data.docs = data.docs.filter((d) => d.id !== id);
     let lastPinned = -1;
-    for (let i = data.docs.length - 1; i >= 0; i--) { if (data.docs[i].pinned) { lastPinned = i; break; } }
+    for (let i = data.docs.length - 1; i >= 0; i--) {
+      if (data.docs[i].pinned) {
+        lastPinned = i;
+        break;
+      }
+    }
     data.docs.splice(lastPinned + 1, 0, doc);
   } else {
     // move to start of non-pinned group
     data.docs = data.docs.filter((d) => d.id !== id);
     const firstNonPinned = data.docs.findIndex((d) => !d.pinned);
-    data.docs.splice(firstNonPinned === -1 ? data.docs.length : firstNonPinned, 0, doc);
+    data.docs.splice(
+      firstNonPinned === -1 ? data.docs.length : firstNonPinned,
+      0,
+      doc,
+    );
   }
   saveAppData(data);
   renderDocList();
@@ -99,7 +132,12 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
-function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, data: AppData): void {
+function setupDocInteraction(
+  el: HTMLElement,
+  doc: DocMeta,
+  list: HTMLElement,
+  data: AppData,
+): void {
   // Reordering uses plain mouse tracking, not the native HTML5 drag API —
   // Tauri's window-level file-drop hook (dragDropEnabled, needed for
   // dropping .numi files from Explorer) intercepts WebView2's own drag
@@ -110,7 +148,8 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
   el.addEventListener("mousedown", (e) => {
     if ((e.target as HTMLElement).closest("button")) return;
     const startY = e.clientY;
-    let cachedItems: { el: HTMLElement, top: number, bottom: number }[] | null = null;
+    let cachedItems: { el: HTMLElement; top: number; bottom: number }[] | null =
+      null;
     const onMove = (ev: MouseEvent) => {
       if (!dragging) {
         if (Math.abs(ev.clientY - startY) < 4) return;
@@ -137,10 +176,13 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
       }
       if (over) {
         const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
-        if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
+        if (overDoc && !!overDoc.pinned === !!doc.pinned)
+          over.classList.add("drag-over");
       }
     };
-    const onScroll = () => { cachedItems = null; };
+    const onScroll = () => {
+      cachedItems = null;
+    };
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -148,7 +190,8 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
       cachedItems = null;
       if (dragging) {
         const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
-        for (const item of list.querySelectorAll(".doc-item")) item.classList.remove("drag-over", "dragging");
+        for (const item of list.querySelectorAll(".doc-item"))
+          item.classList.remove("drag-over", "dragging");
         document.body.style.cursor = "";
         if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
       }
@@ -159,22 +202,37 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
     list.addEventListener("scroll", onScroll);
   });
   el.addEventListener("click", () => {
-    if (suppressClick) { suppressClick = false; return; }
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
     switchDoc(doc.id);
   });
 }
 
-function mkBtn(cls: string, text: string, title: string, cb: () => void): HTMLButtonElement {
+function mkBtn(
+  cls: string,
+  text: string,
+  title: string,
+  cb: () => void,
+): HTMLButtonElement {
   const b = document.createElement("button");
   b.className = cls;
   b.textContent = text;
   b.title = title;
   b.setAttribute("aria-label", title);
-  b.addEventListener("click", (e) => { e.stopPropagation(); cb(); });
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    cb();
+  });
   return b;
 }
 
-function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: SettingsData): HTMLButtonElement {
+function createDeleteButton(
+  doc: DocMeta,
+  appData: AppData,
+  appSettings: SettingsData,
+): HTMLButtonElement {
   const del = document.createElement("button");
   del.className = "del";
   del.textContent = "✕";
@@ -192,7 +250,11 @@ function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: Setting
       return;
     }
     if (confirmTimer) clearTimeout(confirmTimer);
-    void backupDeletedSheet(appSettings.dataDir, doc.title, appData.contents[doc.id] ?? "");
+    void backupDeletedSheet(
+      appSettings.dataDir,
+      doc.title,
+      appData.contents[doc.id] ?? "",
+    );
     delete appData.contents[doc.id];
     appData.docs = appData.docs.filter((d) => d.id !== doc.id);
     if (appData.activeId === doc.id) switchDoc(appData.docs[0].id);
@@ -208,13 +270,23 @@ function renderDocList(): void {
   const frag = document.createDocumentFragment();
   for (const doc of data.docs) {
     const el = document.createElement("div");
-    el.className = "doc-item" + (doc.id === data.activeId ? " active" : "") + (doc.pinned ? " pinned" : "");
+    el.className =
+      "doc-item" +
+      (doc.id === data.activeId ? " active" : "") +
+      (doc.pinned ? " pinned" : "");
     const name = document.createElement("span");
     name.className = "doc-name";
     name.textContent = doc.title || t("untitled");
     el.appendChild(name);
 
-    el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
+    el.appendChild(
+      mkBtn(
+        "pin-btn" + (doc.pinned ? " active" : ""),
+        "📌",
+        doc.pinned ? t("unpin") : t("pin"),
+        () => pinDoc(doc.id),
+      ),
+    );
 
     setupDocInteraction(el, doc, list, data);
     el.dataset.docId = doc.id;
@@ -238,7 +310,10 @@ function switchDoc(id: string): void {
 
 function newDoc(content = ""): void {
   const id = uid();
-  data.docs.push({ id, title: content ? titleFromContent(content) : t("untitled") });
+  data.docs.push({
+    id,
+    title: content ? titleFromContent(content) : t("untitled"),
+  });
   data.contents[id] = content;
   switchDoc(id);
 }
@@ -256,7 +331,9 @@ async function closeActiveDoc(): Promise<void> {
   void backupDeletedSheet(settings.dataDir, doc.title, content);
   delete data.contents[doc.id];
   data.docs = data.docs.filter((d) => d.id !== doc.id);
-  const nextId = data.docs[idx] ? data.docs[idx].id : data.docs[idx - 1]?.id ?? data.docs[0].id;
+  const nextId = data.docs[idx]
+    ? data.docs[idx].id
+    : (data.docs[idx - 1]?.id ?? data.docs[0].id);
   switchDoc(nextId);
   saveAppData(data);
 }
@@ -264,12 +341,21 @@ async function closeActiveDoc(): Promise<void> {
 // ---------- settings
 
 function applySettings(): void {
-  const theme = settings.theme === "system"
-    ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    : settings.theme;
+  const theme =
+    settings.theme === "system"
+      ? matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : settings.theme;
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.setProperty("--editor-font-size", `${settings.fontSize}px`);
-  $("#editor-wrap").style.setProperty("--results-width", `${settings.resultsWidth}%`);
+  document.documentElement.style.setProperty(
+    "--editor-font-size",
+    `${settings.fontSize}px`,
+  );
+  $("#editor-wrap").style.setProperty(
+    "--results-width",
+    `${settings.resultsWidth}%`,
+  );
   setLang(settings.language);
   const searchInput = $<HTMLInputElement>("#search-input");
   searchInput.placeholder = t("searchPlaceholder");
@@ -282,7 +368,10 @@ function applySettings(): void {
   });
   editor?.refresh();
   syncTitleField();
-  $<HTMLElement>("#sidebar").classList.toggle("hidden", !settings.sidebarVisible);
+  $<HTMLElement>("#sidebar").classList.toggle(
+    "hidden",
+    !settings.sidebarVisible,
+  );
 }
 
 function bindFormattingSettings(): void {
@@ -306,7 +395,10 @@ function bindFormattingSettings(): void {
 
   const save = () => {
     settings.theme = themeSel.value as SettingsData["theme"];
-    settings.precision = Math.max(0, Math.min(15, Number(precision.value) || 2));
+    settings.precision = Math.max(
+      0,
+      Math.min(15, Number(precision.value) || 2),
+    );
     settings.groupSeparator = groupSep.value;
     settings.decimalSeparator = decimalSep.value;
     // "1,234,56" is unreadable — a comma decimal forces a space group separator
@@ -316,13 +408,27 @@ function bindFormattingSettings(): void {
     }
     settings.dateFormat = dateFmt.value as SettingsData["dateFormat"];
     settings.language = langSel.value;
-    settings.fontSize = Math.max(10, Math.min(32, Number(fontSize.value) || 15));
-    settings.resultsWidth = Math.max(20, Math.min(60, Number(resultsWidth.value) || 42));
+    settings.fontSize = Math.max(
+      10,
+      Math.min(32, Number(fontSize.value) || 15),
+    );
+    settings.resultsWidth = Math.max(
+      20,
+      Math.min(60, Number(resultsWidth.value) || 42),
+    );
     applySettings();
     void saveSettings(settings);
   };
 
-  for (const el of [themeSel, precision, groupSep, decimalSep, dateFmt, langSel, fontSize]) {
+  for (const el of [
+    themeSel,
+    precision,
+    groupSep,
+    decimalSep,
+    dateFmt,
+    langSel,
+    fontSize,
+  ]) {
     el.addEventListener("change", save);
   }
   resultsWidth.addEventListener("input", save); // live while sliding
@@ -401,7 +507,10 @@ function bindBehaviorSettings(): void {
     void saveSettings(settings);
   });
   binDays.addEventListener("change", () => {
-    settings.deletedRetentionDays = Math.max(1, Math.min(365, Math.round(Number(binDays.value)) || 14));
+    settings.deletedRetentionDays = Math.max(
+      1,
+      Math.min(365, Math.round(Number(binDays.value)) || 14),
+    );
     binDays.value = String(settings.deletedRetentionDays);
     void saveSettings(settings);
     void runBackups(settings.dataDir, settings.deletedRetentionDays); // prune right away
@@ -417,7 +526,9 @@ function bindBehaviorSettings(): void {
 function bindDataDirSettings(): void {
   const dataDirBtn = $<HTMLButtonElement>("#set-datadir");
   const renderDataDir = () => {
-    dataDirBtn.textContent = settings.dataDir ? settings.dataDir.split(/[\\/]/).pop() ?? settings.dataDir : t("defaultFolder");
+    dataDirBtn.textContent = settings.dataDir
+      ? (settings.dataDir.split(/[\\/]/).pop() ?? settings.dataDir)
+      : t("defaultFolder");
     dataDirBtn.title = settings.dataDir || t("defaultFolder");
   };
   renderDataDir();
@@ -426,14 +537,18 @@ function bindDataDirSettings(): void {
     if (!picked || picked === settings.dataDir) return;
     let strategy: "move" | "overwrite" | "use_existing" = "move";
     if (await dataDirHasDocuments(picked)) {
-      const ans = await askModal(t("folderConflict"), t("useExisting"), t("replaceMine"));
+      const ans = await askModal(
+        t("folderConflict"),
+        t("useExisting"),
+        t("replaceMine"),
+      );
       if (ans === null) return;
       strategy = ans === "a" ? "use_existing" : "overwrite";
     }
     try {
       await migrateDataDir(settings.dataDir, picked, strategy);
     } catch (e) {
-      console.warn("migrate failed", e);
+      logger.warn("migrate failed", e);
       toast(t("folderError"));
       return;
     }
@@ -445,7 +560,8 @@ function bindDataDirSettings(): void {
       const fresh = await loadAppData(picked);
       if (fresh && fresh.docs.length > 0) {
         data = fresh;
-        if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
+        if (!data.docs.some((d) => d.id === data.activeId))
+          data.activeId = data.docs[0].id;
         switchDoc(data.activeId);
       }
     }
@@ -454,12 +570,19 @@ function bindDataDirSettings(): void {
 }
 
 function bindSettingsNavigation(): void {
-  const tabs = document.querySelectorAll<HTMLButtonElement>("#settings-tabs .tab");
-  const tabPanels = document.querySelectorAll<HTMLElement>(".settings-tabpanel");
+  const tabs = document.querySelectorAll<HTMLButtonElement>(
+    "#settings-tabs .tab",
+  );
+  const tabPanels =
+    document.querySelectorAll<HTMLElement>(".settings-tabpanel");
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
       for (const other of tabs) other.classList.toggle("active", other === tab);
-      for (const panel of tabPanels) panel.classList.toggle("hidden", panel.dataset.tabpanel !== tab.dataset.tab);
+      for (const panel of tabPanels)
+        panel.classList.toggle(
+          "hidden",
+          panel.dataset.tabpanel !== tab.dataset.tab,
+        );
     });
   }
 
@@ -469,8 +592,14 @@ function bindSettingsNavigation(): void {
   $("#close-settings").addEventListener("click", () => {
     $("#settings-panel").classList.add("hidden");
   });
-  $("#open-extensions").addEventListener("click", () => void openExtensionsFolder());
-  $("#open-backups").addEventListener("click", () => void openBackupsFolder(settings.dataDir));
+  $("#open-extensions").addEventListener(
+    "click",
+    () => void openExtensionsFolder(),
+  );
+  $("#open-backups").addEventListener(
+    "click",
+    () => void openBackupsFolder(settings.dataDir),
+  );
   $("#check-update").addEventListener("click", () => void checkUpdate(true));
 }
 
@@ -500,18 +629,39 @@ function normalizeKeyName(e: KeyboardEvent): string | null {
   if (/^Numpad\d$/.test(code)) return code;
   if (/^F\d{1,2}$/.test(code)) return code;
   const map: Record<string, string> = {
-    Space: "Space", Enter: "Enter", Backspace: "Backspace", Delete: "Delete",
-    Tab: "Tab", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
-    ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
-    Minus: "-", Equal: "=", Comma: ",", Period: ".", Slash: "/", Backquote: "`",
-    BracketLeft: "[", BracketRight: "]", Semicolon: ";", Quote: "'",
+    Space: "Space",
+    Enter: "Enter",
+    Backspace: "Backspace",
+    Delete: "Delete",
+    Tab: "Tab",
+    Home: "Home",
+    End: "End",
+    PageUp: "PageUp",
+    PageDown: "PageDown",
+    ArrowUp: "Up",
+    ArrowDown: "Down",
+    ArrowLeft: "Left",
+    ArrowRight: "Right",
+    Minus: "-",
+    Equal: "=",
+    Comma: ",",
+    Period: ".",
+    Slash: "/",
+    Backquote: "`",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Semicolon: ";",
+    Quote: "'",
   };
   return map[code] ?? null;
 }
 
 // ---------- tauri integration
 
-async function registerHotkey(old: string | null, combo: string): Promise<boolean> {
+async function registerHotkey(
+  old: string | null,
+  combo: string,
+): Promise<boolean> {
   if (!isTauri()) return true;
   try {
     const gs = await import("@tauri-apps/plugin-global-shortcut");
@@ -534,7 +684,7 @@ async function registerHotkey(old: string | null, combo: string): Promise<boolea
     });
     return true;
   } catch (e) {
-    console.warn("hotkey registration failed", e);
+    logger.warn("hotkey registration failed", e);
     return false;
   }
 }
@@ -546,14 +696,16 @@ async function applyAutostart(enabled: boolean): Promise<void> {
     if (enabled) await auto.enable();
     else await auto.disable();
   } catch (e) {
-    console.warn("autostart failed", e);
+    logger.warn("autostart failed", e);
   }
 }
 
 async function applyAlwaysOnTop(enabled: boolean): Promise<void> {
   if (!isTauri()) return;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().setAlwaysOnTop(enabled).catch((e) => console.warn("always-on-top failed", e));
+  await getCurrentWindow()
+    .setAlwaysOnTop(enabled)
+    .catch((e) => logger.warn("always-on-top failed", e));
 }
 
 async function refreshRates(force = false): Promise<void> {
@@ -563,7 +715,7 @@ async function refreshRates(force = false): Promise<void> {
   info.classList.remove("spin");
   if (payload) {
     liveRates = Object.fromEntries(
-      Object.entries(payload.rates).map(([k, v]) => [k, Number(v)])
+      Object.entries(payload.rates).map(([k, v]) => [k, Number(v)]),
     );
     applyAllRates();
     workspace.invalidateAll();
@@ -577,7 +729,15 @@ async function refreshRates(force = false): Promise<void> {
 // ---------- market data
 
 // Yahoo delisted Russian tickers (SBER/GAZP) in 2022 — dropped, they always miss.
-const MARKET_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"];
+const MARKET_SYMBOLS = [
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "TSLA",
+  "NVDA",
+  "META",
+];
 
 let marketPrices: Record<string, number> = {};
 let marketFetchedAt = 0;
@@ -616,7 +776,9 @@ const HIST_DATE_RE = /(?:on|на)\s+(\d{4}-\d{2}-\d{2})/gi;
 async function fetchNeededHistoricalRates(text: string): Promise<void> {
   const dates = new Set<string>();
   for (const m of text.matchAll(HIST_DATE_RE)) dates.add(m[1]!);
-  const datesToFetch = Array.from(dates).filter((date) => !engine.hasHistoricalRates(date));
+  const datesToFetch = Array.from(dates).filter(
+    (date) => !engine.hasHistoricalRates(date),
+  );
   let fetched = false;
   if (datesToFetch.length > 0) {
     const results = await fetchHistoricalRatesBatch(datesToFetch);
@@ -628,12 +790,18 @@ async function fetchNeededHistoricalRates(text: string): Promise<void> {
       }
     }
   }
-  if (fetched) { workspace.invalidateAll(); editor.refresh(); }
+  if (fetched) {
+    workspace.invalidateAll();
+    editor.refresh();
+  }
 }
 
 function renderMarketInfo(): void {
   const el = $("#market-info") as HTMLElement;
-  if (marketFetchedAt === 0) { el.style.display = "none"; return; }
+  if (marketFetchedAt === 0) {
+    el.style.display = "none";
+    return;
+  }
   el.style.display = "";
   el.textContent = `${t("market")}: ${agoText(marketFetchedAt)} ↺`;
   el.title = t("refreshRates");
@@ -669,7 +837,8 @@ function agoText(unixSec: number): string {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - unixSec);
   if (s < 90) return t("justNow");
   if (s < 3600) return t("minAgo").replace("{}", String(Math.round(s / 60)));
-  if (s < 86400) return t("hourAgo").replace("{}", String(Math.round(s / 3600)));
+  if (s < 86400)
+    return t("hourAgo").replace("{}", String(Math.round(s / 3600)));
   return t("dayAgo").replace("{}", String(Math.round(s / 86400)));
 }
 
@@ -691,13 +860,21 @@ let modalChain: Promise<unknown> = Promise.resolve();
 /** two-button modal; resolves "a" | "b" | null (click outside = cancel).
     calls serialize on the shared #modal singleton — a second call waits for
     the first to resolve rather than clobbering its handlers */
-function askModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b" | null> {
+function askModal(
+  msg: string,
+  aLabel: string,
+  bLabel: string,
+): Promise<"a" | "b" | null> {
   const run = modalChain.then(() => showModal(msg, aLabel, bLabel));
   modalChain = run.catch(() => {});
   return run;
 }
 
-function showModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "b" | null> {
+function showModal(
+  msg: string,
+  aLabel: string,
+  bLabel: string,
+): Promise<"a" | "b" | null> {
   return new Promise((resolve) => {
     const modal = $("#modal");
     const a = $("#modal-a");
@@ -718,7 +895,8 @@ function showModal(msg: string, aLabel: string, bLabel: string): Promise<"a" | "
       // a click that just refocused the window (native dialog closing, or
       // bringing a backgrounded tray window to front) lands on the backdrop
       // too — ignore a backdrop dismiss that arrives right after refocus
-      if (e.target === modal && performance.now() - lastWindowFocusAt > 300) done(null);
+      if (e.target === modal && performance.now() - lastWindowFocusAt > 300)
+        done(null);
     };
   });
 }
@@ -738,7 +916,10 @@ function toast(msg: string): void {
 
 async function initSettings(): Promise<void> {
   settings = await loadSettings();
-  if (!localStorage.getItem("summarum.langInit") && settings.language === "en") {
+  if (
+    !localStorage.getItem("summarum.langInit") &&
+    settings.language === "en"
+  ) {
     settings.language = detectLang();
     localStorage.setItem("summarum.langInit", "1");
   }
@@ -758,19 +939,34 @@ async function initDataAndEngine(): Promise<void> {
 
   const stored = await loadAppData(settings.dataDir);
   // a corrupt or foreign documents.json must not crash the boot
-  if (stored && Array.isArray(stored.docs) && stored.docs.length > 0 && stored.contents && typeof stored.contents === "object") {
+  if (
+    stored &&
+    Array.isArray(stored.docs) &&
+    stored.docs.length > 0 &&
+    stored.contents &&
+    typeof stored.contents === "object"
+  ) {
     data = stored;
   } else {
     const id = uid();
-    data = { docs: [{ id, title: "Sample" }], activeId: id, contents: { [id]: welcomeText(settings.language) } };
+    data = {
+      docs: [{ id, title: "Sample" }],
+      activeId: id,
+      contents: { [id]: welcomeText(settings.language) },
+    };
   }
-  if (!data.docs.some((d) => d.id === data.activeId)) data.activeId = data.docs[0].id;
+  if (!data.docs.some((d) => d.id === data.activeId))
+    data.activeId = data.docs[0].id;
 
   const scripts = await loadExtensionScripts();
   await runExtensions(engine, scripts);
 
   workspace = new Workspace(engine, () =>
-    data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),
+    data.docs.map((d) => ({
+      id: d.id,
+      title: d.title,
+      text: data.contents[d.id] ?? "",
+    })),
   );
 
   editor = new SumEditor(
@@ -813,7 +1009,12 @@ async function initDataAndEngine(): Promise<void> {
   search = initSearch({
     engine,
     workspace,
-    docs: () => data.docs.map((d) => ({ id: d.id, title: d.title, text: data.contents[d.id] ?? "" })),
+    docs: () =>
+      data.docs.map((d) => ({
+        id: d.id,
+        title: d.title,
+        text: data.contents[d.id] ?? "",
+      })),
     t,
     onOpen: (docId, line) => {
       if (docId !== data.activeId) switchDoc(docId);
@@ -859,7 +1060,9 @@ function bindMiscUI(): void {
 
   $("#open-search").addEventListener("click", () => search.open());
 
-  window.addEventListener("focus", () => { lastWindowFocusAt = performance.now(); });
+  window.addEventListener("focus", () => {
+    lastWindowFocusAt = performance.now();
+  });
 }
 
 async function bindWindowControls(): Promise<void> {
@@ -884,7 +1087,11 @@ function bindSidebarUI(): void {
   document.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     const panel = $("#settings-panel");
-    if (!panel.classList.contains("hidden") && !target.closest("#settings-panel") && !target.closest("#open-settings")) {
+    if (
+      !panel.classList.contains("hidden") &&
+      !target.closest("#settings-panel") &&
+      !target.closest("#open-settings")
+    ) {
       panel.classList.add("hidden");
     }
     if (!settings.sidebarVisible) return;
@@ -913,7 +1120,9 @@ function bindDividerUI(): void {
       window.removeEventListener("mouseup", onUp);
       divider.classList.remove("dragging");
       document.body.style.cursor = "";
-      $<HTMLInputElement>("#set-resultswidth").value = String(settings.resultsWidth);
+      $<HTMLInputElement>("#set-resultswidth").value = String(
+        settings.resultsWidth,
+      );
       void saveSettings(settings);
     };
     window.addEventListener("mousemove", onMove);
@@ -956,7 +1165,9 @@ function bindExportUI(): void {
   });
   document.addEventListener("click", () => exportMenu.classList.add("hidden"));
   exportMenu.addEventListener("click", async (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-action]",
+    );
     if (!btn) return;
     exportMenu.classList.add("hidden");
     const action = btn.dataset.action;
@@ -978,7 +1189,10 @@ function bindExportUI(): void {
       const isSum = action === "save-sum";
       const content = isSum ? editor.getText() : editor.getSheetWithResults();
       try {
-        const saved = await invoke<boolean>("write_text_file", { contents: content, isSum });
+        const saved = await invoke<boolean>("write_text_file", {
+          contents: content,
+          isSum,
+        });
         if (saved) {
           toast(t("saved"));
         }
@@ -1028,11 +1242,15 @@ async function bindLifecycle(): Promise<void> {
   // update check above only ever runs once at boot — recheck periodically
   // so a long-lived process still notices new releases; re-read the setting
   // on every tick since the user can flip it while the app is running
-  setInterval(() => { if (settings.autoUpdateEnabled) void checkUpdate(); }, 6 * 60 * 60 * 1000);
+  setInterval(
+    () => {
+      if (settings.autoUpdateEnabled) void checkUpdate();
+    },
+    6 * 60 * 60 * 1000,
+  );
 }
 
 async function initUI(): Promise<void> {
-
   applySettings(); // sets the language before bindSettingsUI renders dynamic labels
   bindSettingsUI();
   renderDocList();
@@ -1066,7 +1284,11 @@ async function checkUpdate(manual = false): Promise<void> {
     if (manual) toast(t("upToDate"));
     return;
   }
-  const choice = await askModal(t("updateAvailable").replace("{}", result.version), t("updateInstall"), t("updateLater"));
+  const choice = await askModal(
+    t("updateAvailable").replace("{}", result.version),
+    t("updateInstall"),
+    t("updateLater"),
+  );
   if (choice !== "a") return;
   toast(t("updateInstalling"));
   try {
