@@ -146,7 +146,7 @@ export class SumEngine {
         } else if (e instanceof EvalError) {
           // Expected evaluation failure; remain silent
         } else {
-          // Surface unexpected bugs/BigInt errors/RangeErrors and log them
+          // Capture unexpected execution anomalies like BigInt or Range errors
           lineError = e instanceof Error ? e.message : String(e);
           console.warn("evaluate failed:", e);
         }
