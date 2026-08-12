@@ -115,7 +115,7 @@ export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dm
     tokens.push({ t: "word", raw: lx.raw, ...span });
     i++;
   }
-  return disambiguateIn(tokens, reg, line);
+  return disambiguateMinAgg(disambiguateIn(tokens, reg, line), reg, line);
 }
 
 /**
@@ -136,5 +136,23 @@ function disambiguateIn(tokens: Token[], reg: Registry, line: string): Token[] {
       return { t: "unit", unit: inch, start: tk.start, end: tk.end } as Token;
     }
     return tk;
+  });
+}
+
+/**
+ * "5 min": the "min" aggregate keyword (registered first, so it wins the
+ * phrase in the registry) collides with the minute unit's "min"/"мин"
+ * abbreviation. Right after a number it can only mean minutes — the
+ * standalone `min` aggregate line has no preceding number to collide with.
+ */
+function disambiguateMinAgg(tokens: Token[], reg: Registry, line: string): Token[] {
+  const minute = reg.unitsById.get("minute");
+  if (!minute) return tokens;
+  return tokens.map((tk, i) => {
+    if (tk.t !== "agg" || tk.name !== "min") return tk;
+    const raw = line.slice(tk.start, tk.end).toLowerCase();
+    if (raw !== "min" && raw !== "мин") return tk;
+    if (tokens[i - 1]?.t !== "num") return tk;
+    return { t: "unit", unit: minute, start: tk.start, end: tk.end } as Token;
   });
 }

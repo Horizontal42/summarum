@@ -291,4 +291,15 @@ describe("regression 2026-08-12", () => {
     expect(r[1]).toBeNull();
     expect(r[2]).toBe("4");
   });
+
+  it("'5 min' means 5 minutes, not the min() aggregate", () => {
+    expect(calc("5 min")).toBe("5 min");
+    expect(calc("5 мин")).toBe("5 min");
+  });
+  it("standalone 'min'/'max' aggregate lines still work", () => {
+    const r = eng.evaluateDocument("10\n20\n5\nmin").map((x) => x.text);
+    expect(r).toEqual(["10", "20", "5", "5"]);
+    const r2 = eng.evaluateDocument("10\n20\n5\nmax").map((x) => x.text);
+    expect(r2).toEqual(["10", "20", "5", "20"]);
+  });
 });
