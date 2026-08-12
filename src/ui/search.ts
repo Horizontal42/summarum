@@ -40,7 +40,7 @@ export function parseResultQuery(engine: SumEngine, q: string): { op: string; th
   return { op: m[1], threshold: v };
 }
 
-function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
+export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
   const q = query.trim();
   if (!q) return [];
   const docs = deps.docs();
