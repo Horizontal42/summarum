@@ -19,11 +19,15 @@ vi.mock('@tauri-apps/plugin-process', () => ({
   relaunch: vi.fn(),
 }));
 
+vi.mock('@tauri-apps/plugin-log', () => ({
+  warn: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn()
+}));
+
 describe('checkForUpdate', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('should return null if not in Tauri', async () => {
@@ -39,7 +43,8 @@ describe('checkForUpdate', () => {
 
     const result = await checkForUpdate();
     expect(result).toBe('error');
-    expect(console.warn).toHaveBeenCalledWith('update check failed', expect.any(Error));
+    const { warn } = await import('@tauri-apps/plugin-log');
+    expect(warn).toHaveBeenCalledWith('update check failed: Error: Network error');
   });
 
   it('should return null if no update is available', async () => {
@@ -52,7 +57,8 @@ describe('checkForUpdate', () => {
 
     const result = await checkForUpdate();
     expect(result).toBeNull();
-    expect(console.info).toHaveBeenCalledWith("no update: running 1.0.0, that's the latest published release");
+    const { info } = await import('@tauri-apps/plugin-log');
+    expect(info).toHaveBeenCalledWith("no update: running 1.0.0, that's the latest published release");
   });
 
   it('should return an update object if an update is available', async () => {
@@ -70,6 +76,9 @@ describe('checkForUpdate', () => {
     expect(result).not.toBeNull();
     if (result !== 'error' && result !== null) {
       expect(result.version).toBe('1.1.0');
+
+      const { info } = await import('@tauri-apps/plugin-log');
+      expect(info).toHaveBeenCalledWith('update available: 1.0.0 -> 1.1.0');
 
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await result.install();
