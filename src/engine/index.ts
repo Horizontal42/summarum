@@ -137,7 +137,6 @@ export class SumEngine {
             historicalRates: this.historicalRates,
             resolveXRef,
           };
-          // a line without a result beats a dead sheet.
           value = evaluate(parsed.expr, ctx);
         }
       } catch (e) {
@@ -150,6 +149,7 @@ export class SumEngine {
           lineError = e instanceof Error ? e.message : String(e);
           console.warn("evaluate failed:", e);
         }
+        // a line without a result beats a dead sheet.
         value = null;
       }
       if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
