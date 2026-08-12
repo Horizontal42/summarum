@@ -15,6 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
+const MAX_SHEET_BYTES: u64 = 1_000_000;
 const SAMPLE_JS: &str = include_str!("../extension-sample.js");
 
 fn data_dir(app: &AppHandle) -> PathBuf {
@@ -750,7 +751,7 @@ fn read_text_file(app: AppHandle, path: String) -> Result<String, String> {
         return Err("unsupported file type".into());
     }
     let meta = fs::metadata(&p).map_err(|e| e.to_string())?;
-    if meta.len() > 1_000_000 {
+    if meta.len() > MAX_SHEET_BYTES {
         return Err("file too large".into());
     }
     fs::read_to_string(p).map_err(|e| e.to_string())
@@ -799,15 +800,22 @@ fn is_sheet_path(path: &str) -> bool {
     lower.ends_with(".numi") || lower.ends_with(".sum")
 }
 
+/// A sheet handed to us by the OS (file association, second launch): same
+/// extension whitelist and size cap `read_text_file` applies to drag&drop.
+fn read_sheet_file(path: &Path) -> Option<String> {
+    if !is_sheet_path(&path.to_string_lossy()) {
+        return None;
+    }
+    if fs::metadata(path).ok()?.len() > MAX_SHEET_BYTES {
+        return None;
+    }
+    fs::read_to_string(path).ok()
+}
+
 /// Contents of a .numi/.sum file passed on the command line (file association).
 #[tauri::command]
 fn get_launch_file() -> Option<String> {
-    let arg = std::env::args().nth(1)?;
-    if is_sheet_path(&arg) {
-        fs::read_to_string(arg).ok()
-    } else {
-        None
-    }
+    read_sheet_file(Path::new(&std::env::args().nth(1)?))
 }
 
 #[tauri::command]
@@ -861,7 +869,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(path) = args.iter().skip(1).find(|a| is_sheet_path(a)) {
-                if let Ok(content) = fs::read_to_string(path) {
+                if let Some(content) = read_sheet_file(Path::new(path)) {
                     app.emit("open-file", content).ok();
                 }
             }
@@ -1029,5 +1037,39 @@ mod tests {
         assert!(!map.contains_key("BBB"));
         assert!(!map.contains_key("CCC"));
         assert!(!map.contains_key("DDD"));
+    }
+
+    // read_sheet_file
+    fn temp_sheet(name: &str, contents: &[u8]) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("summarum-test-sheet-{}", nanos));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
+        fs::write(&path, contents).unwrap();
+        path
+    }
+
+    #[test]
+    fn read_sheet_file_reads_a_small_sheet() {
+        let path = temp_sheet("budget.numi", b"1 + 1");
+        assert_eq!(read_sheet_file(&path), Some("1 + 1".to_string()));
+        fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn read_sheet_file_rejects_a_foreign_extension() {
+        let path = temp_sheet("notes.txt", b"1 + 1");
+        assert_eq!(read_sheet_file(&path), None);
+        fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn read_sheet_file_rejects_an_oversized_sheet() {
+        let path = temp_sheet("big.numi", &vec![b'1'; (MAX_SHEET_BYTES + 1) as usize]);
+        assert_eq!(read_sheet_file(&path), None);
+        fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 }
