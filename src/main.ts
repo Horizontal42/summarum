@@ -112,19 +112,19 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
     const startY = e.clientY;
     let cachedItems: { el: HTMLElement, top: number, bottom: number }[] | null = null;
     const onMove = (ev: MouseEvent) => {
-      if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < 4) return;
-        dragging = true;
-        suppressClick = true;
-        el.classList.add("dragging");
-        document.body.style.cursor = "grabbing";
-      }
       if (!cachedItems) {
         const domItems = [...list.querySelectorAll<HTMLElement>(".doc-item")];
         cachedItems = domItems.map((item) => {
           const rect = item.getBoundingClientRect();
           return { el: item, top: rect.top, bottom: rect.bottom };
         });
+      }
+      if (!dragging) {
+        if (Math.abs(ev.clientY - startY) < 4) return;
+        dragging = true;
+        suppressClick = true;
+        el.classList.add("dragging");
+        document.body.style.cursor = "grabbing";
       }
       let over: HTMLElement | undefined;
       for (const item of cachedItems) {
