@@ -243,6 +243,11 @@ function evalBit(op: string, l: Value, r: Value): Value {
   return qty(new Decimal(out.toString()), null, repr);
 }
 
+/** l already a percent -> its value; otherwise treat the scalar as a whole-number percent. */
+function asPercentValue(l: Value): Decimal {
+  return l.kind === "percent" ? l.value : asScalar(l).mul(100);
+}
+
 function evalPctOp(op: string, l: Value, r: Value): Value {
   const rq = r.kind === "quantity" ? r : null;
   const rv = r.kind === "percent" ? r.value.div(100) : rq ? rq.value : null;
@@ -250,7 +255,7 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
   const unit = rq?.unit ?? null;
 
   if (op === "of" || op === "off" || op === "on") {
-    const p = l.kind === "percent" ? l.value : asScalar(l).mul(100);
+    const p = asPercentValue(l);
     const factor =
       op === "of" ? p.div(100)
       : op === "off" ? new Decimal(1).sub(p.div(100))
@@ -269,7 +274,7 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
     }
   }
   // "20% of what is 30"
-  const p = l.kind === "percent" ? l.value : asScalar(l).mul(100);
+  const p = asPercentValue(l);
   switch (op) {
     case "of_what_is": return qty(rv.div(p.div(100)), unit);
     case "off_what_is": {
