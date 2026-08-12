@@ -1,3 +1,4 @@
+import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeApi, runExtensions } from "./extensions";
 import { SumEngine } from "./engine";
@@ -41,8 +42,8 @@ describe("extensions", () => {
     let consoleWarnSpy: any;
 
     beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      consoleErrorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      consoleWarnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -185,6 +186,8 @@ describe("extensions", () => {
         newQuickJSWASMModuleFromVariant: () => Promise.reject(new Error("no WebAssembly")),
       }));
       const { runExtensions: run } = await import("./extensions");
+      const { logger } = await import("./logger");
+      consoleWarnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       await run(mockEngine as SumEngine, [{ name: "s", code: "numi.setVariable('x', 1);" }]);
 
