@@ -15,8 +15,12 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 const RATES_TTL_SECS: u64 = 3600;
-const MAX_SHEET_BYTES: u64 = 1_000_000;
 const SAMPLE_JS: &str = include_str!("../extension-sample.js");
+/// Rust owns this file: it records the data folder the user committed to via
+/// the native picker. `save_file`/`load_file` refuse the name so the frontend
+/// cannot forge its own authorization.
+const DATA_DIR_FILE: &str = "data-dir.txt";
+const MAX_SHEET_BYTES: u64 = 1_000_000;
 
 fn data_dir(app: &AppHandle) -> PathBuf {
     let dir = app.path().app_data_dir().expect("no app data dir");
@@ -24,17 +28,106 @@ fn data_dir(app: &AppHandle) -> PathBuf {
     dir
 }
 
+/// Which folder the frontend may point file operations at.
+///
+/// Every `dir` argument arrives over IPC, where a buggy extension or
+/// compromised webview content can name any path on disk, so a path counts
+/// only when the user proved intent for it: `picked` is the folder just chosen
+/// in the native picker, `active` is the folder in use — plus the one being
+/// migrated away from, so a migration that fails partway leaves the folder the
+/// frontend is still pointing at usable.
+#[derive(Default)]
+struct DataDirGate {
+    picked: Mutex<Option<PathBuf>>,
+    active: Mutex<Vec<PathBuf>>,
+}
+
+fn canon_or_raw(p: &Path) -> PathBuf {
+    fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// Exact match against an authorized folder, compared canonicalized so a
+/// symlink or ".." spelling cannot stand in for a different path. A subfolder
+/// of an authorized folder is not itself authorized.
+fn path_allowed(candidate: &Path, allowed: &[PathBuf]) -> bool {
+    let c = canon_or_raw(candidate);
+    allowed.iter().any(|a| canon_or_raw(a) == c)
+}
+
+/// The custom folder recorded in the app's own settings.json, if any. Only
+/// read once, to seed the gate on the first run after it was introduced —
+/// settings.json is frontend-writable and is not a trust anchor afterwards.
+fn settings_data_dir(app: &AppHandle) -> Option<PathBuf> {
+    let raw = fs::read_to_string(data_dir(app).join("settings.json")).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let d = parsed.get("dataDir")?.as_str()?.trim();
+    (!d.is_empty()).then(|| PathBuf::from(d))
+}
+
+fn seed_data_dir_gate(app: &AppHandle) {
+    let marker = data_dir(app).join(DATA_DIR_FILE);
+    let active = match fs::read_to_string(&marker) {
+        Ok(raw) => {
+            let t = raw.trim();
+            (!t.is_empty()).then(|| PathBuf::from(t))
+        }
+        Err(_) => {
+            // upgrading over an install that predates the gate: adopt the
+            // folder already configured, then stop consulting settings.json
+            let adopted = settings_data_dir(app);
+            let contents = adopted
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            write_atomic(&marker, &contents).ok();
+            adopted
+        }
+    };
+    *app.state::<DataDirGate>().active.lock().unwrap() = active.into_iter().collect();
+}
+
+/// Let the session use `dir` without yet declaring it the folder to come back
+/// to on the next launch — the previous folder stays usable meanwhile.
+fn authorize_data_dir(app: &AppHandle, dir: &Path) {
+    let gate = app.state::<DataDirGate>();
+    let mut active = gate.active.lock().unwrap();
+    active.retain(|p| p != dir);
+    active.insert(0, dir.to_path_buf());
+    active.truncate(2);
+}
+
+/// Record the folder the migration actually landed in. Only reached once every
+/// file is in place, so a half-finished migration never becomes the folder the
+/// app boots into.
+fn commit_data_dir(app: &AppHandle, dir: &Path) -> Result<(), String> {
+    write_atomic(
+        &data_dir(app).join(DATA_DIR_FILE),
+        dir.to_string_lossy().as_ref(),
+    )?;
+    authorize_data_dir(app, dir);
+    Ok(())
+}
+
 /// Documents live either in the default app-data dir or in a user-chosen
 /// folder (settings stay in app-data — the path itself is stored there).
-fn docs_dir(app: &AppHandle, dir: &Option<String>) -> PathBuf {
-    match dir {
-        Some(d) if !d.trim().is_empty() => {
-            let p = PathBuf::from(d);
-            fs::create_dir_all(&p).ok();
-            p
-        }
-        _ => data_dir(app),
+/// Anything other than the default has to clear `DataDirGate` first.
+fn docs_dir(app: &AppHandle, dir: &Option<String>) -> Result<PathBuf, String> {
+    let requested = dir.as_deref().map(str::trim).unwrap_or("");
+    if requested.is_empty() {
+        return Ok(data_dir(app));
     }
+    let candidate = PathBuf::from(requested);
+    let gate = app.state::<DataDirGate>();
+    let allowed: Vec<PathBuf> = {
+        let mut allowed = gate.active.lock().unwrap().clone();
+        allowed.extend(gate.picked.lock().unwrap().clone());
+        allowed
+    };
+    if !path_allowed(&candidate, &allowed) {
+        return Err("data folder was not chosen by the user".into());
+    }
+    fs::create_dir_all(&candidate).ok();
+    Ok(candidate)
 }
 
 fn safe_name(name: &str) -> bool {
@@ -128,9 +221,26 @@ fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
     write_atomic_bytes(path, contents.as_bytes())
 }
 
+async fn read_file_async(path: PathBuf) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || fs::read_to_string(path).ok())
+        .await
+        .ok()
+        .flatten()
+}
+
+async fn write_atomic_async(path: PathBuf, contents: String) {
+    let _ = tauri::async_runtime::spawn_blocking(move || write_atomic(&path, &contents)).await;
+}
+
+/// settings.json and friends; DATA_DIR_FILE is Rust's own authorization record
+/// and must not be forgeable from the frontend.
+fn writable_name(name: &str) -> bool {
+    safe_name(name) && !name.eq_ignore_ascii_case(DATA_DIR_FILE)
+}
+
 #[tauri::command]
 fn save_file(app: AppHandle, name: String, contents: String) -> Result<(), String> {
-    if !safe_name(&name) {
+    if !writable_name(&name) {
         return Err("bad file name".into());
     }
     write_atomic(&data_dir(&app).join(name), &contents)
@@ -138,7 +248,7 @@ fn save_file(app: AppHandle, name: String, contents: String) -> Result<(), Strin
 
 #[tauri::command]
 fn load_file(app: AppHandle, name: String) -> Result<Option<String>, String> {
-    if !safe_name(&name) {
+    if !writable_name(&name) {
         return Err("bad file name".into());
     }
     let path = data_dir(&app).join(name);
@@ -194,17 +304,6 @@ fn now_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs()
-}
-
-async fn read_file_async(path: PathBuf) -> Option<String> {
-    tauri::async_runtime::spawn_blocking(move || fs::read_to_string(path).ok())
-        .await
-        .ok()
-        .flatten()
-}
-
-async fn write_atomic_async(path: PathBuf, contents: String) {
-    let _ = tauri::async_runtime::spawn_blocking(move || write_atomic(&path, &contents)).await;
 }
 
 async fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
@@ -528,7 +627,7 @@ async fn fetch_historical_rates_batch(
 
 #[tauri::command]
 fn load_documents(app: AppHandle, dir: Option<String>) -> Result<Option<String>, String> {
-    let path = docs_dir(&app, &dir).join("documents.json");
+    let path = docs_dir(&app, &dir)?.join("documents.json");
     if !path.exists() {
         return Ok(None);
     }
@@ -539,7 +638,7 @@ fn load_documents(app: AppHandle, dir: Option<String>) -> Result<Option<String>,
 
 #[tauri::command]
 fn save_documents(app: AppHandle, dir: Option<String>, contents: String) -> Result<(), String> {
-    write_atomic(&docs_dir(&app, &dir).join("documents.json"), &contents)
+    write_atomic(&docs_dir(&app, &dir)?.join("documents.json"), &contents)
 }
 
 // ---------- backups
@@ -550,7 +649,7 @@ const SNAPSHOT_KEEP: usize = 14;
 /// before the app writes anything, so it captures yesterday's state.
 #[tauri::command]
 fn run_backups(app: AppHandle, dir: Option<String>, retention_days: u32) -> Result<(), String> {
-    let base = docs_dir(&app, &dir);
+    let base = docs_dir(&app, &dir)?;
     let docs = base.join("documents.json");
     let bdir = base.join("backups");
     fs::create_dir_all(bdir.join("deleted")).map_err(|e| e.to_string())?;
@@ -605,7 +704,7 @@ fn backup_deleted_sheet(
     title: String,
     contents: String,
 ) -> Result<(), String> {
-    let bin = docs_dir(&app, &dir).join("backups").join("deleted");
+    let bin = docs_dir(&app, &dir)?.join("backups").join("deleted");
     fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
     let safe: String = title
         .chars()
@@ -627,7 +726,7 @@ fn backup_deleted_sheet(
 
 #[tauri::command]
 fn open_backups_folder(app: AppHandle, dir: Option<String>) -> Result<(), String> {
-    let bdir = docs_dir(&app, &dir).join("backups");
+    let bdir = docs_dir(&app, &dir)?.join("backups");
     fs::create_dir_all(&bdir).ok();
     app.opener()
         .open_path(bdir.to_string_lossy(), None::<&str>)
@@ -636,16 +735,12 @@ fn open_backups_folder(app: AppHandle, dir: Option<String>) -> Result<(), String
 
 // ---------- data folder migration
 
+/// Gated like every other `dir` argument: without it this is a probe for the
+/// existence of an arbitrary path anywhere on disk.
 #[tauri::command]
-fn data_dir_has_documents(dir: String) -> bool {
-    PathBuf::from(dir).join("documents.json").exists()
+fn data_dir_has_documents(app: AppHandle, dir: String) -> Result<bool, String> {
+    Ok(docs_dir(&app, &Some(dir))?.join("documents.json").exists())
 }
-
-/// The folder the user last chose in the native picker. `migrate_data_dir`
-/// writes to and prunes whatever it is handed, and the frontend can name any
-/// path over IPC, so the target has to be proven user-chosen.
-#[derive(Default)]
-struct PickedDataDir(Mutex<Option<PathBuf>>);
 
 #[tauri::command]
 fn pick_data_dir(app: AppHandle) -> Result<Option<String>, String> {
@@ -654,7 +749,7 @@ fn pick_data_dir(app: AppHandle) -> Result<Option<String>, String> {
     };
     let path = picked.into_path().map_err(|e| e.to_string())?;
     let canon = fs::canonicalize(&path).map_err(|e| e.to_string())?;
-    *app.state::<PickedDataDir>().0.lock().unwrap() = Some(canon);
+    *app.state::<DataDirGate>().picked.lock().unwrap() = Some(canon);
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
@@ -667,24 +762,27 @@ fn migrate_data_dir(
     new_dir: String,
     strategy: String,
 ) -> Result<(), String> {
+    // `old_dir` is exactly as untrusted as `new_dir`: on "move" this function
+    // deletes documents.json and every file under backups/ beneath it, so it
+    // has to clear the gate before anything else happens.
+    let old = docs_dir(&app, &old_dir)?;
     let new = PathBuf::from(&new_dir);
     // canonicalize: "C:\Data" and "c:\data" are the same folder on Windows
     let canon_new = fs::canonicalize(&new).map_err(|e| e.to_string())?;
-    let state = app.state::<PickedDataDir>();
+    let gate = app.state::<DataDirGate>();
     {
-        let mut picked = state.0.lock().unwrap();
+        let mut picked = gate.picked.lock().unwrap();
         if picked.as_deref() != Some(canon_new.as_path()) {
             return Err("target folder was not chosen by the user".into());
         }
         *picked = None;
     }
-    let old = docs_dir(&app, &old_dir);
+    // the target is usable from here on; the source stays usable too until the
+    // move is known to have finished
+    authorize_data_dir(&app, &canon_new);
     let canon_old = fs::canonicalize(&old).unwrap_or_else(|_| old.clone());
-    if canon_old == canon_new {
-        return Ok(());
-    }
-    if strategy == "use_existing" {
-        return Ok(());
+    if canon_old == canon_new || strategy == "use_existing" {
+        return commit_data_dir(&app, &canon_new);
     }
     let old_docs = old.join("documents.json");
     if old_docs.exists() {
@@ -710,9 +808,9 @@ fn migrate_data_dir(
     if old_docs.exists() {
         fs::remove_file(&old_docs).ok();
     }
-    // one level at a time, files only — `old` comes from the frontend, and a
-    // recursive delete of anything named "backups" is too big a hammer to hand
-    // over. run_backups/backup_deleted_sheet only ever write flat files here.
+    // one level at a time, files only — a recursive delete of anything named
+    // "backups" is too big a hammer even for a gated path.
+    // run_backups/backup_deleted_sheet only ever write flat files here.
     if all_copied {
         for sub in ["backups", "backups/deleted"] {
             if let Ok(entries) = fs::read_dir(old.join(sub)) {
@@ -725,7 +823,7 @@ fn migrate_data_dir(
             }
         }
     }
-    Ok(())
+    commit_data_dir(&app, &canon_new)
 }
 
 /// Paths the OS actually handed us in a window drop event. The frontend can
@@ -888,7 +986,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(DroppedFiles::default())
-        .manage(PickedDataDir::default())
+        .manage(DataDirGate::default())
         .invoke_handler(tauri::generate_handler![
             save_file,
             load_file,
@@ -915,6 +1013,9 @@ fn main() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+            // before the webview can ask for anything, so a frontend-written
+            // settings.json cannot influence an already-seeded gate
+            seed_data_dir_gate(&handle);
             let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Summarum", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
@@ -939,7 +1040,6 @@ fn main() {
                     }
                 })
                 .build(app)?;
-            let _ = handle;
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -994,21 +1094,79 @@ mod tests {
         assert!(safe_name("rates.json"));
     }
 
-    // is_sheet_path
+    // writable_name — the frontend must not be able to forge the gate's record
     #[test]
-    fn is_sheet_path_matches_extensions() {
-        assert!(is_sheet_path("my-calc.numi"));
-        assert!(is_sheet_path("budget.sum"));
-        assert!(is_sheet_path("MY-CALC.NUMI"));
-        assert!(is_sheet_path("BUDGET.SUM"));
+    fn writable_name_rejects_the_data_dir_marker() {
+        assert!(!writable_name(DATA_DIR_FILE));
+        assert!(!writable_name("DATA-DIR.TXT"));
     }
     #[test]
-    fn is_sheet_path_rejects_others() {
-        assert!(!is_sheet_path("notes.txt"));
-        assert!(!is_sheet_path("doc.md"));
-        assert!(!is_sheet_path("script.js"));
-        assert!(!is_sheet_path("numi"));
-        assert!(!is_sheet_path(""));
+    fn writable_name_accepts_ordinary_app_files() {
+        assert!(writable_name("settings.json"));
+        assert!(writable_name("documents.json"));
+    }
+
+    fn temp_subdir(tag: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("summarum-test-{}-{}", tag, nanos));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // path_allowed — the IPC trust boundary for data-folder paths
+    #[test]
+    fn path_allowed_rejects_when_nothing_is_authorized() {
+        let dir = temp_subdir("gate-empty");
+        assert!(!path_allowed(&dir, &[]));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn path_allowed_accepts_the_authorized_dir() {
+        let dir = temp_subdir("gate-ok");
+        assert!(path_allowed(&dir, std::slice::from_ref(&dir)));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn path_allowed_accepts_a_different_spelling_of_the_same_dir() {
+        let dir = temp_subdir("gate-spelling");
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        let detour = dir.join("sub").join("..");
+        assert!(path_allowed(&detour, std::slice::from_ref(&dir)));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn path_allowed_rejects_an_unrelated_dir() {
+        let allowed = temp_subdir("gate-allowed");
+        let attacker = temp_subdir("gate-attacker");
+        assert!(!path_allowed(&attacker, std::slice::from_ref(&allowed)));
+        fs::remove_dir_all(&allowed).ok();
+        fs::remove_dir_all(&attacker).ok();
+    }
+
+    #[test]
+    fn path_allowed_rejects_a_subdir_of_an_authorized_dir() {
+        let allowed = temp_subdir("gate-parent");
+        let child = allowed.join("child");
+        fs::create_dir_all(&child).unwrap();
+        assert!(!path_allowed(&child, std::slice::from_ref(&allowed)));
+        fs::remove_dir_all(&allowed).ok();
+    }
+
+    #[test]
+    fn path_allowed_rejects_a_missing_dir_that_is_not_authorized() {
+        let allowed = temp_subdir("gate-missing");
+        let ghost = allowed
+            .parent()
+            .unwrap()
+            .join("summarum-test-ghost-does-not-exist");
+        assert!(!path_allowed(&ghost, std::slice::from_ref(&allowed)));
+        fs::remove_dir_all(&allowed).ok();
     }
 
     // parse_rate_map
@@ -1039,37 +1197,48 @@ mod tests {
         assert!(!map.contains_key("DDD"));
     }
 
-    // read_sheet_file
-    fn temp_sheet(name: &str, contents: &[u8]) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("summarum-test-sheet-{}", nanos));
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join(name);
-        fs::write(&path, contents).unwrap();
-        path
-    }
-
+    // read_sheet_file — size cap shared with read_text_file
     #[test]
     fn read_sheet_file_reads_a_small_sheet() {
-        let path = temp_sheet("budget.numi", b"1 + 1");
-        assert_eq!(read_sheet_file(&path), Some("1 + 1".to_string()));
-        fs::remove_dir_all(path.parent().unwrap()).ok();
-    }
-
-    #[test]
-    fn read_sheet_file_rejects_a_foreign_extension() {
-        let path = temp_sheet("notes.txt", b"1 + 1");
-        assert_eq!(read_sheet_file(&path), None);
-        fs::remove_dir_all(path.parent().unwrap()).ok();
+        let dir = temp_subdir("sheet-small");
+        let path = dir.join("calc.numi");
+        fs::write(&path, "2 + 2").unwrap();
+        assert_eq!(read_sheet_file(&path).as_deref(), Some("2 + 2"));
+        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn read_sheet_file_rejects_an_oversized_sheet() {
-        let path = temp_sheet("big.numi", &vec![b'1'; (MAX_SHEET_BYTES + 1) as usize]);
-        assert_eq!(read_sheet_file(&path), None);
-        fs::remove_dir_all(path.parent().unwrap()).ok();
+        let dir = temp_subdir("sheet-big");
+        let path = dir.join("calc.numi");
+        fs::write(&path, "x".repeat((MAX_SHEET_BYTES + 1) as usize)).unwrap();
+        assert!(read_sheet_file(&path).is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn read_sheet_file_rejects_a_foreign_extension() {
+        let dir = temp_subdir("sheet-ext");
+        let path = dir.join("payload.js");
+        fs::write(&path, "alert(1)").unwrap();
+        assert!(read_sheet_file(&path).is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // is_sheet_path
+    #[test]
+    fn is_sheet_path_matches_extensions() {
+        assert!(is_sheet_path("my-calc.numi"));
+        assert!(is_sheet_path("budget.sum"));
+        assert!(is_sheet_path("MY-CALC.NUMI"));
+        assert!(is_sheet_path("BUDGET.SUM"));
+    }
+    #[test]
+    fn is_sheet_path_rejects_others() {
+        assert!(!is_sheet_path("notes.txt"));
+        assert!(!is_sheet_path("doc.md"));
+        assert!(!is_sheet_path("script.js"));
+        assert!(!is_sheet_path("numi"));
+        assert!(!is_sheet_path(""));
     }
 }
