@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { SumEngine } from "./index";
+
+vi.mock("@tauri-apps/plugin-log", () => ({
+  warn: vi.fn().mockResolvedValue(undefined),
+  error: vi.fn().mockResolvedValue(undefined),
+  info: vi.fn().mockResolvedValue(undefined),
+}));
 
 let eng: SumEngine;
 

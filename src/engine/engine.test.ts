@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { SumEngine } from "./index";
+
+vi.mock("@tauri-apps/plugin-log", () => ({
+  warn: vi.fn().mockResolvedValue(undefined),
+  error: vi.fn().mockResolvedValue(undefined),
+  info: vi.fn().mockResolvedValue(undefined),
+}));
 import { qty, EvalError, XRefError } from "./types";
 import type { XRefResolution, EvalCtx } from "./evaluator";
 import { evaluate } from "./evaluator";
@@ -230,7 +236,13 @@ describe("variables and document context", () => {
   });
   it("sum / total", () => {
     expect(calcDoc("10\n20\n30\nsum")).toEqual(["10", "20", "30", "60"]);
-    expect(calcDoc("10\n20\n\n30\nsum")).toEqual(["10", "20", null, "30", "30"]);
+    expect(calcDoc("10\n20\n\n30\nsum")).toEqual([
+      "10",
+      "20",
+      null,
+      "30",
+      "30",
+    ]);
   });
   it("sum with units", () => {
     expect(calcDoc("$10\n$20\ntotal")).toEqual(["$10", "$20", "$30"]);
@@ -243,15 +255,31 @@ describe("variables and document context", () => {
   });
   it("count", () => {
     expect(calcDoc("10\n20\n30\ncount")).toEqual(["10", "20", "30", "3"]);
-    expect(calcDoc("10\n20\n\n30\ncount")).toEqual(["10", "20", null, "30", "1"]);
+    expect(calcDoc("10\n20\n\n30\ncount")).toEqual([
+      "10",
+      "20",
+      null,
+      "30",
+      "1",
+    ]);
   });
   it("min / max", () => {
     expect(calcDoc("10\n20\n5\nmin")).toEqual(["10", "20", "5", "5"]);
     expect(calcDoc("10\n20\n5\nmax")).toEqual(["10", "20", "5", "20"]);
   });
   it("min / max with units", () => {
-    expect(calcDoc("10 m\n5 m\n20 m\nmin")).toEqual(["10 m", "5 m", "20 m", "5 m"]);
-    expect(calcDoc("10 m\n5 m\n20 m\nmax")).toEqual(["10 m", "5 m", "20 m", "20 m"]);
+    expect(calcDoc("10 m\n5 m\n20 m\nmin")).toEqual([
+      "10 m",
+      "5 m",
+      "20 m",
+      "5 m",
+    ]);
+    expect(calcDoc("10 m\n5 m\n20 m\nmax")).toEqual([
+      "10 m",
+      "5 m",
+      "20 m",
+      "20 m",
+    ]);
   });
   it("product", () => {
     expect(calcDoc("2\n3\n4\nproduct")).toEqual(["2", "3", "4", "24"]);
@@ -332,18 +360,32 @@ describe("goal seek", () => {
 
 describe("extension API", () => {
   it("addUnit (horse from Sample.js)", () => {
-    eng.addUnit({ id: "horse", phrases: "horse, horses, hrs", baseUnitId: "meter", format: "hrs", ratio: 2.4 });
+    eng.addUnit({
+      id: "horse",
+      phrases: "horse, horses, hrs",
+      baseUnitId: "meter",
+      format: "hrs",
+      ratio: 2.4,
+    });
     expect(calc("2 horses in meters")).toBe("4.8 m");
   });
   it("addUnit throws on id collision instead of silently corrupting unitsById", () => {
     expect(() =>
-      eng.addUnit({ id: "horse", phrases: "nag", baseUnitId: "meter", format: "nag", ratio: 99 })
+      eng.addUnit({
+        id: "horse",
+        phrases: "nag",
+        baseUnitId: "meter",
+        format: "nag",
+        ratio: 99,
+      }),
     ).toThrow(/horse/);
     // the original registration must survive the failed collision
     expect(calc("2 horses in meters")).toBe("4.8 m");
   });
   it("addFunction (zum from Sample.js)", () => {
-    eng.addFunction({ id: "zum", phrases: "zum" }, (values) => ({ double: values[0].double + values[1].double }));
+    eng.addFunction({ id: "zum", phrases: "zum" }, (values) => ({
+      double: values[0].double + values[1].double,
+    }));
     expect(calc("zum(2;3)")).toBe("5");
   });
   it("setVariable", () => {
@@ -374,7 +416,8 @@ describe("cross-sheet references", () => {
     const s = sheet.toLowerCase();
     if (s === "budget") {
       if (key === "total") return { ok: true, value: qty(150) };
-      if (key === "rent") return { ok: true, value: qty(500, eng.reg.unitsById.get("meter")!) };
+      if (key === "rent")
+        return { ok: true, value: qty(500, eng.reg.unitsById.get("meter")!) };
       if (key === "last") return { ok: true, value: qty(7) };
       return { ok: false, reason: `no variable "${key}" in "${sheet}"` };
     }
@@ -415,7 +458,10 @@ describe("cross-sheet references", () => {
     expect(r[0].error).toBeUndefined();
   });
   it("propagates a resolver-reported circular reference", () => {
-    const cyc = (): XRefResolution => ({ ok: false, reason: "circular reference" });
+    const cyc = (): XRefResolution => ({
+      ok: false,
+      reason: "circular reference",
+    });
     const r = eng.evaluateDocument("@A.total", cyc);
     expect(r[0].value).toBeNull();
     expect(r[0].error).toBe("circular reference");
@@ -439,7 +485,9 @@ describe("evaluation errors", () => {
       reg: eng.reg,
       historicalRates: {},
     } as unknown as EvalCtx;
-    expect(() => evaluate({ k: "var", name: "unknown" }, ctx)).toThrowError(EvalError);
+    expect(() => evaluate({ k: "var", name: "unknown" }, ctx)).toThrowError(
+      EvalError,
+    );
   });
 
   it("throws XRefError for unresolved xref", () => {
@@ -449,6 +497,8 @@ describe("evaluation errors", () => {
       historicalRates: {},
       resolveXRef: () => ({ ok: false, reason: "xref error" }),
     } as unknown as EvalCtx;
-    expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
+    expect(() =>
+      evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx),
+    ).toThrowError(XRefError);
   });
 });
