@@ -218,7 +218,7 @@ describe("numeral systems", () => {
 describe("variables and document context", () => {
   it("sequence error recovery", () => {
     eng.addFunction({ id: "throw_err", phrases: "throw_err" }, () => {
-      throw new Error("test error");
+      throw new EvalError("test error");
     });
     expect(calc("throw_err(1) 2 hours")).toBe("2 h");
   });
