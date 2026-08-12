@@ -7,6 +7,7 @@ import {
 } from "quickjs-emscripten-core";
 import releaseSyncVariant from "@jitl/quickjs-singlefile-browser-release-sync";
 import { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
+import { logger } from "./utils/logger";
 
 interface ExtensionApi {
   setVariable(name: string, value: number | ExtensionValue): void;
@@ -75,7 +76,7 @@ export async function runExtensions(
   try {
     await load(engine, scripts);
   } catch (e) {
-    console.warn("extensions disabled: QuickJS sandbox unavailable:", e);
+    logger.warn("extensions disabled: QuickJS sandbox unavailable:", e);
   }
 }
 
@@ -200,7 +201,7 @@ function evaluateScripts(
       }
       res.value.dispose();
     } catch (e) {
-      console.error(`extension ${s.name} failed:`, e);
+      logger.error(`extension ${s.name} failed:`, e);
     }
   }
 }

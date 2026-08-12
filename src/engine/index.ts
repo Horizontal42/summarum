@@ -2,6 +2,7 @@
 // extension API (numi.addUnit / addFunction / setVariable).
 import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
+import { logger } from "../utils/logger";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine } from "./parser";
 import { evaluate, EvalCtx, XRefResolver, toBase, fromBase } from "./evaluator";
@@ -144,7 +145,7 @@ export class SumEngine {
           } else {
             // Surface unexpected bugs/BigInt errors and log them
             lineError = e instanceof Error ? e.message : String(e);
-            console.warn("evaluate failed:", e);
+            logger.warn("evaluate failed:", e);
           }
           value = null;
         }
