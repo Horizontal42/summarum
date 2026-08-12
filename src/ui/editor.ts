@@ -257,8 +257,8 @@ export class SumEditor {
     });
 
     this.resultsEl.addEventListener("click", (e) => {
-      const el = (e.target as HTMLElement).closest(".result-line") as HTMLElement | null;
-      if (el?.dataset.value) {this.cb.onCopy(el.dataset.value as string);}
+      const el = (e.target as HTMLElement).closest(".result-line");
+      if (el?.dataset.value) {this.cb.onCopy(el.dataset.value);}
     });
   }
 
