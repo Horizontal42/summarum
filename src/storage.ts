@@ -218,13 +218,50 @@ export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record
     if (isTauri()) {
       return await invoke<Record<string, Record<string, number>>>("fetch_historical_rates_batch", { dates });
     }
+    const uniqueDates = Array.from(new Set(dates));
     const results: Record<string, Record<string, number>> = {};
-    await Promise.all(
-      dates.map(async (date) => {
-        const rates = await fetchHistoricalRates(date);
-        if (rates) results[date] = rates;
-      })
-    );
+
+    if (uniqueDates.length === 0) return results;
+
+    if (uniqueDates.length === 1) {
+      const rates = await fetchHistoricalRates(uniqueDates[0]!);
+      if (rates) results[uniqueDates[0]!] = rates;
+      return results;
+    }
+
+    const minDate = uniqueDates.reduce((a, b) => (a < b ? a : b));
+    const maxDate = uniqueDates.reduce((a, b) => (a > b ? a : b));
+
+    const res = await fetch(`https://api.frankfurter.dev/v1/${minDate}..${maxDate}?from=USD`);
+    const json = await res.json();
+
+    if (json?.rates) {
+      const availableDates = Object.keys(json.rates).sort();
+      for (const reqDate of uniqueDates) {
+        let matchDate: string | undefined = undefined;
+        for (let i = 0; i < availableDates.length; i++) {
+          if (availableDates[i]! <= reqDate) matchDate = availableDates[i];
+          else break;
+        }
+
+        // In case there is a date requested prior to the first available date
+        // Frankfurter might not return a rate, fallback to individual query
+        if (!matchDate) {
+          const rates = await fetchHistoricalRates(reqDate);
+          if (rates) results[reqDate] = rates;
+          continue;
+        }
+
+        const rates = json.rates[matchDate];
+        if (rates) {
+          const out: Record<string, number> = { USD: 1 };
+          for (const [k, v] of Object.entries(rates as Record<string, number>)) {
+            if (v > 0) out[k.toUpperCase()] = v;
+          }
+          results[reqDate] = out;
+        }
+      }
+    }
     return results;
   } catch (e) {
     console.warn("fetchHistoricalRatesBatch failed", e);
