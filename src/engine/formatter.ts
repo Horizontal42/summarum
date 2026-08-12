@@ -109,6 +109,9 @@ function withUnit(num: string, f: string): string {
 }
 
 /** Best rational approximation via continued fractions: 0.75 -> "3/4". */
+// Native float, not Decimal: the continued-fraction algorithm is tuned to
+// float epsilon by design, and this is display formatting, not arithmetic
+// carried forward into the result.
 function formatFraction(v: Decimal): string {
   const neg = v.isNegative();
   const x = v.abs().toNumber();

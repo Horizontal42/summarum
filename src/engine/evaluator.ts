@@ -547,6 +547,9 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
   }
 }
 
+// Native float, not Decimal: this is a PRNG (mulberry32/strHash bit-twiddling
+// over 32-bit ints), not arithmetic on user quantities — decimal.js has no
+// bitwise ops and would add nothing but overhead here.
 function evalRandom(args: Value[], ctx: EvalCtx): Value {
   const seed = strHash(ctx.line.lineText) ^ (ctx.line.index * 0x9e3779b9);
   const rand = mulberry32(seed);
