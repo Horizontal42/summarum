@@ -68,6 +68,6 @@ export function convertQ(q: Quantity, unit: Unit): Quantity {
   return qty(fromBase(toBase(q), unit), unit);
 }
 
-function qty(value: Decimal, unit: Unit | null, repr?: string) {
+function qty(value: Decimal, unit: Unit | null, repr?: "decimal" | "plain" | "fraction") {
   return { kind: "quantity" as const, value, unit, repr: repr ?? "decimal" };
 }
