@@ -596,7 +596,7 @@ function applyAllRates(): void {
 async function refreshMarket(force = false): Promise<void> {
   if (!isTauri()) return;
   const info = $("#market-info") as HTMLElement;
-  info.style.display = "";
+  info.classList.remove("d-none");
   info.classList.add("spin");
   info.textContent = t("market");
   const prices = await fetchMarketData(MARKET_SYMBOLS);
@@ -636,8 +636,8 @@ async function fetchNeededHistoricalRates(text: string): Promise<void> {
 
 function renderMarketInfo(): void {
   const el = $("#market-info") as HTMLElement;
-  if (marketFetchedAt === 0) { el.style.display = "none"; return; }
-  el.style.display = "";
+  if (marketFetchedAt === 0) { el.classList.add("d-none"); return; }
+  el.classList.remove("d-none");
   el.textContent = `${t("market")}: ${agoText(marketFetchedAt)} ↺`;
   el.title = t("refreshRates");
 }
@@ -661,9 +661,9 @@ function renderTotal(): void {
     lbl.textContent = label;
     line.append(lbl, document.createTextNode(total));
     line.dataset.value = total;
-    line.style.display = "";
+    line.classList.remove("d-none");
   } else {
-    line.style.display = "none";
+    line.classList.add("d-none");
     delete line.dataset.value;
   }
 }
@@ -872,7 +872,7 @@ async function bindWindowControls(): Promise<void> {
     $("#win-min").addEventListener("click", () => void win.minimize());
     $("#win-close").addEventListener("click", () => void win.hide());
   } else {
-    $("#win-controls").style.display = "none";
+    $("#win-controls").classList.add("d-none");
   }
 }
 
