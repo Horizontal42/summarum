@@ -1,11 +1,11 @@
 // JS extensions runtime: numi.setVariable, numi.addUnit, numi.addFunction.
 // Scripts run inside a QuickJS WASM sandbox — no DOM, no Tauri IPC, no host globals.
 import {
-  newQuickJSWASMModuleFromVariant,
-  QuickJSContext,
+  newQuickJSAsyncWASMModuleFromVariant,
+  QuickJSAsyncContext,
   QuickJSHandle,
 } from "quickjs-emscripten-core";
-import releaseSyncVariant from "@jitl/quickjs-singlefile-browser-release-sync";
+import releaseAsyncVariant from "@jitl/quickjs-wasmfile-release-asyncify";
 import { SumEngine, ExtensionUnitSpec, ExtensionValue } from "./engine";
 
 interface ExtensionApi {
@@ -82,7 +82,7 @@ export async function runExtensions(
 type RunWithTimeout = <T>(timeoutMs: number, fn: () => T) => T;
 
 function callGuest(
-  vm: QuickJSContext,
+  vm: QuickJSAsyncContext,
   id: string,
   fn: QuickJSHandle,
   values: ExtensionValue[],
@@ -121,7 +121,7 @@ function callGuest(
 }
 
 function exposeApi(
-  vm: QuickJSContext,
+  vm: QuickJSAsyncContext,
   api: ExtensionApi,
   runWithTimeout: RunWithTimeout,
 ) {
@@ -184,7 +184,7 @@ function exposeApi(
 }
 
 function evaluateScripts(
-  vm: QuickJSContext,
+  vm: QuickJSAsyncContext,
   scripts: { name: string; code: string }[],
   runWithTimeout: RunWithTimeout,
 ) {
@@ -209,8 +209,8 @@ async function load(
   engine: SumEngine,
   scripts: { name: string; code: string }[],
 ): Promise<void> {
-  const mod = await newQuickJSWASMModuleFromVariant(releaseSyncVariant);
-  const vm: QuickJSContext = mod.newContext();
+  const mod = await newQuickJSAsyncWASMModuleFromVariant(releaseAsyncVariant);
+  const vm: QuickJSAsyncContext = mod.newContext();
   vm.runtime.setMemoryLimit(MEMORY_LIMIT);
   vm.runtime.setMaxStackSize(STACK_SIZE);
 
