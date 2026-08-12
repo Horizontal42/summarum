@@ -105,8 +105,13 @@ export function startOfToday(): number {
  * survives DST transitions; months/years clamp to the end of the target
  * month (Jan 31 + 1 month = Feb 28, not Mar 3).
  */
+/** Strips a prefixed unit id ("milli:second") down to its base ("second"). */
+function baseUnitId(unitId: string): string {
+  return unitId.includes(":") ? unitId.split(":")[1] : unitId;
+}
+
 export function addToDate(ms: number, amount: number, unitId: string): number {
-  const baseId = unitId.includes(":") ? unitId.split(":")[1] : unitId;
+  const baseId = baseUnitId(unitId);
   const d = new Date(ms);
   if ((baseId === "day" || baseId === "week") && Number.isInteger(amount)) {
     d.setDate(d.getDate() + amount * (baseId === "week" ? 7 : 1));
@@ -134,6 +139,6 @@ function lastDayOfMonth(d: Date): number {
 }
 
 export function isCalendarUnit(unitId: string, amount: number): boolean {
-  const baseId = unitId.includes(":") ? unitId.split(":")[1] : unitId;
+  const baseId = baseUnitId(unitId);
   return (baseId === "day" || baseId === "week" || baseId === "month" || baseId === "year") && Number.isInteger(amount);
 }
