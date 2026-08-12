@@ -4,6 +4,9 @@ Decimal.set({ precision: 40, toExpNeg: -9, toExpPos: 21 });
 
 export { Decimal };
 
+/** Shared here (not in evaluator.ts) so unitdata.ts can use it too without a cycle. */
+export const PI = new Decimal("3.14159265358979323846264338327950288419716939937510");
+
 export type Dimension =
   | "scalar"
   | "length"

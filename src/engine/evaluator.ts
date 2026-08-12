@@ -1,6 +1,6 @@
 // Walks the AST with the document context (variables, line results for
 // sum/avg/prev) and produces unit-aware values.
-import { Decimal, EvalError, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
+import { Decimal, EvalError, PI, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
 import { Node, ConvTarget } from "./parser";
 import { Registry } from "./registry";
 import { resolveZone, startOfToday, addToDate, isCalendarUnit } from "./datetime";
@@ -28,7 +28,6 @@ export interface EvalCtx {
 export type XRefResolution = { ok: true; value: Value } | { ok: false; reason: string };
 export type XRefResolver = (sheet: string, key: string) => XRefResolution;
 
-const PI = new Decimal("3.14159265358979323846264338327950288419716939937510");
 const E = new Decimal("2.71828182845904523536028747135266249775724709369995");
 
 export function evaluate(node: Node, ctx: EvalCtx): Value {

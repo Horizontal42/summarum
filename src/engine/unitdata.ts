@@ -1,7 +1,7 @@
 // Conversion ratios. Base units per dimension: length=meter, area=m²,
 // volume=m³, weight=gram, time=second, angle=radian, data=bit,
 // temperature=kelvin (ratio+offset).
-import { Decimal, Dimension } from "./types";
+import { Decimal, Dimension, PI } from "./types";
 
 export interface UnitData {
   id: string;
@@ -79,7 +79,7 @@ export const UNIT_DATA: UnitData[] = [
 
   // Angle (base: radian)
   { id: "radian", category: "Angle", dimension: "angle", ratio: "1" },
-  { id: "degree", category: "Angle", dimension: "angle", ratio: String(Math.PI / 180) },
+  { id: "degree", category: "Angle", dimension: "angle", ratio: PI.div(180).toString() },
 
   // Data (base: bit)
   { id: "bit", category: "Data", dimension: "data", ratio: "1", prefixes: "data" },
