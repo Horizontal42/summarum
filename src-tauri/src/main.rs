@@ -195,8 +195,19 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
-fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
-    let raw = fs::read_to_string(data_dir(app).join("rates.json")).ok()?;
+async fn read_file_async(path: PathBuf) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || fs::read_to_string(path).ok())
+        .await
+        .ok()
+        .flatten()
+}
+
+async fn write_atomic_async(path: PathBuf, contents: String) {
+    let _ = tauri::async_runtime::spawn_blocking(move || write_atomic(&path, &contents)).await;
+}
+
+async fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
+    let raw = read_file_async(data_dir(app).join("rates.json")).await?;
     serde_json::from_str(&raw).ok()
 }
 
@@ -253,7 +264,7 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
 #[tauri::command]
 async fn fetch_rates(app: AppHandle, force: bool) -> Result<RatesPayload, String> {
     if !force {
-        if let Some(cache) = read_rates_cache(&app) {
+        if let Some(cache) = read_rates_cache(&app).await {
             if now_secs().saturating_sub(cache.fetched_at) < RATES_TTL_SECS {
                 let mut payload = cache.payload;
                 payload.fetched_at = cache.fetched_at;
@@ -268,11 +279,12 @@ async fn fetch_rates(app: AppHandle, force: bool) -> Result<RatesPayload, String
                 payload: payload.clone(),
             };
             if let Ok(raw) = serde_json::to_string(&cache) {
-                write_atomic(&data_dir(&app).join("rates.json"), &raw).ok();
+                write_atomic_async(data_dir(&app).join("rates.json"), raw).await;
             }
             Ok(payload)
         }
         Err(e) => read_rates_cache(&app)
+            .await
             .map(|c| {
                 let mut payload = c.payload;
                 payload.fetched_at = c.fetched_at;
@@ -300,7 +312,7 @@ async fn fetch_market_data(
     let cache_path = data_dir(&app).join("market.json");
 
     // try cache first
-    if let Ok(raw) = fs::read_to_string(&cache_path) {
+    if let Some(raw) = read_file_async(cache_path.clone()).await {
         if let Ok(cache) = serde_json::from_str::<MarketCache>(&raw) {
             if now_secs().saturating_sub(cache.fetched_at) < MARKET_TTL_SECS {
                 let syms: std::collections::HashSet<&str> =
@@ -364,7 +376,7 @@ async fn fetch_market_data(
             prices: prices.clone(),
         };
         if let Ok(raw) = serde_json::to_string(&cache) {
-            write_atomic(&cache_path, &raw).ok();
+            write_atomic_async(cache_path, raw).await;
         }
     }
 
@@ -410,7 +422,7 @@ async fn fetch_historical_rates(
         return Err("invalid date format".into());
     }
     let cache_path = data_dir(&app).join(format!("rates-{}.json", date));
-    if let Ok(raw) = fs::read_to_string(&cache_path) {
+    if let Some(raw) = read_file_async(cache_path.clone()).await {
         if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw) {
             return Ok(cached);
         }
@@ -434,7 +446,7 @@ async fn fetch_historical_rates(
         .map_err(|e| e.to_string())?;
     let rates = parse_rate_map(body["rates"].as_object().ok_or("no rates in response")?);
     if let Ok(serialized) = serde_json::to_string(&rates) {
-        write_atomic(&cache_path, &serialized).ok();
+        write_atomic_async(cache_path, serialized).await;
     }
     Ok(rates)
 }
@@ -452,7 +464,7 @@ async fn fetch_historical_rates_batch(
             continue;
         }
         let cache_path = data_dir(&app).join(format!("rates-{}.json", date));
-        if let Ok(raw) = std::fs::read_to_string(&cache_path) {
+        if let Some(raw) = read_file_async(cache_path).await {
             if let Ok(cached) = serde_json::from_str::<std::collections::HashMap<String, f64>>(&raw)
             {
                 results.insert(date.clone(), cached);
@@ -488,7 +500,7 @@ async fn fetch_historical_rates_batch(
                         let daily_rates = parse_rate_map(rates_obj);
                         let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
                         if let Ok(serialized) = serde_json::to_string(&daily_rates) {
-                            let _ = crate::write_atomic(&cache_path, &serialized);
+                            write_atomic_async(cache_path, serialized).await;
                         }
                         rate_map = Some((date, daily_rates));
                     }
