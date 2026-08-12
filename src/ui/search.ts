@@ -32,7 +32,7 @@ export interface SearchController {
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
 
-function parseResultQuery(engine: SumEngine, q: string): { op: string; threshold: Value } | null {
+export function parseResultQuery(engine: SumEngine, q: string): { op: string; threshold: Value } | null {
   const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
   if (!m) return null;
   const v = engine.evaluateExpression(m[2].trim());
