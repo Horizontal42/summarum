@@ -282,3 +282,13 @@ describe("review fixes", () => {
     });
   });
 });
+
+describe("regression 2026-08-12", () => {
+  it("a deeply nested-parens line nulls out just that line, not the whole document", () => {
+    const deep = "(".repeat(50000) + "1" + ")".repeat(50000);
+    const r = eng.evaluateDocument(`1+1\n${deep}\n2+2`).map((x) => x.text);
+    expect(r[0]).toBe("2");
+    expect(r[1]).toBeNull();
+    expect(r[2]).toBe("4");
+  });
+});

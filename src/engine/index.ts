@@ -3,7 +3,7 @@
 import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
-import { parseLine } from "./parser";
+import { parseLine, ParsedLine } from "./parser";
 import { evaluate, EvalCtx, XRefResolver, toBase, fromBase } from "./evaluator";
 import { formatValue } from "./formatter";
 import { detectDateOrder } from "./datetime";
@@ -118,39 +118,42 @@ export class SumEngine {
         continue;
       }
 
-      const tokens = tokenize(line, this.reg, this.dateOrder);
-      const knownVars = new Set(vars.keys());
-      const parsed = parseLine(tokens, knownVars, line);
-
+      // tokenize/parseLine/evaluate all run under one try/catch: pathological
+      // input (e.g. stack-overflowing nested parens in the parser) must null
+      // out this one line, not throw past evaluateDocument and kill the rest.
+      let tokens: Token[] = [];
+      let parsed: ParsedLine = { expr: null };
       let value: Value | null = null;
       let lineError: string | undefined;
-      if (parsed.expr) {
-        const ctx: EvalCtx = {
-          reg: this.reg,
-          vars,
-          line: { lineValues, lineKinds, index: i, lineText: rawLine },
-          historicalRates: this.historicalRates,
-          resolveXRef,
-        };
-        try {
-          value = evaluate(parsed.expr, ctx);
+      try {
+        tokens = tokenize(line, this.reg, this.dateOrder);
+        const knownVars = new Set(vars.keys());
+        parsed = parseLine(tokens, knownVars, line);
+        if (parsed.expr) {
+          const ctx: EvalCtx = {
+            reg: this.reg,
+            vars,
+            line: { lineValues, lineKinds, index: i, lineText: rawLine },
+            historicalRates: this.historicalRates,
+            resolveXRef,
+          };
           // a line without a result beats a dead sheet.
-          // surface unexpected bugs so the user knows why it failed
-        } catch (e) {
-          if (e instanceof XRefError) {
-            lineError = e.message;
-          } else if (e instanceof EvalError) {
-            // Expected evaluation failure; remain silent
-          } else {
-            // Surface unexpected bugs/BigInt errors and log them
-            lineError = e instanceof Error ? e.message : String(e);
-            console.warn("evaluate failed:", e);
-          }
-          value = null;
+          value = evaluate(parsed.expr, ctx);
         }
-        if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
-        if (value && parsed.assign) vars.set(parsed.assign, value);
+      } catch (e) {
+        if (e instanceof XRefError) {
+          lineError = e.message;
+        } else if (e instanceof EvalError) {
+          // Expected evaluation failure; remain silent
+        } else {
+          // Surface unexpected bugs/BigInt errors/RangeErrors and log them
+          lineError = e instanceof Error ? e.message : String(e);
+          console.warn("evaluate failed:", e);
+        }
+        value = null;
       }
+      if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
+      if (value && parsed.assign) vars.set(parsed.assign, value);
 
       lineValues.push(value);
       lineKinds.push("normal");
