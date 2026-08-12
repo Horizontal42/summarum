@@ -611,7 +611,7 @@ fn backup_deleted_sheet(
         safe,
         chrono::Local::now().format("%Y-%m-%d-%H%M%S")
     );
-    fs::write(bin.join(name), contents).map_err(|e| e.to_string())
+    write_atomic(&bin.join(name), &contents)
 }
 
 #[tauri::command]
