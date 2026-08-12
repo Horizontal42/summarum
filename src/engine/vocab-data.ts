@@ -169,11 +169,13 @@ export const EN: VocabLocale = {
     "KES.format": "%@ KSh",
     "KES.variants": "Kenyan Shillings,Kenyan Shilling,KSh",
     "KGS.format": "%@ sом",
-    "KGS.variants": "Kyrgyzstani Soms,Kyrgyzstani Som,Soms,Som,sом",
+    // bare "Som"/"Soms" dropped — UZS (larger economy) owns it; say "Kyrgyzstani Som" for KGS
+    "KGS.variants": "Kyrgyzstani Soms,Kyrgyzstani Som,sом",
     "KHR.format": "%@ R.",
     "KHR.variants": "Cambodian Riel,Riel,៛,Cambodian Riels,Riels",
     "KMF.format": "%@ FC",
-    "KMF.variants": "Comorian Francs,Comorian Franc,FC",
+    // bare "FC" dropped — CDF (Congolese franc, registered first) owns it; say "Comorian Franc" for KMF
+    "KMF.variants": "Comorian Francs,Comorian Franc",
     "KPW.format": "￦ %@",
     "KPW.variants": "North Korean won",
     "KRW.format": "￦ %@",
@@ -221,7 +223,8 @@ export const EN: VocabLocale = {
     "MVR.format": "Rf %@",
     "MVR.variants": "Maldivian Rufiyaa,Rufiyaa,Rf",
     "MWK.format": "%@ MK",
-    "MWK.variants": "Malawian Kwacha,Kwacha",
+    // bare "Kwacha" dropped — ZMW (larger economy) owns it; say "Malawian Kwacha" for MWK
+    "MWK.variants": "Malawian Kwacha",
     "MXN.format": "$ %@",
     "MXN.variants": "Mexican Peso,Mexican Pesos",
     "MYR.format": "RM %@",
@@ -301,7 +304,8 @@ export const EN: VocabLocale = {
     "TJS.format": "%@ TJS",
     "TJS.variants": "Tajikistani Somoni,Somoni",
     "TMT.format": "%@ TMT",
-    "TMT.variants": "Turkmenistan Manat,Manat",
+    // bare "Manat" dropped — AZN (registered first) owns it; say "Turkmenistan Manat" for TMT
+    "TMT.variants": "Turkmenistan Manat",
     "TND.format": "%@ TD",
     "TND.variants": "Tunisian Dinar,Tunisian Dinars,د.ت,TD",
     "TOP.format": "T$ %@",
@@ -733,7 +737,8 @@ export const RU: VocabLocale = {
     "MUR.variants": "Маврикийская рупия,Маврикийских рупий,Маврикийских рупиях",
     "MVR.format": "%@ Rf",
     "MVR.variants": "Мальдивская руфия,Руфия,Руфий,Руфиях",
-    "MWK.variants": "Малавийская квача,Малавийских квач,Малавийских квачах,Квача,Квачах",
+    // bare "Квача"/"Квачах" dropped — ZMW (larger economy) owns them; the fuller phrases stay unambiguous
+    "MWK.variants": "Малавийская квача,Малавийских квач,Малавийских квачах",
     "MXN.format": "%@ $",
     "MXN.variants": "Мексиканских песо,Мексиканское песо",
     "MYR.format": "%@ RM",
@@ -793,7 +798,8 @@ export const RU: VocabLocale = {
     "THB.variants": "Тайский бат,Бат,Батов,Батах",
     "TJS.format": "%@ смн.",
     "TJS.variants": "Таджикский сомони,Сомони",
-    "TMT.variants": "Туркменский манат,Новый туркменский манат,Манат,Манатов,Туркменских манатов,Маната,Туркменских маната",
+    // bare "Манат" dropped — AZN owns it; the fuller phrases below stay unambiguous
+    "TMT.variants": "Туркменский манат,Новый туркменский манат,Манатов,Туркменских манатов,Маната,Туркменских маната",
     "TND.variants": "Тунисские Динары,Тунисский Динар,Тунисских Динаров,Тунисских Динарах",
     "TOP.format": "%@ T$",
     "TOP.variants": "Тонганская паанга,Паанга,Паангах",

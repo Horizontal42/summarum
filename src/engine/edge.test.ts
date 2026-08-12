@@ -302,4 +302,24 @@ describe("regression 2026-08-12", () => {
     const r2 = eng.evaluateDocument("10\n20\n5\nmax").map((x) => x.text);
     expect(r2).toEqual(["10", "20", "5", "20"]);
   });
+
+  function unitIdOf(expr: string): string | null {
+    const v = eng.evaluateDocument(expr)[0].value;
+    return v?.kind === "quantity" ? v.unit?.id ?? null : null;
+  }
+  it("ambiguous currency aliases resolve to one deliberate currency; the other needs its full name", () => {
+    expect(unitIdOf("100 Manat")).toBe("AZN");
+    expect(unitIdOf("100 Turkmenistan Manat")).toBe("TMT");
+    expect(unitIdOf("100 манат")).toBe("AZN");
+    expect(unitIdOf("100 туркменский манат")).toBe("TMT");
+    expect(unitIdOf("100 FC")).toBe("CDF");
+    expect(unitIdOf("100 Comorian Franc")).toBe("KMF");
+    // "Som"/"Kwacha" go to the larger economy (UZS/ZMW); the smaller one needs its full name
+    expect(unitIdOf("100 Som")).toBe("UZS");
+    expect(unitIdOf("100 Kyrgyzstani Som")).toBe("KGS");
+    expect(unitIdOf("100 Kwacha")).toBe("ZMW");
+    expect(unitIdOf("100 Malawian Kwacha")).toBe("MWK");
+    expect(unitIdOf("100 квача")).toBe("ZMW");
+    expect(unitIdOf("100 малавийская квача")).toBe("MWK");
+  });
 });
