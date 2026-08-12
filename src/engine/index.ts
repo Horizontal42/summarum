@@ -218,6 +218,7 @@ export class SumEngine {
   addUnit(spec: ExtensionUnitSpec): void {
     const base = this.reg.unitsById.get(spec.baseUnitId) ?? this.currencyBase(spec.baseUnitId);
     if (!base) throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
+    if (this.reg.unitsById.has(spec.id)) throw new Error(`numi.addUnit: id "${spec.id}" is already registered`);
     const unit: Unit = {
       id: spec.id,
       dimension: base.dimension,

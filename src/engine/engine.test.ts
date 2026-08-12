@@ -335,6 +335,13 @@ describe("extension API", () => {
     eng.addUnit({ id: "horse", phrases: "horse, horses, hrs", baseUnitId: "meter", format: "hrs", ratio: 2.4 });
     expect(calc("2 horses in meters")).toBe("4.8 m");
   });
+  it("addUnit throws on id collision instead of silently corrupting unitsById", () => {
+    expect(() =>
+      eng.addUnit({ id: "horse", phrases: "nag", baseUnitId: "meter", format: "nag", ratio: 99 })
+    ).toThrow(/horse/);
+    // the original registration must survive the failed collision
+    expect(calc("2 horses in meters")).toBe("4.8 m");
+  });
   it("addFunction (zum from Sample.js)", () => {
     eng.addFunction({ id: "zum", phrases: "zum" }, (values) => ({ double: values[0].double + values[1].double }));
     expect(calc("zum(2;3)")).toBe("5");
