@@ -92,14 +92,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           prev=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+          # release-checklist version bumps (bump version to X / bump cargo
+          # version to X / update tauri.conf version to X / sync Cargo.lock
+          # or package-lock.json with X) are internal bookkeeping, not
+          # user-facing changes — never worth a changelog line.
+          noise='^- (bump( cargo)? version to|update tauri\.conf version to|sync (Cargo\.lock|package-lock\.json) with) [0-9]+\.[0-9]+\.[0-9]+$'
+          filter() { grep -vE "$noise" | sed -E 's/ \(#[0-9]+\)$//'; }
           {
             echo "## What's new"
             if [ -n "$prev" ]; then
-              git log "$prev..${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | grep -v "^- bump version"
+              git log "$prev..${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | filter
               echo ""
               echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$prev...${{ github.ref_name }}"
             else
-              git log "${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | grep -v "^- bump version"
+              git log "${{ github.ref_name }}" --pretty=format:"- %s" --no-merges | filter
             fi
           } > notes.md
           gh release edit "${{ github.ref_name }}" --notes-file notes.md --draft=false
