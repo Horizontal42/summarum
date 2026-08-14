@@ -97,7 +97,11 @@ jobs:
           # or package-lock.json with X) are internal bookkeeping, not
           # user-facing changes — never worth a changelog line.
           noise='^- (bump( cargo)? version to|update tauri\.conf version to|sync (Cargo\.lock|package-lock\.json) with) [0-9]+\.[0-9]+\.[0-9]+$'
-          filter() { grep -vE "$noise" | sed -E 's/ \(#[0-9]+\)$//'; }
+          filter() {
+            grep -vE "$noise" \
+              | sed -E 's/ \(#[0-9]+\)$//' \
+              | perl -CSD -pe 's/^- \p{Emoji_Presentation}\x{FE0F}?\s*/- /'
+          }
           {
             echo "## What's new"
             if [ -n "$prev" ]; then
