@@ -68,9 +68,15 @@ jobs:
       # signing — there is no Apple certificate, so macOS builds are only
       # ad-hoc signed (bundle.macOS.signingIdentity "-") and Gatekeeper still
       # asks the user to allow them on first launch.
+      #
+      # RELEASE_TOKEN (fine-grained PAT, Contents: read/write) stands in for
+      # the built-in GITHUB_TOKEN: the Actions-native token started getting
+      # "Resource not accessible by integration" on release creation for this
+      # repo — confirmed not a permissions:/repo-settings/tag-protection issue,
+      # a personal token hits the same Releases API fine.
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
@@ -89,7 +95,7 @@ jobs:
           fetch-depth: 0
 
       - env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           prev=$(git tag --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -1)
           # release-checklist version bumps (bump version to X / bump cargo
