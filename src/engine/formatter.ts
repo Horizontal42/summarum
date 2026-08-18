@@ -74,6 +74,9 @@ export function formatValue(v: Value, s: EngineSettings): string {
 
   // quantity
   if (v.repr === "hex" || v.repr === "binary" || v.repr === "octal") {
+    if (v.value.abs().gte(new Decimal("1e10000"))) {
+      return formatNumber(v.value, s);
+    }
     const int = v.value.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
     const neg = int.isNegative();
     const abs = int.abs();
