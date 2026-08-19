@@ -424,12 +424,13 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     for (const p of probes) {
       const pDec = new Decimal(p);
       const fp = safeEval(pDec);
-      if (fp !== null) {
-        if (flo === null) { lo = pDec; flo = fp; }
-        else if (flo.mul(fp).lte(0)) { hi = pDec; fhi = fp; found = true; break; }
-        else if (fhi === null) { hi = pDec; fhi = fp; }
-        else if (fhi.mul(fp).lte(0)) { lo = pDec; flo = fp; found = true; break; }
-      }
+      if (fp === null) continue;
+      if (flo === null) { lo = pDec; flo = fp; }
+      else if (fhi === null) { hi = pDec; fhi = fp; }
+      else if (flo.mul(fp).lte(0)) { hi = pDec; fhi = fp; }
+      else if (fhi.mul(fp).lte(0)) { lo = pDec; flo = fp; }
+      else continue;
+      if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) { found = true; break; }
     }
     if (!found) throw new EvalError("no solution");
   }

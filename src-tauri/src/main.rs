@@ -320,6 +320,24 @@ async fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
     serde_json::from_str(&raw).ok()
 }
 
+const RATES_RESPONSE_LIMIT: usize = 5 * 1024 * 1024;
+
+/// Reads the body as a stream and aborts as soon as it exceeds `limit`,
+/// instead of buffering an unbounded body in memory before checking its size.
+async fn read_body_capped(resp: reqwest::Response, limit: usize) -> Result<Vec<u8>, String> {
+    use futures::StreamExt;
+    let mut stream = resp.bytes_stream();
+    let mut buf = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        buf.extend_from_slice(&chunk);
+        if buf.len() > limit {
+            return Err("response too large".into());
+        }
+    }
+    Ok(buf)
+}
+
 async fn fetch_rates_online() -> Result<RatesPayload, String> {
     let client = HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
@@ -334,10 +352,7 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-    if bytes.len() > 5 * 1024 * 1024 {
-        return Err("rates api response too large".into());
-    }
+    let bytes = read_body_capped(resp, RATES_RESPONSE_LIMIT).await?;
     let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
 
     if body["result"] != "success" {
@@ -352,14 +367,12 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
         ids.join(",")
     );
     if let Ok(resp) = client.get(&url).send().await {
-        if let Ok(bytes) = resp.bytes().await {
-            if bytes.len() <= 5 * 1024 * 1024 {
-                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                    for (code, id) in CRYPTO {
-                        if let Some(price) = json[id]["usd"].as_f64() {
-                            if price > 0.0 {
-                                rates.insert((*code).into(), serde_json::json!(1.0 / price));
-                            }
+        if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT).await {
+            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                for (code, id) in CRYPTO {
+                    if let Some(price) = json[id]["usd"].as_f64() {
+                        if price > 0.0 {
+                            rates.insert((*code).into(), serde_json::json!(1.0 / price));
                         }
                     }
                 }
@@ -557,11 +570,8 @@ async fn fetch_historical_rates(
         .send()
         .await
         .map_err(|e| e.to_string())?;
-        
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-    if bytes.len() > 5 * 1024 * 1024 {
-        return Err("rates api response too large".into());
-    }
+
+    let bytes = read_body_capped(resp, RATES_RESPONSE_LIMIT).await?;
     let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     let rates = parse_rate_map(body["rates"].as_object().ok_or("no rates in response")?);
     if let Ok(serialized) = serde_json::to_string(&rates) {
@@ -614,17 +624,15 @@ async fn fetch_historical_rates_batch(
         futures.push(async move {
             let mut rate_map = None;
             if let Ok(resp) = client_clone.get(&url).send().await {
-                if let Ok(bytes) = resp.bytes().await {
-                    if bytes.len() <= 5 * 1024 * 1024 {
-                        if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                            if let Some(rates_obj) = body["rates"].as_object() {
-                                let daily_rates = parse_rate_map(rates_obj);
-                                let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
-                                if let Ok(serialized) = serde_json::to_string(&daily_rates) {
-                                    write_atomic_async(cache_path, serialized).await;
-                                }
-                                rate_map = Some((date, daily_rates));
+                if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT).await {
+                    if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        if let Some(rates_obj) = body["rates"].as_object() {
+                            let daily_rates = parse_rate_map(rates_obj);
+                            let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
+                            if let Ok(serialized) = serde_json::to_string(&daily_rates) {
+                                write_atomic_async(cache_path, serialized).await;
                             }
+                            rate_map = Some((date, daily_rates));
                         }
                     }
                 }
