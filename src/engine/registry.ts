@@ -178,29 +178,29 @@ function registerCoreVocab(reg: Registry): void {
     ["minus", { t: "op", op: "minus" }],
     ["multiply", { t: "op", op: "mul" }],
     ["divide", { t: "op", op: "div" }],
+    ["conversion", { t: "conv" }],
+    ["assignment", { t: "assign" }],
+    ["sum", { t: "agg", name: "sum" }],
+    ["avg", { t: "agg", name: "avg" }],
+    ["prev", { t: "agg", name: "prev" }],
+    ["count", { t: "agg", name: "count" }],
+    ["min", { t: "agg", name: "min" }],
+    ["max", { t: "agg", name: "max" }],
+    ["product", { t: "agg", name: "product" }],
+    ["chart", { t: "agg", name: "chart" }],
+    ["sqrt", { t: "func", name: "sqrt" }],
+    ["cbrt", { t: "func", name: "cbrt" }],
+    ["abs", { t: "func", name: "abs" }],
+    ["ln", { t: "func", name: "ln" }],
+    ["log", { t: "func", name: "log" }],
+    ["round", { t: "func", name: "round" }],
+    ["random", { t: "func", name: "random" }],
+    ["until", { t: "func", name: "until" }],
+    ["since", { t: "func", name: "since" }],
   ];
   for (const [key, payload] of ops) {
     for (const v of vocab.variants("Operations", `${key}.variants`)) reg.addPhrase(v, payload, { caseSensitive: false });
   }
-  for (const v of vocab.variants("Operations", "conversion.variants")) reg.addPhrase(v, { t: "conv" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "assignment.variants")) reg.addPhrase(v, { t: "assign" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "sum.variants")) reg.addPhrase(v, { t: "agg", name: "sum" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "avg.variants")) reg.addPhrase(v, { t: "agg", name: "avg" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "prev.variants")) reg.addPhrase(v, { t: "agg", name: "prev" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "count.variants")) reg.addPhrase(v, { t: "agg", name: "count" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "min.variants")) reg.addPhrase(v, { t: "agg", name: "min" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "max.variants")) reg.addPhrase(v, { t: "agg", name: "max" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "product.variants")) reg.addPhrase(v, { t: "agg", name: "product" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "chart.variants")) reg.addPhrase(v, { t: "agg", name: "chart" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "sqrt.variants")) reg.addPhrase(v, { t: "func", name: "sqrt" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "cbrt.variants")) reg.addPhrase(v, { t: "func", name: "cbrt" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "abs.variants")) reg.addPhrase(v, { t: "func", name: "abs" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "ln.variants")) reg.addPhrase(v, { t: "func", name: "ln" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "log.variants")) reg.addPhrase(v, { t: "func", name: "log" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "round.variants")) reg.addPhrase(v, { t: "func", name: "round" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "random.variants")) reg.addPhrase(v, { t: "func", name: "random" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "until.variants")) reg.addPhrase(v, { t: "func", name: "until" }, { caseSensitive: false });
-  for (const v of vocab.variants("Operations", "since.variants")) reg.addPhrase(v, { t: "func", name: "since" }, { caseSensitive: false });
   reg.addPhrase("mod", { t: "op", op: "mod" }, { caseSensitive: false });
   reg.addPhrase("modulo", { t: "op", op: "mod" }, { caseSensitive: false });
 
