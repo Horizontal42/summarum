@@ -50,10 +50,10 @@ fn canon_or_raw(p: &Path) -> PathBuf {
     for component in p.components() {
         match component {
             std::path::Component::ParentDir => {
-                let can_pop = match normalized.components().last() {
-                    Some(std::path::Component::Normal(_)) => true,
-                    _ => false,
-                };
+                let can_pop = matches!(
+                    normalized.components().next_back(),
+                    Some(std::path::Component::Normal(_))
+                );
                 if can_pop {
                     normalized.pop();
                 } else if !normalized.has_root() {
