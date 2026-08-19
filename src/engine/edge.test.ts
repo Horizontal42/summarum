@@ -13,6 +13,10 @@ function calc(expr: string): string | null {
   return r[r.length - 1].text;
 }
 
+function evaluateText(doc: string): (string | null)[] {
+  return eng.evaluateDocument(doc).map((x) => x.text);
+}
+
 describe("edge cases", () => {
   it("russian mixed sentence", () => {
     expect(calc("потратил 20$ и ещё 5$")).toBe("$25");
@@ -45,11 +49,11 @@ describe("edge cases", () => {
     expect(calc("hello world")).toBe(null);
   });
   it("sum stops at header", () => {
-    const r = eng.evaluateDocument("5\n# section\n10\n20\nsum").map((x) => x.text);
+    const r = evaluateText("5\n# section\n10\n20\nsum");
     expect(r).toEqual(["5", null, "10", "20", "30"]);
   });
   it("variables with units survive math", () => {
-    const r = eng.evaluateDocument("rent = $500\nfood = $200\nrent + food").map((x) => x.text);
+    const r = evaluateText("rent = $500\nfood = $200\nrent + food");
     expect(r).toEqual(["$500", "$200", "$700"]);
   });
   it("big numbers with grouping", () => {
@@ -145,7 +149,7 @@ describe("crypto", () => {
 
 describe("regressions", () => {
   it("a broken line does not kill the document (BigInt from NaN)", () => {
-    const r = eng.evaluateDocument("2+2\nasin(5) & 3\n3+3").map((x) => x.text);
+    const r = evaluateText("2+2\nasin(5) & 3\n3+3");
     expect(r).toEqual(["4", null, "6"]);
   });
   it("non-finite results are suppressed", () => {
@@ -178,8 +182,8 @@ describe("regressions", () => {
     expect(calc("1,234 + 0")).toBe("1,234"); // exactly 3 digits = thousands
   });
   it("single-letter unit names can be variables", () => {
-    expect(eng.evaluateDocument("m = 5\nm * 2").map((x) => x.text)).toEqual(["5", "10"]);
-    expect(eng.evaluateDocument("t = 100\nt + 20%").map((x) => x.text)).toEqual(["100", "120"]);
+    expect(evaluateText("m = 5\nm * 2")).toEqual(["5", "10"]);
+    expect(evaluateText("t = 100\nt + 20%")).toEqual(["100", "120"]);
   });
   it("tiny conversion results show significant digits, not 0", () => {
     expect(calc("1 mm in km")).toBe("0.000001 km");
@@ -199,7 +203,7 @@ describe("regressions", () => {
     expect(calc("4 ^ 50%")).toBe("2");
   });
   it("avg skips incompatible lines in the denominator", () => {
-    expect(eng.evaluateDocument("10 kg\n20 kg\n5 hours\navg").map((x) => x.text)).toEqual(["10 kg", "20 kg", "5 h", "15 kg"]);
+    expect(evaluateText("10 kg\n20 kg\n5 hours\navg")).toEqual(["10 kg", "20 kg", "5 h", "15 kg"]);
   });
   it("calendar month add clamps to month end", () => {
     const doc = eng.evaluateDocument("today + 1 month");
@@ -286,7 +290,7 @@ describe("review fixes", () => {
 describe("regression 2026-08-12", () => {
   it("a deeply nested-parens line nulls out just that line, not the whole document", () => {
     const deep = "(".repeat(50000) + "1" + ")".repeat(50000);
-    const r = eng.evaluateDocument(`1+1\n${deep}\n2+2`).map((x) => x.text);
+    const r = evaluateText(`1+1\n${deep}\n2+2`);
     expect(r[0]).toBe("2");
     expect(r[1]).toBeNull();
     expect(r[2]).toBe("4");
@@ -297,9 +301,9 @@ describe("regression 2026-08-12", () => {
     expect(calc("5 мин")).toBe("5 min");
   });
   it("standalone 'min'/'max' aggregate lines still work", () => {
-    const r = eng.evaluateDocument("10\n20\n5\nmin").map((x) => x.text);
+    const r = evaluateText("10\n20\n5\nmin");
     expect(r).toEqual(["10", "20", "5", "5"]);
-    const r2 = eng.evaluateDocument("10\n20\n5\nmax").map((x) => x.text);
+    const r2 = evaluateText("10\n20\n5\nmax");
     expect(r2).toEqual(["10", "20", "5", "20"]);
   });
 
