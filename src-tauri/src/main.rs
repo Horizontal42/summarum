@@ -565,11 +565,7 @@ async fn fetch_historical_rates(
     // api.frankfurter.app 301-redirects here now, and the old domain is
     // flaky over reqwest/rustls-tls — go straight to the stable host
     let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
 
     let bytes = read_body_capped(resp, RATES_RESPONSE_LIMIT).await?;
     let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
@@ -628,7 +624,8 @@ async fn fetch_historical_rates_batch(
                     if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
                         if let Some(rates_obj) = body["rates"].as_object() {
                             let daily_rates = parse_rate_map(rates_obj);
-                            let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
+                            let cache_path =
+                                data_dir(&app_clone).join(format!("rates-{}.json", date));
                             if let Ok(serialized) = serde_json::to_string(&daily_rates) {
                                 write_atomic_async(cache_path, serialized).await;
                             }
