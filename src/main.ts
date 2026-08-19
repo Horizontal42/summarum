@@ -46,8 +46,12 @@ function uid(): string {
 
 // ---------- documents
 
+function getDocById(id: string | undefined): DocMeta | undefined {
+  return data.docs.find((d) => d.id === id);
+}
+
 function activeDoc(): DocMeta {
-  return data.docs.find((d) => d.id === data.activeId) ?? data.docs[0];
+  return getDocById(data.activeId) ?? data.docs[0];
 }
 
 function titleFromContent(text: string): string {
@@ -68,7 +72,7 @@ function syncTitleField(): void {
 }
 
 function pinDoc(id: string): void {
-  const doc = data.docs.find((d) => d.id === id);
+  const doc = getDocById(id);
   if (!doc) return;
   doc.pinned = !doc.pinned;
   if (doc.pinned) {
@@ -90,8 +94,8 @@ function pinDoc(id: string): void {
 /** drag id -> drop-target id; no-op across the pinned/unpinned boundary */
 function reorderDoc(srcId: string, targetId: string): void {
   if (srcId === targetId) return;
-  const src = data.docs.find((d) => d.id === srcId);
-  const target = data.docs.find((d) => d.id === targetId);
+  const src = getDocById(srcId);
+  const target = getDocById(targetId);
   if (!src || !target || !!src.pinned !== !!target.pinned) return;
   data.docs = data.docs.filter((d) => d.id !== srcId);
   const targetIdx = data.docs.findIndex((d) => d.id === targetId);
@@ -100,7 +104,7 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
-function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, data: AppData): void {
+function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): void {
   // Reordering uses plain mouse tracking, not the native HTML5 drag API —
   // Tauri's window-level file-drop hook (dragDropEnabled, needed for
   // dropping .numi files from Explorer) intercepts WebView2's own drag
@@ -137,7 +141,7 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement, d
         }
       }
       if (over) {
-        const overDoc = data.docs.find((d) => d.id === over.dataset.docId);
+        const overDoc = getDocById(over.dataset.docId);
         if (overDoc && !!overDoc.pinned === !!doc.pinned) over.classList.add("drag-over");
       }
     };
@@ -217,7 +221,7 @@ function renderDocList(): void {
 
     el.appendChild(mkBtn("pin-btn" + (doc.pinned ? " active" : ""), "📌", doc.pinned ? t("unpin") : t("pin"), () => pinDoc(doc.id)));
 
-    setupDocInteraction(el, doc, list, data);
+    setupDocInteraction(el, doc, list);
     el.dataset.docId = doc.id;
 
     el.appendChild(createDeleteButton(doc, data, settings));
@@ -246,7 +250,7 @@ function newDoc(content = ""): void {
 
 async function closeActiveDoc(): Promise<void> {
   if (data.docs.length <= 1) return;
-  const doc = data.docs.find((d) => d.id === data.activeId);
+  const doc = getDocById(data.activeId);
   if (!doc) return;
   const content = data.contents[doc.id] ?? "";
   if (content.trim()) {
