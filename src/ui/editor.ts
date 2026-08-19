@@ -170,6 +170,7 @@ export class SumEditor {
     this.resultsEl = resultsEl;
 
     let engineOptions: { label: string; type: string; detail?: string }[] | null = null;
+    const varPattern = /^\s*([\p{L}_][\p{L}\d_]*)\s*=/u;
     const completionSource = (ctx: CompletionContext): CompletionResult | null => {
       const word = ctx.matchBefore(/[\p{L}_]+$/u);
       if (!word || (word.from === word.to && !ctx.explicit)) return null;
@@ -182,9 +183,15 @@ export class SumEditor {
       }));
       const options = [...engineOptions];
       // document variables
-      const text = ctx.state.doc.toString();
-      for (const m of text.matchAll(/^\s*([\p{L}_][\p{L}\d_]*)\s*=/gmu)) {
-        options.push({ label: m[1], type: "variable" });
+      const iter = ctx.state.doc.iterLines();
+      for (let next = iter.next(); !next.done; next = iter.next()) {
+        const line = next.value;
+        if (line.includes("=")) {
+          const m = varPattern.exec(line);
+          if (m) {
+            options.push({ label: m[1], type: "variable" });
+          }
+        }
       }
       return { from: word.from, options, validFor: /^[\p{L}_]*$/u };
     };
