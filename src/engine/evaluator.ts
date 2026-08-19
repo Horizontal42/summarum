@@ -1,6 +1,6 @@
 // Walks the AST with the document context (variables, line results for
 // sum/avg/prev) and produces unit-aware values.
-import { Decimal, EvalError, PI, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
+import { Decimal, DEC_ZERO, DEC_ONE, EvalError, PI, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
 import { Node, ConvTarget } from "./parser";
 import { Registry } from "./registry";
 import { resolveZone, startOfToday, addToDate, isCalendarUnit } from "./datetime";
@@ -148,10 +148,10 @@ function evalPercentArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", 
   const q = (l.kind === "quantity" ? l : r) as Quantity;
   const p = (l.kind === "percent" ? l : r as { kind: "percent"; value: Decimal }).value;
   switch (op) {
-    case "plus": return qty(q.value.mul(new Decimal(1).add(p.div(100))), q.unit);
+    case "plus": return qty(q.value.mul(DEC_ONE.add(p.div(100))), q.unit);
     case "minus":
       if (l.kind === "percent") throw new EvalError("percent minus number");
-      return qty(q.value.mul(new Decimal(1).sub(p.div(100))), q.unit);
+      return qty(q.value.mul(DEC_ONE.sub(p.div(100))), q.unit);
     case "mul": return qty(q.value.mul(p).div(100), q.unit);
     case "div":
       if (l.kind === "percent") throw new EvalError("percent div number");
@@ -257,8 +257,8 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
     const p = asPercentValue(l);
     const factor =
       op === "of" ? p.div(100)
-      : op === "off" ? new Decimal(1).sub(p.div(100))
-      : new Decimal(1).add(p.div(100));
+      : op === "off" ? DEC_ONE.sub(p.div(100))
+      : DEC_ONE.add(p.div(100));
     // a percent of a percent stays a percent: 50% of 50% = 25%
     if (r.kind === "percent") return pct(r.value.mul(factor));
     return qty(rv.mul(factor), unit);
@@ -268,7 +268,7 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
     if (rv.isZero()) throw new EvalError("division by zero");
     switch (op) {
       case "as_pct_of": return pct(lv.div(rv).mul(100));
-      case "as_pct_off": return pct(new Decimal(1).sub(lv.div(rv)).mul(100));
+      case "as_pct_off": return pct(DEC_ONE.sub(lv.div(rv)).mul(100));
       case "as_pct_on": return pct(lv.div(rv).sub(1).mul(100));
     }
   }
@@ -277,11 +277,11 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
   switch (op) {
     case "of_what_is": return qty(rv.div(p.div(100)), unit);
     case "off_what_is": {
-      const d = new Decimal(1).sub(p.div(100));
+      const d = DEC_ONE.sub(p.div(100));
       if (d.isZero()) throw new EvalError("division by zero");
       return qty(rv.div(d), unit);
     }
-    case "on_what_is": return qty(rv.div(new Decimal(1).add(p.div(100))), unit);
+    case "on_what_is": return qty(rv.div(DEC_ONE.add(p.div(100))), unit);
   }
   throw new EvalError(`bad percent op ${op}`);
 }
@@ -392,7 +392,7 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     const innerCtx: EvalCtx = { ...ctx, vars };
     const lv = evaluate(lhsNode, innerCtx);
     const rv = evaluate(rhsNode, innerCtx);
-    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : new Decimal(0);
+    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : DEC_ZERO;
     return toD(lv).minus(toD(rv));
   };
 
@@ -400,8 +400,8 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     try { return evalF(x); } catch { return null; }
   };
 
-  const f0 = safeEval(new Decimal(0));
-  const f1 = safeEval(new Decimal(1));
+  const f0 = safeEval(DEC_ZERO);
+  const f1 = safeEval(DEC_ONE);
 
   if (f0 !== null && f1 !== null) {
     const slope = f1.minus(f0);
@@ -483,7 +483,7 @@ const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
   },
   min: (block) => filterSameDimension(block).reduce((best, q) => toBase(q).lt(toBase(best)) ? q : best),
   max: (block) => filterSameDimension(block).reduce((best, q) => toBase(q).gt(toBase(best)) ? q : best),
-  product: (block) => qty(block.reduce((acc, q) => acc.mul(q.value), new Decimal(1))),
+  product: (block) => qty(block.reduce((acc, q) => acc.mul(q.value), DEC_ONE)),
   sum: (block) => reduceCompatible(block).acc,
   avg: (block) => {
     const { acc, counted } = reduceCompatible(block);
@@ -554,7 +554,7 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
     case "sin": return qty(Decimal.sin(angleArg()));
     case "cos": return qty(Decimal.cos(angleArg()));
     case "tan": return qty(Decimal.tan(angleArg()));
-    case "cot": return qty(new Decimal(1).div(Decimal.tan(angleArg())));
+    case "cot": return qty(DEC_ONE.div(Decimal.tan(angleArg())));
     case "asin": case "arcsin": return qty(Decimal.asin(n()));
     case "acos": case "arccos": return qty(Decimal.acos(n()));
     case "atan": case "arctan": return qty(Decimal.atan(n()));
@@ -613,7 +613,7 @@ function mulberry32(seed: number): number {
 
 function factorial(n: Decimal): Decimal {
   if (!n.isInteger() || n.isNegative() || n.gt(300)) throw new EvalError("bad factorial");
-  let acc = new Decimal(1);
+  let acc = DEC_ONE;
   for (let i = 2; i <= n.toNumber(); i++) acc = acc.mul(i);
   return acc;
 }
