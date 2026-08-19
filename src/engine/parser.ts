@@ -62,6 +62,18 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
     }
   }
 
+  const filtered = filterNoiseTokens(toks, knownVars);
+
+  const goalSeek = tryParseGoalSeek(filtered, knownVars);
+  if (goalSeek) {
+    return { expr: goalSeek };
+  }
+
+  const p = new Parser(filtered, knownVars);
+  return { assign, expr: p.parseSeq() };
+}
+
+function filterNoiseTokens(toks: Token[], knownVars: Set<string>): Token[] {
   // Noise filtering: drop junk and unknown words, but keep words that follow
   // a conversion operator (potential timezone names).
   const filtered: Token[] = [];
@@ -81,7 +93,10 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
     afterConv = tk.t === "conv";
     filtered.push(tk);
   }
+  return filtered;
+}
 
+function tryParseGoalSeek(filtered: Token[], knownVars: Set<string>): Node | null {
   // Goal seek: `? * 1.2 = 1000` → find x where lhs(x) = rhs(x)
   const hasUnknown = filtered.some((tk) => tk.t === "unknown");
   if (hasUnknown) {
@@ -89,12 +104,10 @@ export function parseLine(tokens: Token[], knownVars: Set<string>, line: string)
     if (assignIdx >= 0) {
       const lhs = new Parser(filtered.slice(0, assignIdx), knownVars).parseSeq();
       const rhs = new Parser(filtered.slice(assignIdx + 1), knownVars).parseSeq();
-      if (lhs && rhs) return { expr: { k: "goalseek", lhs, rhs } };
+      if (lhs && rhs) return { k: "goalseek", lhs, rhs };
     }
   }
-
-  const p = new Parser(filtered, knownVars);
-  return { assign, expr: p.parseSeq() };
+  return null;
 }
 
 
