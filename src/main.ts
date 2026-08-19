@@ -67,19 +67,23 @@ function syncTitleField(): void {
   if (document.activeElement !== field) field.value = activeDoc()?.title ?? "";
 }
 
+function removeDocById(id: string): void {
+  data.docs = data.docs.filter((d) => d.id !== id);
+}
+
 function pinDoc(id: string): void {
   const doc = data.docs.find((d) => d.id === id);
   if (!doc) return;
   doc.pinned = !doc.pinned;
   if (doc.pinned) {
     // move to end of pinned group
-    data.docs = data.docs.filter((d) => d.id !== id);
+    removeDocById(id);
     let lastPinned = -1;
     for (let i = data.docs.length - 1; i >= 0; i--) { if (data.docs[i].pinned) { lastPinned = i; break; } }
     data.docs.splice(lastPinned + 1, 0, doc);
   } else {
     // move to start of non-pinned group
-    data.docs = data.docs.filter((d) => d.id !== id);
+    removeDocById(id);
     const firstNonPinned = data.docs.findIndex((d) => !d.pinned);
     data.docs.splice(firstNonPinned === -1 ? data.docs.length : firstNonPinned, 0, doc);
   }
@@ -93,7 +97,7 @@ function reorderDoc(srcId: string, targetId: string): void {
   const src = data.docs.find((d) => d.id === srcId);
   const target = data.docs.find((d) => d.id === targetId);
   if (!src || !target || !!src.pinned !== !!target.pinned) return;
-  data.docs = data.docs.filter((d) => d.id !== srcId);
+  removeDocById(srcId);
   const targetIdx = data.docs.findIndex((d) => d.id === targetId);
   data.docs.splice(targetIdx, 0, src);
   saveAppData(data);
@@ -195,7 +199,7 @@ function createDeleteButton(doc: DocMeta, appData: AppData, appSettings: Setting
     if (confirmTimer) clearTimeout(confirmTimer);
     void backupDeletedSheet(appSettings.dataDir, doc.title, appData.contents[doc.id] ?? "");
     delete appData.contents[doc.id];
-    appData.docs = appData.docs.filter((d) => d.id !== doc.id);
+    removeDocById(doc.id);
     if (appData.activeId === doc.id) switchDoc(appData.docs[0].id);
     else renderDocList();
     saveAppData(appData);
@@ -256,7 +260,7 @@ async function closeActiveDoc(): Promise<void> {
   const idx = data.docs.findIndex((d) => d.id === doc.id);
   void backupDeletedSheet(settings.dataDir, doc.title, content);
   delete data.contents[doc.id];
-  data.docs = data.docs.filter((d) => d.id !== doc.id);
+  removeDocById(doc.id);
   const nextId = data.docs[idx] ? data.docs[idx].id : data.docs[idx - 1]?.id ?? data.docs[0].id;
   switchDoc(nextId);
   saveAppData(data);
