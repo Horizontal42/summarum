@@ -30,9 +30,13 @@ export interface SearchController {
   open(): void;
 }
 
-const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
+const $ = <T extends HTMLElement>(sel: string): T =>
+  document.querySelector(sel) as T;
 
-export function parseResultQuery(engine: SumEngine, q: string): { op: string; threshold: Value } | null {
+export function parseResultQuery(
+  engine: SumEngine,
+  q: string,
+): { op: string; threshold: Value } | null {
   const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
   if (!m) return null;
   const v = engine.evaluateExpression(m[2].trim());
@@ -57,30 +61,73 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
         const v = r.value.value;
         let match = false;
         switch (rq.op) {
-          case ">":  match = v.gt(th); break;
-          case ">=": match = v.gte(th); break;
-          case "<":  match = v.lt(th); break;
-          case "<=": match = v.lte(th); break;
-          case "=":  match = v.eq(th); break;
-          case "~":  match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01); break;
+          case ">":
+            match = v.gt(th);
+            break;
+          case ">=":
+            match = v.gte(th);
+            break;
+          case "<":
+            match = v.lt(th);
+            break;
+          case "<=":
+            match = v.lte(th);
+            break;
+          case "=":
+            match = v.eq(th);
+            break;
+          case "~":
+            match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01);
+            break;
         }
         if (match) {
-          hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] ?? "", result: r.text ?? undefined });
+          hits.push({
+            docId: doc.id,
+            docTitle: doc.title,
+            line: i + 1,
+            text: lines[i] ?? "",
+            result: r.text ?? undefined,
+          });
           if (hits.length >= 200) return hits;
         }
       }
     }
     return hits;
   }
-  const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
+  const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(escapedQ, "ig");
+
   for (const doc of docs) {
-    const lines = doc.text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(ql)) {
-        hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
-        if (hits.length >= 200) return hits;
+    const text = doc.text;
+    let match;
+    let lastIndex = 0;
+    let lineNo = 1;
+
+    regex.lastIndex = 0;
+
+    while ((match = regex.exec(text)) !== null) {
+      let nIdx = text.indexOf("\n", lastIndex);
+      while (nIdx !== -1 && nIdx < match.index) {
+        lineNo++;
+        nIdx = text.indexOf("\n", nIdx + 1);
       }
+
+      let lineStart = text.lastIndexOf("\n", match.index);
+      lineStart = lineStart === -1 ? 0 : lineStart + 1;
+      let lineEnd = text.indexOf("\n", match.index);
+      if (lineEnd === -1) lineEnd = text.length;
+
+      hits.push({
+        docId: doc.id,
+        docTitle: doc.title,
+        line: lineNo,
+        text: text.substring(lineStart, lineEnd),
+      });
+      if (hits.length >= 200) return hits;
+
+      regex.lastIndex = lineEnd;
+      lastIndex = lineEnd;
     }
   }
   return hits;
@@ -113,7 +160,9 @@ export function initSearch(deps: SearchDeps): SearchController {
       docEl.textContent = hit.docTitle;
       const lineEl = document.createElement("div");
       lineEl.className = "line";
-      lineEl.textContent = hit.result ? `${hit.text} = ${hit.result}` : hit.text;
+      lineEl.textContent = hit.result
+        ? `${hit.text} = ${hit.result}`
+        : hit.text;
       item.append(docEl, lineEl);
       item.addEventListener("click", () => {
         deps.onOpen(hit.docId, hit.line);
