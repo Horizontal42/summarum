@@ -54,10 +54,11 @@ export class Workspace {
   invalidate(sheetId: string): void {
     this.titleCache = null;
     const dirty = new Set<string>([sheetId]);
+    const sheetsList = this.sheets();
     let changed = true;
     while (changed) {
       changed = false;
-      for (const s of this.sheets()) {
+      for (const s of sheetsList) {
         if (dirty.has(s.id)) continue;
         for (const title of this.referencedTitles(s.text, s.id)) {
           const target = this.findSheetByTitle(title);
