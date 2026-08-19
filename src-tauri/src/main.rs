@@ -198,6 +198,9 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
         })
         .collect::<Result<_, _>>()?;
     for chunk in bytes.chunks(4) {
+        if chunk.len() < 2 {
+            return Err("invalid base64 padding".into());
+        }
         let b0 = chunk[0];
         let b1 = *chunk.get(1).unwrap_or(&0);
         let b2 = *chunk.get(2).unwrap_or(&0);
@@ -213,9 +216,12 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+static TMP_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 /// write via a temp file + rename so a crash mid-write cannot corrupt the target
 fn write_atomic_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
-    let tmp = path.with_extension("tmp");
+    let count = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp.{}", count));
     fs::write(&tmp, contents).map_err(|e| e.to_string())?;
     fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
@@ -314,6 +320,24 @@ async fn read_rates_cache(app: &AppHandle) -> Option<RatesCache> {
     serde_json::from_str(&raw).ok()
 }
 
+const RATES_RESPONSE_LIMIT: usize = 5 * 1024 * 1024;
+
+/// Reads the body as a stream and aborts as soon as it exceeds `limit`,
+/// instead of buffering an unbounded body in memory before checking its size.
+async fn read_body_capped(resp: reqwest::Response, limit: usize) -> Result<Vec<u8>, String> {
+    use futures::StreamExt;
+    let mut stream = resp.bytes_stream();
+    let mut buf = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        buf.extend_from_slice(&chunk);
+        if buf.len() > limit {
+            return Err("response too large".into());
+        }
+    }
+    Ok(buf)
+}
+
 async fn fetch_rates_online() -> Result<RatesPayload, String> {
     let client = HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
@@ -322,14 +346,14 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
             .unwrap_or_default()
     });
 
-    let body: serde_json::Value = client
+    let resp = client
         .get("https://open.er-api.com/v6/latest/USD")
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
         .map_err(|e| e.to_string())?;
+
+    let bytes = read_body_capped(resp, RATES_RESPONSE_LIMIT).await?;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
 
     if body["result"] != "success" {
         return Err("rates api error".into());
@@ -343,11 +367,13 @@ async fn fetch_rates_online() -> Result<RatesPayload, String> {
         ids.join(",")
     );
     if let Ok(resp) = client.get(&url).send().await {
-        if let Ok(json) = resp.json::<serde_json::Value>().await {
-            for (code, id) in CRYPTO {
-                if let Some(price) = json[id]["usd"].as_f64() {
-                    if price > 0.0 {
-                        rates.insert((*code).into(), serde_json::json!(1.0 / price));
+        if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT).await {
+            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                for (code, id) in CRYPTO {
+                    if let Some(price) = json[id]["usd"].as_f64() {
+                        if price > 0.0 {
+                            rates.insert((*code).into(), serde_json::json!(1.0 / price));
+                        }
                     }
                 }
             }
@@ -539,14 +565,14 @@ async fn fetch_historical_rates(
     // api.frankfurter.app 301-redirects here now, and the old domain is
     // flaky over reqwest/rustls-tls — go straight to the stable host
     let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
-    let body: serde_json::Value = client
+    let resp = client
         .get(&url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
         .map_err(|e| e.to_string())?;
+
+    let bytes = read_body_capped(resp, RATES_RESPONSE_LIMIT).await?;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     let rates = parse_rate_map(body["rates"].as_object().ok_or("no rates in response")?);
     if let Ok(serialized) = serde_json::to_string(&rates) {
         write_atomic_async(cache_path, serialized).await;
@@ -598,14 +624,16 @@ async fn fetch_historical_rates_batch(
         futures.push(async move {
             let mut rate_map = None;
             if let Ok(resp) = client_clone.get(&url).send().await {
-                if let Ok(body) = resp.json::<serde_json::Value>().await {
-                    if let Some(rates_obj) = body["rates"].as_object() {
-                        let daily_rates = parse_rate_map(rates_obj);
-                        let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
-                        if let Ok(serialized) = serde_json::to_string(&daily_rates) {
-                            write_atomic_async(cache_path, serialized).await;
+                if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT).await {
+                    if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        if let Some(rates_obj) = body["rates"].as_object() {
+                            let daily_rates = parse_rate_map(rates_obj);
+                            let cache_path = data_dir(&app_clone).join(format!("rates-{}.json", date));
+                            if let Ok(serialized) = serde_json::to_string(&daily_rates) {
+                                write_atomic_async(cache_path, serialized).await;
+                            }
+                            rate_map = Some((date, daily_rates));
                         }
-                        rate_map = Some((date, daily_rates));
                     }
                 }
             }
@@ -774,17 +802,14 @@ fn migrate_data_dir(
     let canon_new = fs::canonicalize(&new).map_err(|e| e.to_string())?;
     let gate = app.state::<DataDirGate>();
     {
-        let mut picked = gate.picked.lock().unwrap();
+        let picked = gate.picked.lock().unwrap();
         if picked.as_deref() != Some(canon_new.as_path()) {
             return Err("target folder was not chosen by the user".into());
         }
-        *picked = None;
     }
-    // the target is usable from here on; the source stays usable too until the
-    // move is known to have finished
-    authorize_data_dir(&app, &canon_new);
     let canon_old = fs::canonicalize(&old).unwrap_or_else(|_| old.clone());
     if canon_old == canon_new || strategy == "use_existing" {
+        gate.picked.lock().unwrap().take();
         return commit_data_dir(&app, &canon_new);
     }
     let old_docs = old.join("documents.json");
@@ -807,6 +832,7 @@ fn migrate_data_dir(
             }
         }
     }
+    gate.picked.lock().unwrap().take();
     // originals removed only after everything is actually copied
     if old_docs.exists() {
         fs::remove_file(&old_docs).ok();

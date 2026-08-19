@@ -339,8 +339,16 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
 function evalDateWord(word: string): Value {
   switch (word) {
     case "today": return { kind: "date", ms: startOfToday(), hasTime: false };
-    case "tomorrow": return { kind: "date", ms: startOfToday() + 86400_000, hasTime: false };
-    case "yesterday": return { kind: "date", ms: startOfToday() - 86400_000, hasTime: false };
+    case "tomorrow": {
+      const d = new Date(startOfToday());
+      d.setDate(d.getDate() + 1);
+      return { kind: "date", ms: d.getTime(), hasTime: false };
+    }
+    case "yesterday": {
+      const d = new Date(startOfToday());
+      d.setDate(d.getDate() - 1);
+      return { kind: "date", ms: d.getTime(), hasTime: false };
+    }
     case "now": return { kind: "date", ms: Date.now(), hasTime: true };
     case "time": case "local": return { kind: "date", ms: Date.now(), hasTime: true, timeOnly: true };
     default: throw new EvalError(`bad date word ${word}`);
@@ -388,26 +396,54 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     return toD(lv).minus(toD(rv));
   };
 
-  // Linear probe: f(0) and f(1) give slope → exact root for linear expressions
-  const f0 = evalF(new Decimal(0));
-  const f1 = evalF(new Decimal(1));
-  const slope = f1.minus(f0);
-  if (!slope.isZero()) {
-    const root = f0.neg().div(slope);
-    if (evalF(root).abs().lt(new Decimal("1e-9"))) return qty(root);
+  const safeEval = (x: Decimal): Decimal | null => {
+    try { return evalF(x); } catch { return null; }
+  };
+
+  const f0 = safeEval(new Decimal(0));
+  const f1 = safeEval(new Decimal(1));
+
+  if (f0 !== null && f1 !== null) {
+    const slope = f1.minus(f0);
+    if (!slope.isZero()) {
+      const root = f0.neg().div(slope);
+      const fRoot = safeEval(root);
+      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9"))) return qty(root);
+    }
   }
 
   // Bisection fallback for nonlinear cases
   let lo = new Decimal(-1e9);
   let hi = new Decimal(1e9);
-  let flo = evalF(lo);
-  let fhi = evalF(hi);
-  if (flo.mul(fhi).gt(0)) throw new EvalError("no solution");
+  let flo = safeEval(lo);
+  let fhi = safeEval(hi);
+  
+  if (flo === null || fhi === null || flo.mul(fhi).gt(0)) {
+    const probes = [1, 2, 5, 10, 100, 1000, 10000, -1, -2, -5, -10, -100, -1000, -10000];
+    let found = false;
+    for (const p of probes) {
+      const pDec = new Decimal(p);
+      const fp = safeEval(pDec);
+      if (fp === null) continue;
+      if (flo === null) { lo = pDec; flo = fp; }
+      else if (fhi === null) { hi = pDec; fhi = fp; }
+      else if (flo.mul(fp).lte(0)) { hi = pDec; fhi = fp; }
+      else if (fhi.mul(fp).lte(0)) { lo = pDec; flo = fp; }
+      else continue;
+      if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) { found = true; break; }
+    }
+    if (!found) throw new EvalError("no solution");
+  }
+
   for (let i = 0; i < 100; i++) {
     const mid = lo.plus(hi).div(2);
     if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return qty(mid);
-    const fm = evalF(mid);
-    if (flo.mul(fm).lte(0)) { hi = mid; fhi = fm; }
+    const fm = safeEval(mid);
+    if (fm === null) {
+      lo = mid.plus("1e-9"); 
+      continue;
+    }
+    if (flo!.mul(fm).lte(0)) { hi = mid; fhi = fm; }
     else { lo = mid; flo = fm; }
   }
   return qty(lo.plus(hi).div(2));
