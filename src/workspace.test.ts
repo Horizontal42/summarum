@@ -44,6 +44,19 @@ describe("Workspace exports", () => {
   });
 });
 
+describe("Workspace error handling", () => {
+  it("cleans up the resolving set if evaluation throws an unexpected error", () => {
+    const { ws, engine } = makeWorkspace({
+      a: { title: "A", text: "1 + 1" },
+    });
+    vi.spyOn(engine, "evaluateDocument").mockImplementation(() => {
+      throw new Error("mocked crash");
+    });
+    expect(() => ws.evaluateSheet("a", "1 + 1")).toThrowError("mocked crash");
+    expect((ws as any).resolving.has("a")).toBe(false);
+  });
+});
+
 describe("Workspace invalidation", () => {
   it("invalidating a sheet also invalidates its dependents, not unrelated sheets", () => {
     const { ws, store } = makeWorkspace({
