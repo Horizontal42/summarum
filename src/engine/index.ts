@@ -1,7 +1,18 @@
 import { logger } from "../logger";
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
+import {
+  DateOrder,
+  Decimal,
+  EngineSettings,
+  EvalError,
+  Quantity,
+  Unit,
+  Value,
+  XRefError,
+  defaultSettings,
+  qty,
+} from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine, ParsedLine } from "./parser";
@@ -85,7 +96,8 @@ export class SumEngine {
 
   updateSettings(patch: Partial<EngineSettings>): void {
     this.settings = { ...this.settings, ...patch };
-    if (patch.dateFormat) this.dateOrder = resolveDateOrder(this.settings.dateFormat);
+    if (patch.dateFormat)
+      this.dateOrder = resolveDateOrder(this.settings.dateFormat);
   }
 
   completions(): Completion[] {
@@ -107,59 +119,50 @@ export class SumEngine {
 
       if (trimmed.length === 0) {
         const kind = commentStart >= 0 ? "comment" : "empty";
-        results.push({ text: null, value: null, kind, tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
+        results.push({
+          text: null,
+          value: null,
+          kind,
+          tokens: [],
+          commentStart: commentStart >= 0 ? commentStart : null,
+        });
         lineValues.push(null);
         lineKinds.push("empty");
         continue;
       }
       if (trimmed.startsWith("#")) {
-        results.push({ text: null, value: null, kind: "header", tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
+        results.push({
+          text: null,
+          value: null,
+          kind: "header",
+          tokens: [],
+          commentStart: commentStart >= 0 ? commentStart : null,
+        });
         lineValues.push(null);
         lineKinds.push("header");
         continue;
       }
 
-      // tokenize/parseLine/evaluate all run under one try/catch: pathological
-      // input (e.g. stack-overflowing nested parens in the parser) must null
-      // out this one line, not throw past evaluateDocument and kill the rest.
-      let tokens: Token[] = [];
-      let parsed: ParsedLine = { expr: null };
-      let value: Value | null = null;
-      let lineError: string | undefined;
-      try {
-        tokens = tokenize(line, this.reg, this.dateOrder);
-        const knownVars = new Set(vars.keys());
-        parsed = parseLine(tokens, knownVars, line);
-        if (parsed.expr) {
-          const ctx: EvalCtx = {
-            reg: this.reg,
-            vars,
-            line: { lineValues, lineKinds, index: i, lineText: rawLine },
-            historicalRates: this.historicalRates,
-            resolveXRef,
-          };
-          value = evaluate(parsed.expr, ctx);
-        }
-      } catch (e) {
-        if (e instanceof XRefError) {
-          lineError = e.message;
-        } else if (e instanceof EvalError) {
-          // Expected evaluation failure; remain silent
-        } else {
-          // Capture unexpected execution anomalies like BigInt or Range errors
-          lineError = e instanceof Error ? e.message : String(e);
-          logger.warn("evaluate failed:", e);
-        }
-        // a line without a result beats a dead sheet.
-        value = null;
-      }
+      let { tokens, parsed, value, lineError } = this.evaluateLine(
+        line,
+        vars,
+        lineValues,
+        lineKinds,
+        i,
+        rawLine,
+        resolveXRef,
+      );
+
       if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
       if (value && parsed.assign) vars.set(parsed.assign, value);
 
       lineValues.push(value);
       lineKinds.push("normal");
       results.push({
-        text: (value && value.kind !== "chart") ? formatValue(value, this.settings) : null,
+        text:
+          value && value.kind !== "chart"
+            ? formatValue(value, this.settings)
+            : null,
         value,
         kind: "normal",
         tokens,
@@ -169,6 +172,57 @@ export class SumEngine {
       });
     }
     return results;
+  }
+
+  private evaluateLine(
+    line: string,
+    vars: Map<string, Value>,
+    lineValues: (Value | null)[],
+    lineKinds: ("empty" | "header" | "normal")[],
+    index: number,
+    rawLine: string,
+    resolveXRef?: XRefResolver,
+  ): {
+    tokens: Token[];
+    parsed: ParsedLine;
+    value: Value | null;
+    lineError: string | undefined;
+  } {
+    let tokens: Token[] = [];
+    let parsed: ParsedLine = { expr: null };
+    let value: Value | null = null;
+    let lineError: string | undefined;
+    // tokenize/parseLine/evaluate all run under one try/catch: pathological
+    // input (e.g. stack-overflowing nested parens in the parser) must null
+    // out this one line, not throw past evaluateDocument and kill the rest.
+    try {
+      tokens = tokenize(line, this.reg, this.dateOrder);
+      const knownVars = new Set(vars.keys());
+      parsed = parseLine(tokens, knownVars, line);
+      if (parsed.expr) {
+        const ctx: EvalCtx = {
+          reg: this.reg,
+          vars,
+          line: { lineValues, lineKinds, index, lineText: rawLine },
+          historicalRates: this.historicalRates,
+          resolveXRef,
+        };
+        value = evaluate(parsed.expr, ctx);
+      }
+    } catch (e) {
+      if (e instanceof XRefError) {
+        lineError = e.message;
+      } else if (e instanceof EvalError) {
+        // Expected evaluation failure; remain silent
+      } else {
+        // Capture unexpected execution anomalies like BigInt or Range errors
+        lineError = e instanceof Error ? e.message : String(e);
+        logger.warn("evaluate failed:", e);
+      }
+      // a line without a result beats a dead sheet.
+      value = null;
+    }
+    return { tokens, parsed, value, lineError };
   }
 
   /** Evaluate a single expression (used by the extension runtime and tests). */
@@ -217,9 +271,13 @@ export class SumEngine {
   }
 
   addUnit(spec: ExtensionUnitSpec): void {
-    const base = this.reg.unitsById.get(spec.baseUnitId) ?? this.currencyBase(spec.baseUnitId);
-    if (!base) throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
-    if (this.reg.unitsById.has(spec.id)) throw new Error(`numi.addUnit: id "${spec.id}" is already registered`);
+    const base =
+      this.reg.unitsById.get(spec.baseUnitId) ??
+      this.currencyBase(spec.baseUnitId);
+    if (!base)
+      throw new Error(`numi.addUnit: unknown baseUnitId ${spec.baseUnitId}`);
+    if (this.reg.unitsById.has(spec.id))
+      throw new Error(`numi.addUnit: id "${spec.id}" is already registered`);
     const unit: Unit = {
       id: spec.id,
       dimension: base.dimension,
@@ -230,12 +288,24 @@ export class SumEngine {
     this.reg.unitsById.set(unit.id, unit);
     for (const p of spec.phrases.split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "unit", unit }, { caseSensitive: false });
+      if (phrase)
+        this.reg.addPhrase(
+          phrase,
+          { t: "unit", unit },
+          { caseSensitive: false },
+        );
     }
-    this.reg.completions.push({ label: spec.id, type: "unit", detail: "extension" });
+    this.reg.completions.push({
+      label: spec.id,
+      type: "unit",
+      detail: "extension",
+    });
   }
 
-  addFunction(spec: { id: string; phrases: string }, fn: (values: ExtensionValue[]) => ExtensionValue | number): void {
+  addFunction(
+    spec: { id: string; phrases: string },
+    fn: (values: ExtensionValue[]) => ExtensionValue | number,
+  ): void {
     const name = spec.id;
     this.reg.customFuncs.set(name, (args: Value[]) => {
       const mapped = args.map((a) => this.fromValue(a));
@@ -243,26 +313,42 @@ export class SumEngine {
     });
     for (const p of (spec.phrases || spec.id).split(",")) {
       const phrase = p.trim();
-      if (phrase) this.reg.addPhrase(phrase, { t: "func", name }, { caseSensitive: false });
+      if (phrase)
+        this.reg.addPhrase(
+          phrase,
+          { t: "func", name },
+          { caseSensitive: false },
+        );
     }
-    this.reg.completions.push({ label: name, type: "function", detail: "extension" });
+    this.reg.completions.push({
+      label: name,
+      type: "function",
+      detail: "extension",
+    });
   }
 
   private currencyBase(code: string): Unit | null {
-    return this.reg.currencyCodes.has(code) ? this.reg.makeCurrencyUnit(code) : null;
+    return this.reg.currencyCodes.has(code)
+      ? this.reg.makeCurrencyUnit(code)
+      : null;
   }
 
   private toValue(v: number | ExtensionValue): Value {
     if (typeof v === "number") return qty(v);
     const unit = v.unitId
-      ? this.reg.unitsById.get(v.unitId) ?? this.currencyBase(v.unitId) ?? null
+      ? (this.reg.unitsById.get(v.unitId) ??
+        this.currencyBase(v.unitId) ??
+        null)
       : null;
     return qty(new Decimal(v.double), unit);
   }
 
   private fromValue(v: Value): ExtensionValue {
     if (v.kind === "quantity") {
-      return { double: v.value.toNumber(), ...(v.unit ? { unitId: v.unit.id } : {}) };
+      return {
+        double: v.value.toNumber(),
+        ...(v.unit ? { unitId: v.unit.id } : {}),
+      };
     }
     if (v.kind === "percent") return { double: v.value.div(100).toNumber() };
     if (v.kind === "date") return { double: v.ms };
