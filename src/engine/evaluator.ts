@@ -3,7 +3,12 @@
 import { Decimal, DEC_ZERO, DEC_ONE, EvalError, PI, Quantity, Unit, Value, XRefError, qty, pct } from "./types";
 import { Node, ConvTarget } from "./parser";
 import { Registry } from "./registry";
-import { resolveZone, startOfToday, addToDate, isCalendarUnit } from "./datetime";
+import {
+  resolveZone,
+  startOfToday,
+  addToDate,
+  isCalendarUnit,
+} from "./datetime";
 
 export interface LineCtx {
   /** values of lines above (null = no result) */
@@ -25,7 +30,9 @@ export interface EvalCtx {
   resolveXRef?: XRefResolver;
 }
 
-export type XRefResolution = { ok: true; value: Value } | { ok: false; reason: string };
+export type XRefResolution =
+  | { ok: true; value: Value }
+  | { ok: false; reason: string };
 export type XRefResolver = (sheet: string, key: string) => XRefResolution;
 
 const E = new Decimal("2.71828182845904523536028747135266249775724709369995");
@@ -57,7 +64,12 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
     case "curr":
       return evaluateUnitMod(node, ctx);
     case "bin":
-      return evalBin(node.op, evaluate(node.l, ctx), evaluate(node.r, ctx), ctx);
+      return evalBin(
+        node.op,
+        evaluate(node.l, ctx),
+        evaluate(node.r, ctx),
+        ctx,
+      );
     case "bit":
       return evalBit(node.op, evaluate(node.l, ctx), evaluate(node.r, ctx));
     case "pctop":
@@ -65,7 +77,11 @@ export function evaluate(node: Node, ctx: EvalCtx): Value {
     case "conv":
       return evalConv(evaluate(node.x, ctx), node.target, ctx);
     case "call":
-      return evalCall(node.name, node.args.map((a) => evaluate(a, ctx)), ctx);
+      return evalCall(
+        node.name,
+        node.args.map((a) => evaluate(a, ctx)),
+        ctx,
+      );
     case "seq":
       return evaluateSeq(node, ctx);
   }
@@ -112,7 +128,8 @@ export function fromBase(base: Decimal, unit: Unit): Decimal {
 
 export function convertQ(q: Quantity, unit: Unit): Quantity {
   if (!q.unit) return { ...q, unit };
-  if (q.unit.dimension !== unit.dimension) throw new EvalError("dimension mismatch");
+  if (q.unit.dimension !== unit.dimension)
+    throw new EvalError("dimension mismatch");
   return qty(fromBase(toBase(q), unit), unit);
 }
 
@@ -122,31 +139,47 @@ function addQ(a: Quantity, b: Quantity): Quantity {
 
 function numericAdd(a: Quantity, b: Quantity, sign: 1 | -1): Quantity {
   if (a.unit && b.unit) {
-    if (a.unit.dimension !== b.unit.dimension) throw new EvalError("dimension mismatch");
+    if (a.unit.dimension !== b.unit.dimension)
+      throw new EvalError("dimension mismatch");
     if (a.unit.offset || b.unit.offset) {
       // temperatures: operate in the left unit's scale
       const bInA = convertQ(b, a.unit);
-      return qty(sign === 1 ? a.value.add(bInA.value) : a.value.sub(bInA.value), a.unit);
+      return qty(
+        sign === 1 ? a.value.add(bInA.value) : a.value.sub(bInA.value),
+        a.unit,
+      );
     }
-    const base = sign === 1 ? toBase(a).add(toBase(b)) : toBase(a).sub(toBase(b));
+    const base =
+      sign === 1 ? toBase(a).add(toBase(b)) : toBase(a).sub(toBase(b));
     return qty(fromBase(base, a.unit), a.unit);
   }
   const unit = a.unit ?? b.unit ?? null;
   return qty(sign === 1 ? a.value.add(b.value) : a.value.sub(b.value), unit);
 }
 
-function evalPercentArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value, r: Value): Value {
+function evalPercentArith(
+  op: "plus" | "minus" | "mul" | "div" | "mod" | "pow",
+  l: Value,
+  r: Value,
+): Value {
   if (l.kind === "percent" && r.kind === "percent") {
     switch (op) {
-      case "plus": return pct(l.value.add(r.value));
-      case "minus": return pct(l.value.sub(r.value));
-      case "mul": return pct(l.value.mul(r.value).div(100));
-      case "div": return qty(l.value.div(r.value));
-      default: throw new EvalError("bad percent op");
+      case "plus":
+        return pct(l.value.add(r.value));
+      case "minus":
+        return pct(l.value.sub(r.value));
+      case "mul":
+        return pct(l.value.mul(r.value).div(100));
+      case "div":
+        return qty(l.value.div(r.value));
+      default:
+        throw new EvalError("bad percent op");
     }
   }
   const q = (l.kind === "quantity" ? l : r) as Quantity;
-  const p = (l.kind === "percent" ? l : r as { kind: "percent"; value: Decimal }).value;
+  const p = (
+    l.kind === "percent" ? l : (r as { kind: "percent"; value: Decimal })
+  ).value;
   switch (op) {
     case "plus": return qty(q.value.mul(DEC_ONE.add(p.div(100))), q.unit);
     case "minus":
@@ -161,14 +194,22 @@ function evalPercentArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", 
       return l.kind === "percent"
         ? qty(p.div(100).pow(q.value))
         : qty(q.value.pow(p.div(100)), q.unit);
-    default: throw new EvalError("bad percent op");
+    default:
+      throw new EvalError("bad percent op");
   }
 }
 
-function evalQuantityArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", a: Quantity, b: Quantity, ctx: EvalCtx): Value {
+function evalQuantityArith(
+  op: "plus" | "minus" | "mul" | "div" | "mod" | "pow",
+  a: Quantity,
+  b: Quantity,
+  ctx: EvalCtx,
+): Value {
   switch (op) {
-    case "plus": return numericAdd(a, b, 1);
-    case "minus": return numericAdd(a, b, -1);
+    case "plus":
+      return numericAdd(a, b, 1);
+    case "minus":
+      return numericAdd(a, b, -1);
     case "mul": {
       if (a.unit && b.unit) {
         const da = a.unit.dimension;
@@ -183,7 +224,8 @@ function evalQuantityArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow",
           if (u) return qty(baseProduct.div(u.ratio), u);
         }
         // same dimension: "2 kg * 500 g" scales in the left unit, not 2*500
-        if (da === db) return qty(a.value.mul(convertQ(b, a.unit).value), a.unit);
+        if (da === db)
+          return qty(a.value.mul(convertQ(b, a.unit).value), a.unit);
         return qty(a.value.mul(b.value), a.unit);
       }
       return qty(a.value.mul(b.value), a.unit ?? b.unit ?? null);
@@ -202,16 +244,28 @@ function evalQuantityArith(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow",
     case "pow": {
       const result = a.value.pow(b.value);
       if (a.unit?.dimension === "length" && !b.unit) {
-        const id = b.value.eq(2) ? `sq:${a.unit.id}` : b.value.eq(3) ? `cb:${a.unit.id}` : null;
+        const id = b.value.eq(2)
+          ? `sq:${a.unit.id}`
+          : b.value.eq(3)
+            ? `cb:${a.unit.id}`
+            : null;
         const u = id ? ctx.reg.unitsById.get(id) : null;
         if (u) return qty(result, u);
       }
-      return qty(result, b.unit ? null : a.unit && b.value.eq(1) ? a.unit : null);
+      return qty(
+        result,
+        b.unit ? null : a.unit && b.value.eq(1) ? a.unit : null,
+      );
     }
   }
 }
 
-function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value, r: Value, ctx: EvalCtx): Value {
+function evalBin(
+  op: "plus" | "minus" | "mul" | "div" | "mod" | "pow",
+  l: Value,
+  r: Value,
+  ctx: EvalCtx,
+): Value {
   if (l.kind === "date" || r.kind === "date") {
     return evalDateArith(op, l, r);
   }
@@ -224,19 +278,33 @@ function evalBin(op: "plus" | "minus" | "mul" | "div" | "mod" | "pow", l: Value,
 }
 
 function evalBit(op: string, l: Value, r: Value): Value {
-  if (l.kind !== "quantity" || r.kind !== "quantity") throw new EvalError("bitwise needs integers");
-  if (!l.value.isFinite() || !r.value.isFinite()) throw new EvalError("bitwise needs finite integers");
+  if (l.kind !== "quantity" || r.kind !== "quantity")
+    throw new EvalError("bitwise needs integers");
+  if (!l.value.isFinite() || !r.value.isFinite())
+    throw new EvalError("bitwise needs finite integers");
   const a = BigInt(l.value.toDecimalPlaces(0).toFixed(0));
   const b = BigInt(r.value.toDecimalPlaces(0).toFixed(0));
-  if ((op === "shl" || op === "shr") && (b < 0n || b > 256n)) throw new EvalError("bad shift");
+  if ((op === "shl" || op === "shr") && (b < 0n || b > 256n))
+    throw new EvalError("bad shift");
   let out: bigint;
   switch (op) {
-    case "band": out = a & b; break;
-    case "bor": out = a | b; break;
-    case "bxor": out = a ^ b; break;
-    case "shl": out = a << b; break;
-    case "shr": out = a >> b; break;
-    default: throw new EvalError("bad bit op");
+    case "band":
+      out = a & b;
+      break;
+    case "bor":
+      out = a | b;
+      break;
+    case "bxor":
+      out = a ^ b;
+      break;
+    case "shl":
+      out = a << b;
+      break;
+    case "shr":
+      out = a >> b;
+      break;
+    default:
+      throw new EvalError("bad bit op");
   }
   const repr = l.repr !== "decimal" ? l.repr : r.repr;
   return qty(new Decimal(out.toString()), null, repr);
@@ -275,7 +343,8 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
   // "20% of what is 30"
   const p = asPercentValue(l);
   switch (op) {
-    case "of_what_is": return qty(rv.div(p.div(100)), unit);
+    case "of_what_is":
+      return qty(rv.div(p.div(100)), unit);
     case "off_what_is": {
       const d = DEC_ONE.sub(p.div(100));
       if (d.isZero()) throw new EvalError("division by zero");
@@ -290,7 +359,8 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
   switch (target.type) {
     case "unit": {
       if (v.kind === "percent") return pct(v.value); // "x in %" — keep
-      if (v.kind !== "quantity") throw new EvalError("cannot convert date to unit");
+      if (v.kind !== "quantity")
+        throw new EvalError("cannot convert date to unit");
       if (!v.unit) return qty(v.value, target.unit);
       return convertQ(v, target.unit);
     }
@@ -299,13 +369,17 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
       if (target.onDate) {
         const dateRates = ctx.historicalRates?.get(target.onDate);
         const rate = dateRates?.get(target.code);
-        if (rate === undefined) throw new EvalError(`no historical rate for ${target.code} on ${target.onDate}`);
+        if (rate === undefined)
+          throw new EvalError(
+            `no historical rate for ${target.code} on ${target.onDate}`,
+          );
         unit = ctx.reg.makeCurrencyUnitFromRate(target.code, new Decimal(rate));
       } else {
         unit = ctx.reg.makeCurrencyUnit(target.code);
         if (!unit) throw new EvalError(`no rate for ${target.code}`);
       }
-      if (v.kind !== "quantity") throw new EvalError("cannot convert to currency");
+      if (v.kind !== "quantity")
+        throw new EvalError("cannot convert to currency");
       if (!v.unit) return qty(v.value, unit);
       return convertQ(v, unit);
     }
@@ -324,13 +398,17 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
       return { ...v, timeZone: zone };
     }
     case "unix": {
-      if (v.kind === "date") return qty(new Decimal(v.ms).div(1000).floor(), null, "plain");
+      if (v.kind === "date")
+        return qty(new Decimal(v.ms).div(1000).floor(), null, "plain");
       throw new EvalError("unix needs a date");
     }
     case "todate": {
-      if (v.kind !== "quantity" || v.unit) throw new EvalError("date needs a plain number");
+      if (v.kind !== "quantity" || v.unit)
+        throw new EvalError("date needs a plain number");
       // heuristics: > 1e12 means milliseconds, else seconds
-      const ms = v.value.gt(1e12) ? v.value.toNumber() : v.value.mul(1000).toNumber();
+      const ms = v.value.gt(1e12)
+        ? v.value.toNumber()
+        : v.value.mul(1000).toNumber();
       return { kind: "date", ms, hasTime: true };
     }
   }
@@ -338,7 +416,8 @@ function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
 
 function evalDateWord(word: string): Value {
   switch (word) {
-    case "today": return { kind: "date", ms: startOfToday(), hasTime: false };
+    case "today":
+      return { kind: "date", ms: startOfToday(), hasTime: false };
     case "tomorrow": {
       const d = new Date(startOfToday());
       d.setDate(d.getDate() + 1);
@@ -349,9 +428,13 @@ function evalDateWord(word: string): Value {
       d.setDate(d.getDate() - 1);
       return { kind: "date", ms: d.getTime(), hasTime: false };
     }
-    case "now": return { kind: "date", ms: Date.now(), hasTime: true };
-    case "time": case "local": return { kind: "date", ms: Date.now(), hasTime: true, timeOnly: true };
-    default: throw new EvalError(`bad date word ${word}`);
+    case "now":
+      return { kind: "date", ms: Date.now(), hasTime: true };
+    case "time":
+    case "local":
+      return { kind: "date", ms: Date.now(), hasTime: true, timeOnly: true };
+    default:
+      throw new EvalError(`bad date word ${word}`);
   }
 }
 
@@ -359,10 +442,16 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   if (l.kind === "date" && r.kind === "date") {
     if (op !== "minus") throw new EvalError("dates only subtract");
     // midnight-to-midnight differences count calendar days (robust across DST)
-    const days = !l.hasTime && !r.hasTime
-      ? new Decimal(Math.round((l.ms - r.ms) / 86400_000))
-      : new Decimal(l.ms - r.ms).div(86400_000);
-    return qty(days, { id: "day", dimension: "time", ratio: new Decimal(86400), format: "day" });
+    const days =
+      !l.hasTime && !r.hasTime
+        ? new Decimal(Math.round((l.ms - r.ms) / 86400_000))
+        : new Decimal(l.ms - r.ms).div(86400_000);
+    return qty(days, {
+      id: "day",
+      dimension: "time",
+      ratio: new Decimal(86400),
+      format: "day",
+    });
   }
   const date = (l.kind === "date" ? l : r) as Extract<Value, { kind: "date" }>;
   const span = l.kind === "date" ? r : l;
@@ -370,7 +459,8 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
     throw new EvalError("date arithmetic needs a time span");
   }
   if (op !== "plus" && op !== "minus") throw new EvalError("bad date op");
-  if (op === "minus" && l.kind !== "date") throw new EvalError("cannot subtract date from number");
+  if (op === "minus" && l.kind !== "date")
+    throw new EvalError("cannot subtract date from number");
   const amount = span.value.toNumber() * (op === "minus" ? -1 : 1);
   let ms: number;
   let hasTime = date.hasTime;
@@ -397,7 +487,11 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
   };
 
   const safeEval = (x: Decimal): Decimal | null => {
-    try { return evalF(x); } catch { return null; }
+    try {
+      return evalF(x);
+    } catch {
+      return null;
+    }
   };
 
   const f0 = safeEval(DEC_ZERO);
@@ -408,7 +502,8 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     if (!slope.isZero()) {
       const root = f0.neg().div(slope);
       const fRoot = safeEval(root);
-      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9"))) return qty(root);
+      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9")))
+        return qty(root);
     }
   }
 
@@ -417,20 +512,33 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
   let hi = new Decimal(1e9);
   let flo = safeEval(lo);
   let fhi = safeEval(hi);
-  
+
   if (flo === null || fhi === null || flo.mul(fhi).gt(0)) {
-    const probes = [1, 2, 5, 10, 100, 1000, 10000, -1, -2, -5, -10, -100, -1000, -10000];
+    const probes = [
+      1, 2, 5, 10, 100, 1000, 10000, -1, -2, -5, -10, -100, -1000, -10000,
+    ];
     let found = false;
     for (const p of probes) {
       const pDec = new Decimal(p);
       const fp = safeEval(pDec);
       if (fp === null) continue;
-      if (flo === null) { lo = pDec; flo = fp; }
-      else if (fhi === null) { hi = pDec; fhi = fp; }
-      else if (flo.mul(fp).lte(0)) { hi = pDec; fhi = fp; }
-      else if (fhi.mul(fp).lte(0)) { lo = pDec; flo = fp; }
-      else continue;
-      if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) { found = true; break; }
+      if (flo === null) {
+        lo = pDec;
+        flo = fp;
+      } else if (fhi === null) {
+        hi = pDec;
+        fhi = fp;
+      } else if (flo.mul(fp).lte(0)) {
+        hi = pDec;
+        fhi = fp;
+      } else if (fhi.mul(fp).lte(0)) {
+        lo = pDec;
+        flo = fp;
+      } else continue;
+      if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) {
+        found = true;
+        break;
+      }
     }
     if (!found) throw new EvalError("no solution");
   }
@@ -440,11 +548,16 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return qty(mid);
     const fm = safeEval(mid);
     if (fm === null) {
-      lo = mid.plus("1e-9"); 
+      lo = mid.plus("1e-9");
       continue;
     }
-    if (flo!.mul(fm).lte(0)) { hi = mid; fhi = fm; }
-    else { lo = mid; flo = fm; }
+    if (flo!.mul(fm).lte(0)) {
+      hi = mid;
+      fhi = fm;
+    } else {
+      lo = mid;
+      flo = fm;
+    }
   }
   return qty(lo.plus(hi).div(2));
 }
@@ -456,7 +569,10 @@ function filterSameDimension(block: Quantity[]): Quantity[] {
 }
 
 /** Adds compatible lines left to right, silently skipping ones with an incompatible dimension. */
-function reduceCompatible(block: Quantity[]): { acc: Quantity; counted: number } {
+function reduceCompatible(block: Quantity[]): {
+  acc: Quantity;
+  counted: number;
+} {
   let acc = block[0];
   let counted = 1;
   for (let i = 1; i < block.length; i++) {
@@ -474,7 +590,8 @@ const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
   count: (block) => qty(new Decimal(block.length)),
   chart: (block) => {
     const compatible = filterSameDimension(block);
-    if (compatible.length < 2) throw new EvalError("need at least 2 values for chart");
+    if (compatible.length < 2)
+      throw new EvalError("need at least 2 values for chart");
     return {
       kind: "chart",
       points: compatible.map((q) => toBase(q)),
@@ -488,7 +605,7 @@ const AGG_FUNCS: Record<string, (block: Quantity[]) => Value> = {
   avg: (block) => {
     const { acc, counted } = reduceCompatible(block);
     return qty(acc.value.div(counted), acc.unit);
-  }
+  },
 };
 
 function getPrevResult(ctx: EvalCtx): Value {
@@ -517,13 +634,90 @@ function getAggBlock(ctx: EvalCtx): Quantity[] {
   return block;
 }
 
-function evalAgg(name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart", ctx: EvalCtx): Value {
+function evalAgg(
+  name: "sum" | "avg" | "prev" | "count" | "min" | "max" | "product" | "chart",
+  ctx: EvalCtx,
+): Value {
   if (name === "prev") return getPrevResult(ctx);
   const block = getAggBlock(ctx);
   const func = AGG_FUNCS[name];
   if (!func) throw new EvalError(`unknown aggregate function ${name}`);
   return func(block);
 }
+
+const angleArg = (x: Value): Decimal => {
+  if (x.kind === "quantity" && x.unit?.dimension === "angle") {
+    return x.value.mul(x.unit.ratio);
+  }
+  return asScalar(x);
+};
+
+const BUILTIN_FUNCS: Record<string, (x: Value, ctx: EvalCtx) => Value> = {
+  sqrt: (x, ctx) => {
+    if (
+      x.kind === "quantity" &&
+      x.unit?.dimension === "area" &&
+      x.unit.id.startsWith("sq:")
+    ) {
+      const base = ctx.reg.unitsById.get(x.unit.id.slice(3));
+      if (base) return qty(x.value.sqrt(), base);
+    }
+    return qty(asScalar(x).sqrt());
+  },
+  cbrt: (x) => qty(asScalar(x).cbrt()),
+  sin: (x) => qty(Decimal.sin(angleArg(x))),
+  cos: (x) => qty(Decimal.cos(angleArg(x))),
+  tan: (x) => qty(Decimal.tan(angleArg(x))),
+  cot: (x) => qty(DEC_ONE.div(Decimal.tan(angleArg(x)))),
+  asin: (x) => qty(Decimal.asin(asScalar(x))),
+  arcsin: (x) => qty(Decimal.asin(asScalar(x))),
+  acos: (x) => qty(Decimal.acos(asScalar(x))),
+  arccos: (x) => qty(Decimal.acos(asScalar(x))),
+  atan: (x) => qty(Decimal.atan(asScalar(x))),
+  arctan: (x) => qty(Decimal.atan(asScalar(x))),
+  sinh: (x) => qty(Decimal.sinh(asScalar(x))),
+  cosh: (x) => qty(Decimal.cosh(asScalar(x))),
+  tanh: (x) => qty(Decimal.tanh(asScalar(x))),
+  ln: (x) => qty(Decimal.ln(asScalar(x))),
+  lg: (x) => qty(Decimal.log10(asScalar(x))),
+  log: (x) => qty(Decimal.log10(asScalar(x))),
+  log2: (x) => qty(Decimal.log2(asScalar(x))),
+  exp: (x) => qty(Decimal.exp(asScalar(x))),
+  abs: (x) =>
+    x.kind === "quantity"
+      ? { ...x, value: x.value.abs() }
+      : qty(asScalar(x).abs()),
+  round: (x) =>
+    x.kind === "quantity"
+      ? { ...x, value: x.value.round() }
+      : qty(asScalar(x).round()),
+  ceil: (x) =>
+    x.kind === "quantity"
+      ? { ...x, value: x.value.ceil() }
+      : qty(asScalar(x).ceil()),
+  floor: (x) =>
+    x.kind === "quantity"
+      ? { ...x, value: x.value.floor() }
+      : qty(asScalar(x).floor()),
+  fact: (x) => qty(factorial(asScalar(x))),
+  factorial: (x) => qty(factorial(asScalar(x))),
+  until: (x) => {
+    if (x.kind !== "date") throw new EvalError("until needs a date");
+    return evalDateArith("minus", x, {
+      kind: "date",
+      ms: startOfToday(),
+      hasTime: false,
+    });
+  },
+  since: (x) => {
+    if (x.kind !== "date") throw new EvalError("since needs a date");
+    return evalDateArith(
+      "minus",
+      { kind: "date", ms: startOfToday(), hasTime: false },
+      x,
+    );
+  },
+};
 
 function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
   const custom = ctx.reg.customFuncs.get(name);
@@ -533,53 +727,9 @@ function evalCall(name: string, args: Value[], ctx: EvalCtx): Value {
   const x = args[0];
   if (!x) throw new EvalError(`${name} needs an argument`);
 
-  // trig works on angles: degrees convert to radians
-  const angleArg = (): Decimal => {
-    if (x.kind === "quantity" && x.unit?.dimension === "angle") {
-      return x.value.mul(x.unit.ratio);
-    }
-    return asScalar(x);
-  };
-  const n = () => asScalar(x);
-
-  switch (name) {
-    case "sqrt": {
-      if (x.kind === "quantity" && x.unit?.dimension === "area" && x.unit.id.startsWith("sq:")) {
-        const base = ctx.reg.unitsById.get(x.unit.id.slice(3));
-        if (base) return qty(x.value.sqrt(), base);
-      }
-      return qty(n().sqrt());
-    }
-    case "cbrt": return qty(n().cbrt());
-    case "sin": return qty(Decimal.sin(angleArg()));
-    case "cos": return qty(Decimal.cos(angleArg()));
-    case "tan": return qty(Decimal.tan(angleArg()));
-    case "cot": return qty(DEC_ONE.div(Decimal.tan(angleArg())));
-    case "asin": case "arcsin": return qty(Decimal.asin(n()));
-    case "acos": case "arccos": return qty(Decimal.acos(n()));
-    case "atan": case "arctan": return qty(Decimal.atan(n()));
-    case "sinh": return qty(Decimal.sinh(n()));
-    case "cosh": return qty(Decimal.cosh(n()));
-    case "tanh": return qty(Decimal.tanh(n()));
-    case "ln": return qty(Decimal.ln(n()));
-    case "lg": case "log": return qty(Decimal.log10(n()));
-    case "log2": return qty(Decimal.log2(n()));
-    case "exp": return qty(Decimal.exp(n()));
-    case "abs": return x.kind === "quantity" ? { ...x, value: x.value.abs() } : qty(n().abs());
-    case "round": return x.kind === "quantity" ? { ...x, value: x.value.round() } : qty(n().round());
-    case "ceil": return x.kind === "quantity" ? { ...x, value: x.value.ceil() } : qty(n().ceil());
-    case "floor": return x.kind === "quantity" ? { ...x, value: x.value.floor() } : qty(n().floor());
-    case "fact": case "factorial": return qty(factorial(n()));
-    case "until": {
-      if (x.kind !== "date") throw new EvalError("until needs a date");
-      return evalDateArith("minus", x, { kind: "date", ms: startOfToday(), hasTime: false });
-    }
-    case "since": {
-      if (x.kind !== "date") throw new EvalError("since needs a date");
-      return evalDateArith("minus", { kind: "date", ms: startOfToday(), hasTime: false }, x);
-    }
-    default: throw new EvalError(`unknown function ${name}`);
-  }
+  const func = BUILTIN_FUNCS[name];
+  if (!func) throw new EvalError(`unknown function ${name}`);
+  return func(x, ctx);
 }
 
 // Native float, not Decimal: this is a PRNG (mulberry32/strHash bit-twiddling
@@ -589,10 +739,15 @@ function evalRandom(args: Value[], ctx: EvalCtx): Value {
   const seed = strHash(ctx.line.lineText) ^ (ctx.line.index * 0x9e3779b9);
   const rand = mulberry32(seed);
   if (args.length === 0) return qty(new Decimal(rand));
-  const toNum = (v: Value) => v.kind === "quantity" ? v.value.toNumber() : 0;
-  const [lo, hi] = args.length === 1 ? [0, toNum(args[0]!)] : [toNum(args[0]!), toNum(args[1]!)];
+  const toNum = (v: Value) => (v.kind === "quantity" ? v.value.toNumber() : 0);
+  const [lo, hi] =
+    args.length === 1
+      ? [0, toNum(args[0]!)]
+      : [toNum(args[0]!), toNum(args[1]!)];
   const isInt = Number.isInteger(lo) && Number.isInteger(hi);
-  const raw = isInt ? Math.floor(rand * (hi - lo + 1)) + lo : rand * (hi - lo) + lo;
+  const raw = isInt
+    ? Math.floor(rand * (hi - lo + 1)) + lo
+    : rand * (hi - lo) + lo;
   return qty(new Decimal(raw));
 }
 
@@ -605,9 +760,9 @@ function strHash(s: string): number {
 }
 
 function mulberry32(seed: number): number {
-  seed = (seed + 0x6D2B79F5) | 0;
+  seed = (seed + 0x6d2b79f5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
@@ -618,12 +773,19 @@ function factorial(n: Decimal): Decimal {
   return acc;
 }
 
-function evaluateConst(node: { k: "const", name: "pi" | "e" | "half" | "onehalf" }): Value {
+function evaluateConst(node: {
+  k: "const";
+  name: "pi" | "e" | "half" | "onehalf";
+}): Value {
   switch (node.name) {
-    case "pi": return qty(PI);
-    case "e": return qty(E);
-    case "half": return qty(new Decimal("0.5"));
-    case "onehalf": return qty(new Decimal("1.5"));
+    case "pi":
+      return qty(PI);
+    case "e":
+      return qty(E);
+    case "half":
+      return qty(new Decimal("0.5"));
+    case "onehalf":
+      return qty(new Decimal("1.5"));
   }
 }
 
@@ -636,7 +798,9 @@ function evaluateRef(node: Node, ctx: EvalCtx): Value {
   if (node.k === "xref") {
     const res = ctx.resolveXRef?.(node.sheet, node.key);
     if (!res || !res.ok) {
-      throw new XRefError(res && !res.ok ? res.reason : `sheet "${node.sheet}" not found`);
+      throw new XRefError(
+        res && !res.ok ? res.reason : `sheet "${node.sheet}" not found`,
+      );
     }
     return res.value;
   }
@@ -688,7 +852,7 @@ function evaluateUnitMod(node: Node, ctx: EvalCtx): Value {
   throw new EvalError("invalid unit mod node");
 }
 
-function evaluateSeq(node: { k: "seq", items: Node[] }, ctx: EvalCtx): Value {
+function evaluateSeq(node: { k: "seq"; items: Node[] }, ctx: EvalCtx): Value {
   let acc: Value | null = null;
   for (const item of node.items) {
     let v: Value;
@@ -698,8 +862,11 @@ function evaluateSeq(node: { k: "seq", items: Node[] }, ctx: EvalCtx): Value {
       continue;
     }
     if (
-      acc?.kind === "quantity" && v.kind === "quantity" &&
-      acc.unit && v.unit && acc.unit.dimension === v.unit.dimension &&
+      acc?.kind === "quantity" &&
+      v.kind === "quantity" &&
+      acc.unit &&
+      v.unit &&
+      acc.unit.dimension === v.unit.dimension &&
       acc.unit.dimension !== "scalar"
     ) {
       // "2 hours 30 min", "5 ft 4 in" — adjacent same-dimension quantities add up
