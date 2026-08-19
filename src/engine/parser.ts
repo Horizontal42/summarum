@@ -217,114 +217,131 @@ class Parser {
 
     if (!lhs) return null;
 
-    for (;;) {
+    loop: for (;;) {
       tk = this.peek();
       if (!tk) break;
 
-      if (tk.t === "percent") {
-        if (PREC.POSTFIX < minPrec) break;
-        this.i++;
-        lhs = { k: "pct", x: lhs };
-        continue;
-      }
-      if (tk.t === "bang") {
-        if (PREC.POSTFIX < minPrec) break;
-        this.i++;
-        lhs = { k: "fact", x: lhs };
-        continue;
-      }
-      if (tk.t === "unit") {
-        if (PREC.POSTFIX < minPrec) break;
-        this.i++;
-        lhs = { k: "unit", x: lhs, unit: tk.unit };
-        continue;
-      }
-      if (tk.t === "currency") {
-        if (PREC.POSTFIX < minPrec) break;
-        this.i++;
-        lhs = { k: "curr", x: lhs, code: tk.code };
-        continue;
-      }
-      if (tk.t === "scale") {
-        if (PREC.POSTFIX < minPrec) break;
-        this.i++;
-        lhs = { k: "scale", x: lhs, mult: tk.mult, label: "" };
-        continue;
-      }
-      if (tk.t === "op" && tk.op === "pow") {
-        if (PREC.POW < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.POW);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "bin", op: "pow", l: lhs, r };
-        continue;
-      }
-      if (tk.t === "op" && (tk.op === "mul" || tk.op === "div" || tk.op === "mod")) {
-        if (PREC.MUL < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.MUL + 1);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "bin", op: tk.op, l: lhs, r };
-        continue;
-      }
-      if (tk.t === "pctop" && (tk.op === "of" || tk.op === "off" || tk.op === "on")) {
-        if (!(lhs.k === "pct" || lhs.k === "var" || lhs.k === "pctop")) {
+      switch (tk.t) {
+        case "percent": {
+          if (PREC.POSTFIX < minPrec) break loop;
           this.i++;
-          continue;
+          lhs = { k: "pct", x: lhs };
+          continue loop;
         }
-        if (PREC.MUL < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.MUL + 1);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "pctop", op: tk.op, l: lhs, r };
-        continue;
-      }
-      if (tk.t === "lparen" || tk.t === "const" || tk.t === "func" || (tk.t === "word" && this.vars.has(tk.raw))) {
-        if (PREC.MUL < minPrec) break;
-        const save = this.i;
-        const r = this.parseExpr(PREC.MUL + 1);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "bin", op: "mul", l: lhs, r };
-        continue;
-      }
-      if (tk.t === "op" && (tk.op === "plus" || tk.op === "minus")) {
-        if (PREC.ADD < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.ADD + 1);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "bin", op: tk.op, l: lhs, r };
-        continue;
-      }
-      if (tk.t === "bitop") {
-        if (PREC.BIT < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.BIT + 1);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "bit", op: tk.op, l: lhs, r };
-        continue;
-      }
-      if (tk.t === "conv") {
-        if (PREC.CONV < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const target = this.parseTarget();
-        if (!target) { this.i = save; break; }
-        lhs = { k: "conv", x: lhs, target: this.tryHistoricalDate(target) };
-        continue;
-      }
-      if (tk.t === "pctop" && (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is"))) {
-        if (PREC.CONV < minPrec) break;
-        const save = this.i;
-        this.i++;
-        const r = this.parseExpr(PREC.ADD);
-        if (!r) { this.i = save; break; }
-        lhs = { k: "pctop", op: tk.op, l: lhs, r };
-        continue;
+        case "bang": {
+          if (PREC.POSTFIX < minPrec) break loop;
+          this.i++;
+          lhs = { k: "fact", x: lhs };
+          continue loop;
+        }
+        case "unit": {
+          if (PREC.POSTFIX < minPrec) break loop;
+          this.i++;
+          lhs = { k: "unit", x: lhs, unit: tk.unit };
+          continue loop;
+        }
+        case "currency": {
+          if (PREC.POSTFIX < minPrec) break loop;
+          this.i++;
+          lhs = { k: "curr", x: lhs, code: tk.code };
+          continue loop;
+        }
+        case "scale": {
+          if (PREC.POSTFIX < minPrec) break loop;
+          this.i++;
+          lhs = { k: "scale", x: lhs, mult: tk.mult, label: "" };
+          continue loop;
+        }
+        case "op": {
+          switch (tk.op) {
+            case "pow": {
+              if (PREC.POW < minPrec) break loop;
+              const save = this.i;
+              this.i++;
+              const r = this.parseExpr(PREC.POW);
+              if (!r) { this.i = save; break loop; }
+              lhs = { k: "bin", op: "pow", l: lhs, r };
+              continue loop;
+            }
+            case "mul":
+            case "div":
+            case "mod": {
+              if (PREC.MUL < minPrec) break loop;
+              const save = this.i;
+              this.i++;
+              const r = this.parseExpr(PREC.MUL + 1);
+              if (!r) { this.i = save; break loop; }
+              lhs = { k: "bin", op: tk.op, l: lhs, r };
+              continue loop;
+            }
+            case "plus":
+            case "minus": {
+              if (PREC.ADD < minPrec) break loop;
+              const save = this.i;
+              this.i++;
+              const r = this.parseExpr(PREC.ADD + 1);
+              if (!r) { this.i = save; break loop; }
+              lhs = { k: "bin", op: tk.op, l: lhs, r };
+              continue loop;
+            }
+          }
+          break loop;
+        }
+        case "pctop": {
+          if (tk.op === "of" || tk.op === "off" || tk.op === "on") {
+            if (!(lhs.k === "pct" || lhs.k === "var" || lhs.k === "pctop")) {
+              this.i++;
+              continue loop;
+            }
+            if (PREC.MUL < minPrec) break loop;
+            const save = this.i;
+            this.i++;
+            const r = this.parseExpr(PREC.MUL + 1);
+            if (!r) { this.i = save; break loop; }
+            lhs = { k: "pctop", op: tk.op, l: lhs, r };
+            continue loop;
+          }
+          if (tk.op.startsWith("as_pct") || tk.op.endsWith("what_is")) {
+            if (PREC.CONV < minPrec) break loop;
+            const save = this.i;
+            this.i++;
+            const r = this.parseExpr(PREC.ADD);
+            if (!r) { this.i = save; break loop; }
+            lhs = { k: "pctop", op: tk.op, l: lhs, r };
+            continue loop;
+          }
+          break loop;
+        }
+        case "lparen":
+        case "const":
+        case "func":
+        case "word": {
+          if (tk.t === "word" && !this.vars.has(tk.raw)) break loop;
+          if (PREC.MUL < minPrec) break loop;
+          const save = this.i;
+          const r = this.parseExpr(PREC.MUL + 1);
+          if (!r) { this.i = save; break loop; }
+          lhs = { k: "bin", op: "mul", l: lhs, r };
+          continue loop;
+        }
+        case "bitop": {
+          if (PREC.BIT < minPrec) break loop;
+          const save = this.i;
+          this.i++;
+          const r = this.parseExpr(PREC.BIT + 1);
+          if (!r) { this.i = save; break loop; }
+          lhs = { k: "bit", op: tk.op, l: lhs, r };
+          continue loop;
+        }
+        case "conv": {
+          if (PREC.CONV < minPrec) break loop;
+          const save = this.i;
+          this.i++;
+          const target = this.parseTarget();
+          if (!target) { this.i = save; break loop; }
+          lhs = { k: "conv", x: lhs, target: this.tryHistoricalDate(target) };
+          continue loop;
+        }
       }
 
       break;
