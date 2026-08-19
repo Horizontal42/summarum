@@ -30,9 +30,13 @@ export interface SearchController {
   open(): void;
 }
 
-const $ = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
+const $ = <T extends HTMLElement>(sel: string): T =>
+  document.querySelector(sel) as T;
 
-export function parseResultQuery(engine: SumEngine, q: string): { op: string; threshold: Value } | null {
+export function parseResultQuery(
+  engine: SumEngine,
+  q: string,
+): { op: string; threshold: Value } | null {
   const m = /^(>=|<=|>|<|=|~)\s*(.+)$/.exec(q.trim());
   if (!m) return null;
   const v = engine.evaluateExpression(m[2].trim());
@@ -50,22 +54,41 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     const hits: SearchHit[] = [];
     for (const doc of docs) {
       const results = deps.workspace.getCachedResults(doc);
-      const lines = doc.text.split("\n");
+      let lines: string[] | undefined;
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
         if (!r.value || r.value.kind !== "quantity") continue;
         const v = r.value.value;
         let match = false;
         switch (rq.op) {
-          case ">":  match = v.gt(th); break;
-          case ">=": match = v.gte(th); break;
-          case "<":  match = v.lt(th); break;
-          case "<=": match = v.lte(th); break;
-          case "=":  match = v.eq(th); break;
-          case "~":  match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01); break;
+          case ">":
+            match = v.gt(th);
+            break;
+          case ">=":
+            match = v.gte(th);
+            break;
+          case "<":
+            match = v.lt(th);
+            break;
+          case "<=":
+            match = v.lte(th);
+            break;
+          case "=":
+            match = v.eq(th);
+            break;
+          case "~":
+            match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01);
+            break;
         }
         if (match) {
-          hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] ?? "", result: r.text ?? undefined });
+          if (!lines) lines = doc.text.split("\n");
+          hits.push({
+            docId: doc.id,
+            docTitle: doc.title,
+            line: i + 1,
+            text: lines[i] ?? "",
+            result: r.text ?? undefined,
+          });
           if (hits.length >= 200) return hits;
         }
       }
@@ -78,7 +101,12 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     const lines = doc.text.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].toLowerCase().includes(ql)) {
-        hits.push({ docId: doc.id, docTitle: doc.title, line: i + 1, text: lines[i] });
+        hits.push({
+          docId: doc.id,
+          docTitle: doc.title,
+          line: i + 1,
+          text: lines[i],
+        });
         if (hits.length >= 200) return hits;
       }
     }
@@ -113,7 +141,9 @@ export function initSearch(deps: SearchDeps): SearchController {
       docEl.textContent = hit.docTitle;
       const lineEl = document.createElement("div");
       lineEl.className = "line";
-      lineEl.textContent = hit.result ? `${hit.text} = ${hit.result}` : hit.text;
+      lineEl.textContent = hit.result
+        ? `${hit.text} = ${hit.result}`
+        : hit.text;
       item.append(docEl, lineEl);
       item.addEventListener("click", () => {
         deps.onOpen(hit.docId, hit.line);
