@@ -165,7 +165,7 @@ numi.addFunction({ id: "гипот", phrases: "гипот" },
 
 ```bash
 npm install
-npm test               # тесты движка (259 кейсов)
+npm test               # тесты движка (373 кейса)
 npm run tauri dev      # запустить приложение
 npm run tauri build    # собрать установщик
 ```

@@ -169,7 +169,7 @@ see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 npm install
-npm test               # engine tests (259 cases)
+npm test               # engine tests (373 cases)
 npm run tauri dev      # run the app
 npm run tauri build    # build the installer
 ```

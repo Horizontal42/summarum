@@ -23,13 +23,16 @@ src/
     editor.ts        CodeMirror 6 wiring: highlight, results overlay, copy
     search.ts        cross-sheet search overlay (text + result-value queries)
     export.ts        renders the sheet + results to a PNG (clipboard/file)
+    sparkline.ts     SVG sparkline renderer for `chart` results
     app.css          themes (light/dark via CSS variables)
   main.ts            app bootstrap: documents, settings, status bar, dnd
+  workspace.ts       cross-sheet references: exports cache, cycle detection
   storage.ts         Tauri commands / localStorage fallback
   extensions.ts      runs user .js files in a QuickJS/WASM sandbox, bridged
                      to the engine's numi.* API
   i18n.ts            interface strings (en/ru)
   updater.ts         checks tauri-plugin-updater, installs + relaunches
+  logger.ts          thin console wrapper (info/warn/error)
 src-tauri/
   src/main.rs        tray, hide-to-tray, storage commands, rates fetching
                      (open.er-api.com + CoinGecko + Yahoo Finance v8 chart)
@@ -300,7 +303,7 @@ All files below live in `%APPDATA%/app.summarum.calc` (or the user-chosen folder
 
 ## Tests
 
-`npm test` runs 259 vitest cases: `src/engine/*.test.ts` covers every
+`npm test` runs 373 vitest cases across 21 files: `src/engine/*.test.ts` covers every
 expression class, both languages, deterministic injected rates, goal seek,
 historical rates (injected), date-format literals/display (dedicated engines
 with an explicit `dateFormat`, since the default "system" format depends on
