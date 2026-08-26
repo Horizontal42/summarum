@@ -219,13 +219,34 @@ export async function fetchHistoricalRatesBatch(dates: string[]): Promise<Record
     if (isTauri()) {
       return await invoke<Record<string, Record<string, number>>>("fetch_historical_rates_batch", { dates });
     }
+    const sortedDates = [...dates].sort();
+    const minDateObj = new Date(sortedDates[0]);
+    minDateObj.setDate(minDateObj.getDate() - 7);
+    const minDateQuery = minDateObj.toISOString().split("T")[0];
+    const maxDate = sortedDates[sortedDates.length - 1];
+
+    const res = await fetch(`https://api.frankfurter.dev/v1/${minDateQuery}..${maxDate}?from=USD`);
+    const json = await res.json();
+    if (!json?.rates) return {};
+
+    const rangeDates = Object.keys(json.rates).sort();
     const results: Record<string, Record<string, number>> = {};
-    await Promise.all(
-      dates.map(async (date) => {
-        const rates = await fetchHistoricalRates(date);
-        if (rates) results[date] = rates;
-      })
-    );
+
+    for (const date of dates) {
+      let targetDate = date;
+      if (!json.rates[date]) {
+        const possibleDates = rangeDates.filter(d => d <= date);
+        if (possibleDates.length === 0) continue;
+        targetDate = possibleDates[possibleDates.length - 1];
+      }
+
+      const dayRates = json.rates[targetDate] as Record<string, number>;
+      const out: Record<string, number> = { USD: 1 };
+      for (const [k, v] of Object.entries(dayRates)) {
+        if (v > 0) out[k.toUpperCase()] = v;
+      }
+      results[date] = out;
+    }
     return results;
   } catch (e) {
     logger.warn("fetchHistoricalRatesBatch failed", e);

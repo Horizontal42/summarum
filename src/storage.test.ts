@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
+import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates, fetchHistoricalRatesBatch } from './storage';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -379,6 +379,39 @@ describe('storage', () => {
       vi.mocked(fetch).mockResolvedValue({ json: vi.fn().mockResolvedValue(mockResponse) } as unknown as Response);
       const result = await fetchRates();
       expect(result).toBeNull();
+    });
+  });
+
+  describe('fetchHistoricalRatesBatch', () => {
+    it('uses invoke when in Tauri', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      const mockRates = { '2024-01-01': { EUR: 0.85 } };
+      vi.mocked(invoke).mockResolvedValue(mockRates);
+
+      const result = await fetchHistoricalRatesBatch(['2024-01-01']);
+      expect(invoke).toHaveBeenCalledWith('fetch_historical_rates_batch', { dates: ['2024-01-01'] });
+      expect(result).toEqual(mockRates);
+    });
+
+    it('uses fetch when not in Tauri and falls back to closest dates', async () => {
+      const mockResponse = { rates: { '2023-12-29': { EUR: 0.84 }, '2024-01-02': { EUR: 0.85, JPY: -1 }, '2024-01-05': { EUR: 0.86 } } };
+      vi.mocked(fetch).mockResolvedValue({ json: vi.fn().mockResolvedValue(mockResponse) } as unknown as Response);
+
+      const dates = ['2024-01-01', '2024-01-03', '2024-01-05'];
+      const result = await fetchHistoricalRatesBatch(dates);
+
+      expect(fetch).toHaveBeenCalledWith('https://api.frankfurter.dev/v1/2023-12-25..2024-01-05?from=USD');
+
+      expect(result['2024-01-01']).toEqual({ USD: 1, EUR: 0.84 });
+      expect(result['2024-01-03']).toEqual({ USD: 1, EUR: 0.85 });
+      expect(result['2024-01-05']).toEqual({ USD: 1, EUR: 0.86 });
+    });
+
+    it('returns empty if fetch fails', async () => {
+      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
+      const result = await fetchHistoricalRatesBatch(['2024-01-01']);
+      expect(logger.warn).toHaveBeenCalledWith('fetchHistoricalRatesBatch failed', expect.any(Error));
+      expect(result).toEqual({});
     });
   });
 
