@@ -539,7 +539,7 @@ function findBisectionBounds(safeEval: SafeEvalFn): Bounds {
 }
 
 function solveBisection(safeEval: SafeEvalFn, initialBounds: Bounds): Decimal {
-  let { lo, hi, flo, fhi } = initialBounds;
+  let { lo, hi, flo } = initialBounds;
   for (let i = 0; i < 100; i++) {
     const mid = lo.plus(hi).div(2);
     if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return mid;
@@ -550,7 +550,6 @@ function solveBisection(safeEval: SafeEvalFn, initialBounds: Bounds): Decimal {
     }
     if (flo!.mul(fm).lte(0)) {
       hi = mid;
-      fhi = fm;
     } else {
       lo = mid;
       flo = fm;
