@@ -18,7 +18,6 @@ interface SheetExports {
   results: LineResult[];
 }
 
-const XREF_SCAN_RE = /@(?:\[([^\]]+)\]|([\p{L}_][\p{L}\d_]*))\./gu;
 const XREF_BARE_RE_STICKY = /@([\p{L}_][\p{L}\d_]*)\./guy;
 
 function escapeRegExp(s: string): string {
