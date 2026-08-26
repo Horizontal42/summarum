@@ -33,6 +33,10 @@ export interface SearchController {
 const $ = <T extends HTMLElement>(sel: string): T =>
   document.querySelector(sel) as T;
 
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+}
+
 export function parseResultQuery(
   engine: SumEngine,
   q: string,
@@ -95,20 +99,40 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     }
     return hits;
   }
-  const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
+  const regex = new RegExp(escapeRegExp(q), "gi");
+
   for (const doc of docs) {
-    const lines = doc.text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(ql)) {
-        hits.push({
-          docId: doc.id,
-          docTitle: doc.title,
-          line: i + 1,
-          text: lines[i],
-        });
-        if (hits.length >= 200) return hits;
+    const text = doc.text;
+    regex.lastIndex = 0;
+
+    let lastNlIndex = -1;
+    let currentLineNum = 1;
+
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      while (true) {
+        const nextNl = text.indexOf("\n", lastNlIndex + 1);
+        if (nextNl === -1 || nextNl >= match.index) {
+          break;
+        }
+        currentLineNum++;
+        lastNlIndex = nextNl;
       }
+
+      const lineStart = lastNlIndex + 1;
+      let lineEnd = text.indexOf("\n", match.index);
+      if (lineEnd === -1) lineEnd = text.length;
+
+      hits.push({
+        docId: doc.id,
+        docTitle: doc.title,
+        line: currentLineNum,
+        text: text.substring(lineStart, lineEnd),
+      });
+      if (hits.length >= 200) return hits;
+
+      regex.lastIndex = lineEnd;
     }
   }
   return hits;
