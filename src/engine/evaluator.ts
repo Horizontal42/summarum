@@ -475,77 +475,74 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   return { ...date, ms, hasTime };
 }
 
-function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
-  const evalF = (x: Decimal): Decimal => {
-    const vars = new Map(ctx.vars);
-    vars.set("__x__", qty(x));
-    const innerCtx: EvalCtx = { ...ctx, vars };
-    const lv = evaluate(lhsNode, innerCtx);
-    const rv = evaluate(rhsNode, innerCtx);
-    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : DEC_ZERO;
-    return toD(lv).minus(toD(rv));
-  };
+type SafeEvalFn = (x: Decimal) => Decimal | null;
 
-  const safeEval = (x: Decimal): Decimal | null => {
-    try {
-      return evalF(x);
-    } catch {
-      return null;
-    }
-  };
-
+function solveLinear(safeEval: SafeEvalFn): Decimal | null {
   const f0 = safeEval(DEC_ZERO);
   const f1 = safeEval(DEC_ONE);
-
   if (f0 !== null && f1 !== null) {
     const slope = f1.minus(f0);
     if (!slope.isZero()) {
       const root = f0.neg().div(slope);
       const fRoot = safeEval(root);
-      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9")))
-        return qty(root);
+      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9"))) return root;
     }
   }
+  return null;
+}
 
-  // Bisection fallback for nonlinear cases
+interface Bounds {
+  lo: Decimal;
+  hi: Decimal;
+  flo: Decimal | null;
+  fhi: Decimal | null;
+}
+
+function findBisectionBounds(safeEval: SafeEvalFn): Bounds {
   let lo = new Decimal(-1e9);
   let hi = new Decimal(1e9);
   let flo = safeEval(lo);
   let fhi = safeEval(hi);
 
-  if (flo === null || fhi === null || flo.mul(fhi).gt(0)) {
-    const probes = [
-      1, 2, 5, 10, 100, 1000, 10000, -1, -2, -5, -10, -100, -1000, -10000,
-    ];
-    let found = false;
-    for (const p of probes) {
-      const pDec = new Decimal(p);
-      const fp = safeEval(pDec);
-      if (fp === null) continue;
-      if (flo === null) {
-        lo = pDec;
-        flo = fp;
-      } else if (fhi === null) {
-        hi = pDec;
-        fhi = fp;
-      } else if (flo.mul(fp).lte(0)) {
-        hi = pDec;
-        fhi = fp;
-      } else if (fhi.mul(fp).lte(0)) {
-        lo = pDec;
-        flo = fp;
-      } else continue;
-      if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) throw new EvalError("no solution");
+  if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) {
+    return { lo, hi, flo, fhi };
   }
 
+  const probes = [
+    1, 2, 5, 10, 100, 1000, 10000, -1, -2, -5, -10, -100, -1000, -10000,
+  ];
+  let found = false;
+  for (const p of probes) {
+    const pDec = new Decimal(p);
+    const fp = safeEval(pDec);
+    if (fp === null) continue;
+    if (flo === null) {
+      lo = pDec;
+      flo = fp;
+    } else if (fhi === null) {
+      hi = pDec;
+      fhi = fp;
+    } else if (flo.mul(fp).lte(0)) {
+      hi = pDec;
+      fhi = fp;
+    } else if (fhi.mul(fp).lte(0)) {
+      lo = pDec;
+      flo = fp;
+    } else continue;
+    if (flo !== null && fhi !== null && flo.mul(fhi).lte(0)) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) throw new EvalError("no solution");
+  return { lo, hi, flo, fhi };
+}
+
+function solveBisection(safeEval: SafeEvalFn, initialBounds: Bounds): Decimal {
+  let { lo, hi, flo, fhi } = initialBounds;
   for (let i = 0; i < 100; i++) {
     const mid = lo.plus(hi).div(2);
-    if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return qty(mid);
+    if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return mid;
     const fm = safeEval(mid);
     if (fm === null) {
       lo = mid.plus("1e-9");
@@ -559,7 +556,34 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
       flo = fm;
     }
   }
-  return qty(lo.plus(hi).div(2));
+  return lo.plus(hi).div(2);
+}
+
+function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
+  const evalF = (x: Decimal): Decimal => {
+    const vars = new Map(ctx.vars);
+    vars.set("__x__", qty(x));
+    const innerCtx: EvalCtx = { ...ctx, vars };
+    const lv = evaluate(lhsNode, innerCtx);
+    const rv = evaluate(rhsNode, innerCtx);
+    const toD = (v: Value) => (v.kind === "quantity" ? toBase(v) : DEC_ZERO);
+    return toD(lv).minus(toD(rv));
+  };
+
+  const safeEval: SafeEvalFn = (x: Decimal) => {
+    try {
+      return evalF(x);
+    } catch {
+      return null;
+    }
+  };
+
+  const linearRoot = solveLinear(safeEval);
+  if (linearRoot !== null) return qty(linearRoot);
+
+  const bounds = findBisectionBounds(safeEval);
+  const bisectionRoot = solveBisection(safeEval, bounds);
+  return qty(bisectionRoot);
 }
 
 /** Lines whose unit shares the first line's dimension (mixed-dimension blocks skip the rest). */
