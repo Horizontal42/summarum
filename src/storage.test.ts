@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
+import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates, getLaunchFile } from './storage';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -413,6 +413,31 @@ describe('storage', () => {
       const mockResponse = { amount: 1, base: 'USD', date: '2024-01-01' }; // missing rates
       vi.mocked(fetch).mockResolvedValue({ json: vi.fn().mockResolvedValue(mockResponse) } as unknown as Response);
       const result = await fetchHistoricalRates('2024-01-01');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getLaunchFile', () => {
+    it('returns null if not in Tauri', async () => {
+      vi.stubGlobal('window', {});
+      expect(await getLaunchFile()).toBeNull();
+    });
+
+    it('returns launch file path if in Tauri', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      vi.mocked(invoke).mockResolvedValueOnce('/path/to/file.numi');
+
+      const result = await getLaunchFile();
+      expect(invoke).toHaveBeenCalledWith('get_launch_file', undefined);
+      expect(result).toBe('/path/to/file.numi');
+    });
+
+    it('returns null if invoke fails', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      vi.mocked(invoke).mockRejectedValueOnce(new Error('invoke failed'));
+
+      const result = await getLaunchFile();
+      expect(invoke).toHaveBeenCalledWith('get_launch_file', undefined);
       expect(result).toBeNull();
     });
   });
