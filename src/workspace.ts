@@ -18,7 +18,7 @@ interface SheetExports {
   results: LineResult[];
 }
 
-const XREF_SCAN_RE = /@(?:\[([^\]]+)\]|([\p{L}_][\p{L}\d_]*))\./gu;
+const XREF_BARE_RE_STICKY = /@([\p{L}_][\p{L}\d_]*)\./guy;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -104,7 +104,28 @@ export class Workspace {
       if (cached && cached.text === text) return cached.refs;
     }
     const out: string[] = [];
-    for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
+    let i = 0;
+    while ((i = text.indexOf("@", i)) !== -1) {
+      if (i + 1 >= text.length) break;
+
+      if (text[i + 1] === "[") {
+        const endBracket = text.indexOf("]", i + 2);
+        if (endBracket !== -1 && endBracket + 1 < text.length && text[endBracket + 1] === ".") {
+          out.push(text.substring(i + 2, endBracket).trim());
+          i = endBracket + 2;
+          continue;
+        }
+      } else {
+        XREF_BARE_RE_STICKY.lastIndex = i;
+        const m = XREF_BARE_RE_STICKY.exec(text);
+        if (m !== null) {
+          out.push(m[1]); // no trim needed for bare identifier regex match
+          i = XREF_BARE_RE_STICKY.lastIndex;
+          continue;
+        }
+      }
+      i++;
+    }
     if (id) {
       this.parsedRefsCache.set(id, { text, refs: out });
     }
