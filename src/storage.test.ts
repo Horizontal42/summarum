@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
+import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates, fetchMarketData } from './storage';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -31,6 +31,40 @@ describe('storage', () => {
     it('returns true when in Tauri', () => {
       vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
       expect(isTauri()).toBe(true);
+    });
+  });
+
+  describe('fetchMarketData', () => {
+    it('returns empty object when not in Tauri', async () => {
+      const result = await fetchMarketData(['AAPL', 'MSFT']);
+      expect(result).toEqual({});
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it('returns empty object when symbols array is empty', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      const result = await fetchMarketData([]);
+      expect(result).toEqual({});
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it('uses invoke when in Tauri and returns data', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      const mockData = { AAPL: 150.0, MSFT: 300.0 };
+      vi.mocked(invoke).mockResolvedValue(mockData);
+
+      const result = await fetchMarketData(['AAPL', 'MSFT']);
+      expect(invoke).toHaveBeenCalledWith('fetch_market_data', { symbols: ['AAPL', 'MSFT'] });
+      expect(result).toEqual(mockData);
+    });
+
+    it('returns empty object and logs warning if invoke fails', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      vi.mocked(invoke).mockRejectedValue(new Error('Network error'));
+
+      const result = await fetchMarketData(['AAPL', 'MSFT']);
+      expect(logger.warn).toHaveBeenCalledWith('fetchMarketData failed', expect.any(Error));
+      expect(result).toEqual({});
     });
   });
 
