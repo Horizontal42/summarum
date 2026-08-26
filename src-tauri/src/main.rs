@@ -662,13 +662,19 @@ async fn fetch_historical_rates_batch(
                     available_dates.sort();
 
                     for req_date_str in missing_dates {
-                        if let Ok(req_date) = chrono::NaiveDate::parse_from_str(&req_date_str, "%Y-%m-%d") {
+                        if let Ok(req_date) =
+                            chrono::NaiveDate::parse_from_str(&req_date_str, "%Y-%m-%d")
+                        {
                             // Find the exact date or the closest preceding date
                             let matched_date_str = match available_dates.binary_search(&req_date) {
-                                Ok(idx) => Some(available_dates[idx].format("%Y-%m-%d").to_string()),
+                                Ok(idx) => {
+                                    Some(available_dates[idx].format("%Y-%m-%d").to_string())
+                                }
                                 Err(idx) => {
                                     if idx > 0 {
-                                        Some(available_dates[idx - 1].format("%Y-%m-%d").to_string())
+                                        Some(
+                                            available_dates[idx - 1].format("%Y-%m-%d").to_string(),
+                                        )
                                     } else {
                                         None
                                     }
@@ -676,9 +682,12 @@ async fn fetch_historical_rates_batch(
                             };
 
                             if let Some(matched_date) = matched_date_str {
-                                if let Some(matched_rates_obj) = rates_obj.get(&matched_date).and_then(|r| r.as_object()) {
+                                if let Some(matched_rates_obj) =
+                                    rates_obj.get(&matched_date).and_then(|r| r.as_object())
+                                {
                                     let daily_rates = parse_rate_map(matched_rates_obj);
-                                    let cache_path = data_dir(&app).join(format!("rates-{}.json", req_date_str));
+                                    let cache_path =
+                                        data_dir(&app).join(format!("rates-{}.json", req_date_str));
                                     if let Ok(serialized) = serde_json::to_string(&daily_rates) {
                                         write_atomic_async(cache_path, serialized).await;
                                     }
