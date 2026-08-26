@@ -140,7 +140,11 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
-function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): void {
+function setupDocInteraction(
+  el: HTMLElement,
+  doc: DocMeta,
+  list: HTMLElement,
+): void {
   // Reordering uses plain mouse tracking, not the native HTML5 drag API —
   // Tauri's window-level file-drop hook (dragDropEnabled, needed for
   // dropping .numi files from Explorer) intercepts WebView2's own drag
@@ -163,7 +167,8 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): 
         });
       }
       if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < 4) return;
+        const dy = ev.clientY - startY;
+        if (dy > -4 && dy < 4) return;
         dragging = true;
         suppressClick = true;
         el.classList.add("dragging");
@@ -171,10 +176,9 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): 
       }
       let over: HTMLElement | undefined;
       for (const item of cachedItems) {
-        if (!over && item.el !== el) {
-          if (ev.clientY >= item.top && ev.clientY <= item.bottom) {
-            over = item.el;
-          }
+        if (ev.clientY >= item.top && ev.clientY <= item.bottom) {
+          if (item.el !== el) over = item.el;
+          break;
         }
       }
       let newOver: HTMLElement | undefined;
@@ -341,7 +345,9 @@ async function closeActiveDoc(): Promise<void> {
   void backupDeletedSheet(settings.dataDir, doc.title, content);
   delete data.contents[doc.id];
   removeDocById(doc.id);
-  const nextId = data.docs[idx] ? data.docs[idx].id : (data.docs[idx - 1]?.id ?? data.docs[0].id);
+  const nextId = data.docs[idx]
+    ? data.docs[idx].id
+    : (data.docs[idx - 1]?.id ?? data.docs[0].id);
   switchDoc(nextId);
   saveAppData(data);
 }
