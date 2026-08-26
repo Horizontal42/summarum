@@ -631,7 +631,10 @@ async fn fetch_historical_rates_batch(
     let mut futures = Vec::new();
 
     for date in missing_dates {
-        let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
+        let mut url = String::with_capacity(42 + date.len());
+        url.push_str("https://api.frankfurter.dev/v1/");
+        url.push_str(&date);
+        url.push_str("?from=USD");
         let client_clone = client.clone();
         let app_clone = app.clone();
 
