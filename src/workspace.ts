@@ -29,6 +29,7 @@ export class Workspace {
   private resolving: Set<string> = new Set();
   private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
   private titleCache: Map<string, SheetSource> | null = null;
+  private lowerTitleCache = new Map<string, string>();
 
   constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
 
@@ -115,8 +116,14 @@ export class Workspace {
     const needle = title.trim().toLowerCase();
     if (this.titleCache === null) {
       this.titleCache = new Map();
-      for (const s of this.sheets()) {
-        const key = s.title.trim().toLowerCase();
+      const currentSheets = this.sheets();
+      for (let i = 0, len = currentSheets.length; i < len; i++) {
+        const s = currentSheets[i];
+        let key = this.lowerTitleCache.get(s.title);
+        if (key === undefined) {
+          key = s.title.trim().toLowerCase();
+          this.lowerTitleCache.set(s.title, key);
+        }
         if (!this.titleCache.has(key)) {
           this.titleCache.set(key, s);
         }
