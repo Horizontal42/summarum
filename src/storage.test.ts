@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
+import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, openExtensionsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -296,6 +296,19 @@ describe('storage', () => {
         vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
         await openBackupsFolder('dir');
         expect(invoke).toHaveBeenCalledWith('open_backups_folder', { dir: 'dir' });
+      });
+    });
+
+    describe('openExtensionsFolder', () => {
+      it('does nothing when not in Tauri', async () => {
+        await openExtensionsFolder();
+        expect(invoke).not.toHaveBeenCalled();
+      });
+
+      it('calls invoke when in Tauri', async () => {
+        vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+        await openExtensionsFolder();
+        expect(invoke).toHaveBeenCalledWith('open_extensions_folder', undefined);
       });
     });
 
