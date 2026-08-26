@@ -256,7 +256,12 @@ export async function fetchHistoricalRates(date: string): Promise<Record<string,
 
 export async function writeImageFile(dataBase64: string): Promise<boolean> {
   if (!isTauri()) return false;
-  return invoke("write_image_file", { dataBase64 });
+  try {
+    return await invoke("write_image_file", { dataBase64 });
+  } catch (e) {
+    logger.warn("writeImageFile failed", e);
+    return false;
+  }
 }
 
 // ---------- market data
