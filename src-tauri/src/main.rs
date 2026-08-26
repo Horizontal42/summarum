@@ -628,42 +628,68 @@ async fn fetch_historical_rates_batch(
             .unwrap_or_default()
     });
 
-    let mut futures = Vec::new();
+    let mut parsed_dates: Vec<chrono::NaiveDate> = missing_dates
+        .iter()
+        .filter_map(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+        .collect();
 
-    for date in missing_dates {
-        let url = format!("https://api.frankfurter.dev/v1/{}?from=USD", date);
-        let client_clone = client.clone();
-        let app_clone = app.clone();
+    if parsed_dates.is_empty() {
+        return Ok(results);
+    }
 
-        futures.push(async move {
-            let mut rate_map = None;
-            if let Ok(resp) = client_clone.get(&url).send().await {
-                if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT).await {
-                    if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                        if let Some(rates_obj) = body["rates"].as_object() {
-                            let daily_rates = parse_rate_map(rates_obj);
-                            let cache_path =
-                                data_dir(&app_clone).join(format!("rates-{}.json", date));
-                            if let Ok(serialized) = serde_json::to_string(&daily_rates) {
-                                write_atomic_async(cache_path, serialized).await;
+    parsed_dates.sort();
+
+    let min_date = parsed_dates.first().unwrap();
+    let max_date = parsed_dates.last().unwrap();
+
+    // Request from min_date - 7 days to cover weekends/holidays before the earliest requested date
+    let start_date = *min_date - chrono::Duration::days(7);
+
+    let url = format!(
+        "https://api.frankfurter.dev/v1/{}..{}?from=USD",
+        start_date.format("%Y-%m-%d"),
+        max_date.format("%Y-%m-%d")
+    );
+
+    if let Ok(resp) = client.get(&url).send().await {
+        if let Ok(bytes) = read_body_capped(resp, RATES_RESPONSE_LIMIT * 50).await {
+            if let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                if let Some(rates_obj) = body["rates"].as_object() {
+                    let mut available_dates: Vec<chrono::NaiveDate> = rates_obj
+                        .keys()
+                        .filter_map(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                        .collect();
+                    available_dates.sort();
+
+                    for req_date_str in missing_dates {
+                        if let Ok(req_date) = chrono::NaiveDate::parse_from_str(&req_date_str, "%Y-%m-%d") {
+                            // Find the exact date or the closest preceding date
+                            let matched_date_str = match available_dates.binary_search(&req_date) {
+                                Ok(idx) => Some(available_dates[idx].format("%Y-%m-%d").to_string()),
+                                Err(idx) => {
+                                    if idx > 0 {
+                                        Some(available_dates[idx - 1].format("%Y-%m-%d").to_string())
+                                    } else {
+                                        None
+                                    }
+                                }
+                            };
+
+                            if let Some(matched_date) = matched_date_str {
+                                if let Some(matched_rates_obj) = rates_obj.get(&matched_date).and_then(|r| r.as_object()) {
+                                    let daily_rates = parse_rate_map(matched_rates_obj);
+                                    let cache_path = data_dir(&app).join(format!("rates-{}.json", req_date_str));
+                                    if let Ok(serialized) = serde_json::to_string(&daily_rates) {
+                                        write_atomic_async(cache_path, serialized).await;
+                                    }
+                                    results.insert(req_date_str, daily_rates);
+                                }
                             }
-                            rate_map = Some((date, daily_rates));
                         }
                     }
                 }
             }
-            rate_map
-        });
-    }
-
-    use futures::stream::StreamExt;
-    let fetched_results = futures::stream::iter(futures)
-        .buffer_unordered(5)
-        .collect::<Vec<_>>()
-        .await;
-
-    for (date, rates) in fetched_results.into_iter().flatten() {
-        results.insert(date, rates);
+        }
     }
 
     Ok(results)
