@@ -1,6 +1,6 @@
 // Lexes a line and resolves phrases through the registry into semantic tokens.
 import { DateOrder, Decimal, NumeralRepr, Unit } from "./types";
-import { lexLine } from "./lexer";
+import { Lex, lexLine } from "./lexer";
 import { Registry, PctOp, DateWord, BitOp } from "./registry";
 
 export type Token =
@@ -29,6 +29,33 @@ export type Token =
   | { t: "word"; raw: string; start: number; end: number }
   | { t: "unknown"; start: number; end: number }
   | { t: "junk"; raw: string; start: number; end: number };
+
+function processSymToken(lx: Lex, nextLx: Lex | undefined, tokens: Token[]): number {
+  const span = { start: lx.start, end: lx.end };
+  // << and >> arrive as two single-char lexemes
+  if ((lx.raw === "<" || lx.raw === ">") && nextLx?.type === "sym" && nextLx.raw === lx.raw && nextLx.start === lx.end) {
+    tokens.push({ t: "bitop", op: lx.raw === "<" ? "shl" : "shr", start: lx.start, end: nextLx.end });
+    return 2;
+  }
+  switch (lx.raw) {
+    case "&": tokens.push({ t: "bitop", op: "band", ...span }); break;
+    case "|": tokens.push({ t: "bitop", op: "bor", ...span }); break;
+    case "+": tokens.push({ t: "op", op: "plus", ...span }); break;
+    case "-": case "−": case "–": tokens.push({ t: "op", op: "minus", ...span }); break;
+    case "*": case "×": case "·": tokens.push({ t: "op", op: "mul", ...span }); break;
+    case "/": case "÷": tokens.push({ t: "op", op: "div", ...span }); break;
+    case "^": tokens.push({ t: "op", op: "pow", ...span }); break;
+    case "%": tokens.push({ t: "percent", ...span }); break;
+    case "(": tokens.push({ t: "lparen", ...span }); break;
+    case ")": tokens.push({ t: "rparen", ...span }); break;
+    case "=": tokens.push({ t: "assign", ...span }); break;
+    case ";": tokens.push({ t: "semicolon", ...span }); break;
+    case "!": tokens.push({ t: "bang", ...span }); break;
+    case "?": tokens.push({ t: "unknown", ...span }); break;
+    default: tokens.push({ t: "junk", raw: lx.raw, ...span });
+  }
+  return 1;
+}
 
 export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dmy"): Token[] {
   const lexes = lexLine(line, dateOrder);
@@ -60,55 +87,13 @@ export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dm
     const m = reg.match(lexes, lowers, i);
     if (m) {
       const end = lexes[i + m.length - 1].end;
-      const s = { start: lx.start, end };
-      const p = m.payload;
-      switch (p.t) {
-        case "unit": tokens.push({ t: "unit", unit: p.unit, ...s }); break;
-        case "currency": tokens.push({ t: "currency", code: p.code, ...s }); break;
-        case "op": tokens.push({ t: "op", op: p.op, ...s }); break;
-        case "bitop": tokens.push({ t: "bitop", op: p.op, ...s }); break;
-        case "special": tokens.push({ t: "special", name: p.name, ...s }); break;
-        case "conv": tokens.push({ t: "conv", ...s }); break;
-        case "assign": tokens.push({ t: "assign", ...s }); break;
-        case "pctop": tokens.push({ t: "pctop", op: p.op, ...s }); break;
-        case "percent": tokens.push({ t: "percent", ...s }); break;
-        case "func": tokens.push({ t: "func", name: p.name, ...s }); break;
-        case "agg": tokens.push({ t: "agg", name: p.name, ...s }); break;
-        case "scale": tokens.push({ t: "scale", mult: p.mult, ...s }); break;
-        case "repr": tokens.push({ t: "repr", repr: p.repr, ...s }); break;
-        case "date": tokens.push({ t: "date", word: p.word, ...s }); break;
-        case "const": tokens.push({ t: "const", name: p.name, ...s }); break;
-      }
+      tokens.push({ ...m.payload, start: lx.start, end } as Token);
       i += m.length;
       continue;
     }
 
     if (lx.type === "sym") {
-      // << and >> arrive as two single-char lexemes
-      const nextLx = lexes[i + 1];
-      if ((lx.raw === "<" || lx.raw === ">") && nextLx?.type === "sym" && nextLx.raw === lx.raw && nextLx.start === lx.end) {
-        tokens.push({ t: "bitop", op: lx.raw === "<" ? "shl" : "shr", start: lx.start, end: nextLx.end });
-        i += 2;
-        continue;
-      }
-      switch (lx.raw) {
-        case "&": tokens.push({ t: "bitop", op: "band", ...span }); break;
-        case "|": tokens.push({ t: "bitop", op: "bor", ...span }); break;
-        case "+": tokens.push({ t: "op", op: "plus", ...span }); break;
-        case "-": case "−": case "–": tokens.push({ t: "op", op: "minus", ...span }); break;
-        case "*": case "×": case "·": tokens.push({ t: "op", op: "mul", ...span }); break;
-        case "/": case "÷": tokens.push({ t: "op", op: "div", ...span }); break;
-        case "^": tokens.push({ t: "op", op: "pow", ...span }); break;
-        case "%": tokens.push({ t: "percent", ...span }); break;
-        case "(": tokens.push({ t: "lparen", ...span }); break;
-        case ")": tokens.push({ t: "rparen", ...span }); break;
-        case "=": tokens.push({ t: "assign", ...span }); break;
-        case ";": tokens.push({ t: "semicolon", ...span }); break;
-        case "!": tokens.push({ t: "bang", ...span }); break;
-        case "?": tokens.push({ t: "unknown", ...span }); break;
-        default: tokens.push({ t: "junk", raw: lx.raw, ...span });
-      }
-      i++;
+      i += processSymToken(lx, lexes[i + 1], tokens);
       continue;
     }
 
