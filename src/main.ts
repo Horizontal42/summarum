@@ -64,7 +64,7 @@ let liveRates: Record<string, number> = {};
 let lastWindowFocusAt = 0;
 
 function uid(): string {
-  return Math.random().toString(36).slice(2, 10);
+  return crypto.randomUUID();
 }
 
 // ---------- documents
