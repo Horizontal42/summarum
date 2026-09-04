@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lexLine } from "./lexer";
+import { lexLine, lexPhrase } from "./lexer";
 import { Decimal } from "./types";
 
 describe("lexer", () => {
@@ -108,6 +108,24 @@ describe("lexer", () => {
       expect(result).toEqual([
         { type: "xref", raw: "@[my sheet].key", start: 0, end: 15, sheet: "my sheet", key: "key" },
       ]);
+    });
+  });
+
+  describe("lexPhrase", () => {
+    it("should split a phrase into raw strings", () => {
+      expect(lexPhrase("meters per second")).toEqual(["meters", "per", "second"]);
+    });
+
+    it("should handle empty strings", () => {
+      expect(lexPhrase("")).toEqual([]);
+    });
+
+    it("should ignore extra spaces", () => {
+      expect(lexPhrase("  meters   per second ")).toEqual(["meters", "per", "second"]);
+    });
+
+    it("should handle symbols correctly", () => {
+      expect(lexPhrase("meters / second")).toEqual(["meters", "/", "second"]);
     });
   });
 });
