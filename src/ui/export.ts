@@ -11,8 +11,8 @@ export interface ExportImageDeps {
   t(key: string): string;
 }
 
-export async function exportSheetImage(deps: ExportImageDeps): Promise<void> {
-  const { lines: rawLines, results: doc, fontSize, toast, t } = deps;
+function createImageCanvas(deps: ExportImageDeps): HTMLCanvasElement {
+  const { lines: rawLines, results: doc, fontSize } = deps;
   const dpr = window.devicePixelRatio || 1;
   const style = getComputedStyle(document.documentElement);
   const bgColor = style.getPropertyValue("--bg").trim() || "#ffffff";
@@ -49,9 +49,11 @@ export async function exportSheetImage(deps: ExportImageDeps): Promise<void> {
     }
   }
 
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-  if (!blob) { toast(t("imageFailed")); return; }
+  return canvas;
+}
 
+async function copyOrSaveImage(blob: Blob, deps: ExportImageDeps): Promise<void> {
+  const { toast, t } = deps;
   try {
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     toast(t("imageCopied"));
@@ -67,6 +69,18 @@ export async function exportSheetImage(deps: ExportImageDeps): Promise<void> {
       toast(t("imageFailed"));
     }
   }
+}
+
+export async function exportSheetImage(deps: ExportImageDeps): Promise<void> {
+  const canvas = createImageCanvas(deps);
+
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+  if (!blob) {
+    deps.toast(deps.t("imageFailed"));
+    return;
+  }
+
+  await copyOrSaveImage(blob, deps);
 }
 
 /** chunked to avoid "Maximum call stack size exceeded" from spreading a large array as args */
