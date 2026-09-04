@@ -324,8 +324,11 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", async (e) => {
     e.preventDefault();
-    for (const f of e.dataTransfer?.files ?? []) {
-      if (/\.(numi|txt|md)$/i.test(f.name)) cb(await f.text());
-    }
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    await Promise.all(
+      files
+        .filter((f) => /\.(numi|txt|md)$/i.test(f.name))
+        .map(async (f) => cb(await f.text()))
+    );
   });
 }
