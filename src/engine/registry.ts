@@ -5,7 +5,7 @@
 import { Decimal, Dimension, NumeralRepr, Unit, Value } from "./types";
 import { Lex, lexLine } from "./lexer";
 import * as vocab from "./vocab";
-import { UNIT_DATA, SI_PREFIXES, DATA_SI_PREFIXES, IEC_PREFIXES, SCALE_DATA } from "./unitdata";
+import { UNIT_DATA, SI_PREFIXES, DATA_SI_PREFIXES, IEC_PREFIXES, SCALE_DATA, UnitData } from "./unitdata";
 import { EXTRA_UNITS, CRYPTO } from "./extraunits";
 
 /** Operators for percentage calculations. */
@@ -270,6 +270,67 @@ function registerCoreVocab(reg: Registry): void {
   for (const f of BUILTIN_FUNCS) reg.addPhrase(f, { t: "func", name: f }, { caseSensitive: false });
 }
 
+function registerPrefixesForUnit(
+  reg: Registry,
+  d: UnitData,
+  unit: Unit,
+  variants: string[],
+  symbol: string | undefined,
+  format: string,
+  symbolsAll: string[],
+  lenientSym: Map<string, Unit | null>,
+  lengthPhrases: LengthPhrase[]
+): void {
+  let prefixes = d.prefixes === "si" ? SI_PREFIXES : [...DATA_SI_PREFIXES, ...IEC_PREFIXES];
+  if (d.id === "second") {
+    // only sub-second prefixes are useful; "as" (attosecond) would
+    // shadow the conversion word "as", "das"/"hs" are noise
+    prefixes = prefixes.filter((p) => ["milli", "micro", "nano", "pico"].includes(p.id));
+  }
+  const wordVariants = variants.filter((v) => v.length > 2 && /^[\p{L}]+$/u.test(v));
+  for (const p of prefixes) {
+    const pWords = vocab.variants(p.category, `${p.id}.prefix`);
+    const pSym = vocab.entryEn(p.category, `${p.id}.symbol`) ?? "";
+    const pSymsAll = vocab.entriesAll(p.category, `${p.id}.symbol`);
+    const mult = new Decimal(p.mult);
+    const pUnit: Unit = {
+      id: `${p.id}:${d.id}`,
+      dimension: d.dimension,
+      ratio: unit.ratio.mul(mult),
+      format: pSym + (symbol ?? format),
+    };
+    const phrases: string[] = [];
+    const csPhrases: string[] = [];
+    if (d.id === "bit") {
+      // no "kb" for bits — bare *b symbols mean bytes (common expectation)
+      csPhrases.push(`${pSym}bit`);
+    } else {
+      // symbol compositions in every locale: "km" and "км"
+      for (const ps of pSymsAll) for (const us of symbolsAll) csPhrases.push(ps + us);
+    }
+    for (const pw of pWords) for (const wv of wordVariants) phrases.push(pw + wv);
+    if (d.id === "byte" && pSym) {
+      // lenient: KB/kb/Kb all mean kilobyte
+      phrases.push((pSym + "b").toLowerCase());
+    }
+    reg.unitsById.set(pUnit.id, pUnit);
+    for (const ph of csPhrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });
+    for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
+    // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
+    // while "mm"/"Mm" stay strict (milli vs mega)
+    for (const ph of csPhrases) {
+      const lower = ph.toLowerCase();
+      const prev = lenientSym.get(lower);
+      if (prev === undefined) lenientSym.set(lower, pUnit);
+      else if (prev && prev.id !== pUnit.id) lenientSym.set(lower, null);
+    }
+    if (d.dimension === "length") {
+      for (const ph of csPhrases) lengthPhrases.push({ phrase: ph, unit: pUnit, caseSensitive: true });
+      for (const pw of pWords) for (const wv of wordVariants) lengthPhrases.push({ phrase: pw + wv, unit: pUnit, caseSensitive: false });
+    }
+  }
+}
+
 // UNIT_DATA + SI/IEC prefixes; returns the length-dimension phrases the
 // area/volume templates need to build "square meter" / "cubic foot" etc.
 function registerUnits(reg: Registry): LengthPhrase[] {
@@ -295,54 +356,7 @@ function registerUnits(reg: Registry): LengthPhrase[] {
     }
 
     if (d.prefixes) {
-      let prefixes = d.prefixes === "si" ? SI_PREFIXES : [...DATA_SI_PREFIXES, ...IEC_PREFIXES];
-      if (d.id === "second") {
-        // only sub-second prefixes are useful; "as" (attosecond) would
-        // shadow the conversion word "as", "das"/"hs" are noise
-        prefixes = prefixes.filter((p) => ["milli", "micro", "nano", "pico"].includes(p.id));
-      }
-      const wordVariants = variants.filter((v) => v.length > 2 && /^[\p{L}]+$/u.test(v));
-      for (const p of prefixes) {
-        const pWords = vocab.variants(p.category, `${p.id}.prefix`);
-        const pSym = vocab.entryEn(p.category, `${p.id}.symbol`) ?? "";
-        const pSymsAll = vocab.entriesAll(p.category, `${p.id}.symbol`);
-        const mult = new Decimal(p.mult);
-        const pUnit: Unit = {
-          id: `${p.id}:${d.id}`,
-          dimension: d.dimension,
-          ratio: unit.ratio.mul(mult),
-          format: pSym + (symbol ?? format),
-        };
-        const phrases: string[] = [];
-        const csPhrases: string[] = [];
-        if (d.id === "bit") {
-          // no "kb" for bits — bare *b symbols mean bytes (common expectation)
-          csPhrases.push(`${pSym}bit`);
-        } else {
-          // symbol compositions in every locale: "km" and "км"
-          for (const ps of pSymsAll) for (const us of symbolsAll) csPhrases.push(ps + us);
-        }
-        for (const pw of pWords) for (const wv of wordVariants) phrases.push(pw + wv);
-        if (d.id === "byte" && pSym) {
-          // lenient: KB/kb/Kb all mean kilobyte
-          phrases.push((pSym + "b").toLowerCase());
-        }
-        reg.unitsById.set(pUnit.id, pUnit);
-        for (const ph of csPhrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });
-        for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
-        // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
-        // while "mm"/"Mm" stay strict (milli vs mega)
-        for (const ph of csPhrases) {
-          const lower = ph.toLowerCase();
-          const prev = lenientSym.get(lower);
-          if (prev === undefined) lenientSym.set(lower, pUnit);
-          else if (prev && prev.id !== pUnit.id) lenientSym.set(lower, null);
-        }
-        if (d.dimension === "length") {
-          for (const ph of csPhrases) lengthPhrases.push({ phrase: ph, unit: pUnit, caseSensitive: true });
-          for (const pw of pWords) for (const wv of wordVariants) lengthPhrases.push({ phrase: pw + wv, unit: pUnit, caseSensitive: false });
-        }
-      }
+      registerPrefixesForUnit(reg, d, unit, variants, symbol, format, symbolsAll, lenientSym, lengthPhrases);
     }
   }
 
