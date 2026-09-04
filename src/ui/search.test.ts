@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SumEngine } from "../engine";
-import { parseResultQuery, searchAllSheets, SearchDeps, SearchDoc } from "./search";
+import { parseResultQuery, searchAllSheets, initSearch, SearchDeps, SearchDoc } from "./search";
 import { Workspace } from "../workspace";
 import Decimal from "decimal.js";
 
@@ -239,5 +239,191 @@ describe("searchAllSheets", () => {
       const hits = searchAllSheets(deps, "> 50");
       expect(hits).toHaveLength(200);
     });
+  });
+});
+
+describe("initSearch", () => {
+  class MockElement {
+    public classList = {
+      classes: new Set<string>(),
+      add: (c: string) => this.classList.classes.add(c),
+      remove: (c: string) => this.classList.classes.delete(c),
+      contains: (c: string) => this.classList.classes.has(c),
+    };
+    public value = "";
+    public className = "";
+    public textContent = "";
+    public children: MockElement[] = [];
+    public listeners: Record<string, ((e: any) => void)[]> = {};
+
+    constructor(public tag?: string) {}
+
+    replaceChildren() {
+      this.children = [];
+    }
+
+    appendChild(child: MockElement) {
+      if (child instanceof MockDocumentFragment) {
+        this.children.push(...child.children);
+      } else {
+        this.children.push(child);
+      }
+    }
+
+    append(...nodes: MockElement[]) {
+      this.children.push(...nodes);
+    }
+
+    addEventListener(event: string, handler: (e: any) => void) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(handler);
+    }
+
+    dispatchEvent(event: string, e: any = {}) {
+      for (const h of this.listeners[event] || []) {
+        h(e);
+      }
+    }
+
+    click() {
+      this.dispatchEvent("click");
+    }
+
+    focus() {}
+
+    querySelector(sel: string): MockElement | null {
+      if (sel === ".search-item") {
+        return this.children.find((c) => c.className === "search-item") || null;
+      }
+      return null;
+    }
+  }
+
+  class MockDocumentFragment extends MockElement {}
+
+  let mockOverlay: MockElement;
+  let mockInput: MockElement;
+  let mockResults: MockElement;
+  let deps: SearchDeps;
+
+  const mockDocument = {
+    querySelector(sel: string) {
+      if (sel === "#search-overlay") return mockOverlay;
+      if (sel === "#search-input") return mockInput;
+      if (sel === "#search-results") return mockResults;
+      return null;
+    },
+    createElement(tag: string) {
+      return new MockElement(tag);
+    },
+    createDocumentFragment() {
+      return new MockDocumentFragment();
+    }
+  };
+
+  beforeEach(() => {
+    mockOverlay = new MockElement("div");
+    mockInput = new MockElement("input");
+    mockResults = new MockElement("div");
+    vi.stubGlobal("document", mockDocument);
+    vi.useFakeTimers();
+
+    deps = {
+      engine: new SumEngine(),
+      workspace: {} as any,
+      docs: () => [],
+      t: (k: string) => `trans_${k}`,
+      onOpen: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("opens the search overlay and focuses input", () => {
+    const controller = initSearch(deps);
+    mockOverlay.classList.add("hidden");
+
+    controller.open();
+
+    expect(mockOverlay.classList.contains("hidden")).toBe(false);
+    expect(mockInput.value).toBe("");
+    expect(mockResults.children).toHaveLength(0);
+  });
+
+  it("closes on Escape key", () => {
+    initSearch(deps);
+    mockInput.dispatchEvent("keydown", { key: "Escape" });
+    expect(mockOverlay.classList.contains("hidden")).toBe(true);
+  });
+
+  it("closes on overlay mousedown", () => {
+    initSearch(deps);
+    mockOverlay.dispatchEvent("mousedown", { target: mockOverlay });
+    expect(mockOverlay.classList.contains("hidden")).toBe(true);
+  });
+
+  it("does not close on mousedown inside overlay", () => {
+    initSearch(deps);
+    mockOverlay.dispatchEvent("mousedown", { target: new MockElement() });
+    expect(mockOverlay.classList.contains("hidden")).toBe(false);
+  });
+
+  it("renders empty state for query with no hits", () => {
+    initSearch(deps);
+    mockInput.value = "no results";
+    mockInput.dispatchEvent("input");
+    vi.advanceTimersByTime(150);
+
+    expect(mockResults.children).toHaveLength(1);
+    expect(mockResults.children[0].className).toBe("search-empty");
+    expect(mockResults.children[0].textContent).toBe("trans_searchEmpty");
+  });
+
+  it("renders hits and handles click selection", () => {
+    deps.docs = () => [{ id: "doc1", title: "Doc 1", text: "hello world" }];
+    initSearch(deps);
+    mockInput.value = "hello";
+    mockInput.dispatchEvent("input");
+    vi.advanceTimersByTime(150);
+
+    expect(mockResults.children).toHaveLength(1);
+    const item = mockResults.children[0];
+    expect(item.className).toBe("search-item");
+    expect(item.children[0].textContent).toBe("Doc 1");
+    expect(item.children[1].textContent).toBe("hello world");
+
+    item.click();
+    expect(deps.onOpen).toHaveBeenCalledWith("doc1", 1);
+    expect(mockOverlay.classList.contains("hidden")).toBe(true); // closes after open
+  });
+
+  it("handles Enter key selection", () => {
+    deps.docs = () => [{ id: "doc2", title: "Doc 2", text: "hit" }];
+    initSearch(deps);
+    mockInput.value = "hit";
+    mockInput.dispatchEvent("input");
+    vi.advanceTimersByTime(150);
+
+    mockInput.dispatchEvent("keydown", { key: "Enter" });
+    expect(deps.onOpen).toHaveBeenCalledWith("doc2", 1);
+  });
+
+  it("debounces search input", () => {
+    const renderSpy = vi.spyOn(mockResults, "replaceChildren");
+    initSearch(deps);
+
+    mockInput.value = "h";
+    mockInput.dispatchEvent("input");
+    mockInput.value = "he";
+    mockInput.dispatchEvent("input");
+
+    vi.advanceTimersByTime(100);
+    expect(renderSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(50);
+    expect(renderSpy).toHaveBeenCalledTimes(1);
   });
 });
