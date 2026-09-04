@@ -940,14 +940,16 @@ async function initSettings(): Promise<void> {
   await runBackups(settings.dataDir, settings.deletedRetentionDays);
 }
 
-async function initDataAndEngine(): Promise<void> {
+function initEngine(): void {
   engine = new SumEngine({
     precision: settings.precision,
     groupSeparator: settings.groupSeparator,
     decimalSeparator: settings.decimalSeparator,
     dateFormat: settings.dateFormat,
   });
+}
 
+async function initData(): Promise<void> {
   const stored = await loadAppData(settings.dataDir);
   // a corrupt or foreign documents.json must not crash the boot
   if (
@@ -968,10 +970,9 @@ async function initDataAndEngine(): Promise<void> {
   }
   if (!data.docs.some((d) => d.id === data.activeId))
     data.activeId = data.docs[0].id;
+}
 
-  const scripts = await loadExtensionScripts();
-  await runExtensions(engine, scripts);
-
+function initWorkspace(): void {
   workspace = new Workspace(engine, () =>
     data.docs.map((d) => ({
       id: d.id,
@@ -979,7 +980,9 @@ async function initDataAndEngine(): Promise<void> {
       text: data.contents[d.id] ?? "",
     })),
   );
+}
 
+function initEditor(): void {
   editor = new SumEditor(
     $("#editor"),
     $("#results"),
@@ -1016,7 +1019,9 @@ async function initDataAndEngine(): Promise<void> {
   // the editor above was seeded directly with initialText (not via switchDoc),
   // so a reopened sheet with "on 2024-01-01" needs its own historical-rate fetch
   void fetchNeededHistoricalRates(data.contents[data.activeId] ?? "");
+}
 
+function initSearchUI(): void {
   search = initSearch({
     engine,
     workspace,
@@ -1032,6 +1037,18 @@ async function initDataAndEngine(): Promise<void> {
       editor.goToLine(line);
     },
   });
+}
+
+async function initDataAndEngine(): Promise<void> {
+  initEngine();
+  await initData();
+
+  const scripts = await loadExtensionScripts();
+  await runExtensions(engine, scripts);
+
+  initWorkspace();
+  initEditor();
+  initSearchUI();
 }
 
 function bindTitleUI(): void {
