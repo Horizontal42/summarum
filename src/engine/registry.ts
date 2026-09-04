@@ -173,6 +173,15 @@ export function buildRegistry(): Registry {
 
 // operators, percent, dates, numerals, scales, aggregates, built-in functions
 function registerCoreVocab(reg: Registry): void {
+  registerOperations(reg);
+  registerSpecialAndRepresentations(reg);
+  registerPercentages(reg);
+  registerDates(reg);
+  registerScales(reg);
+  registerConstantsAndFuncs(reg);
+}
+
+function registerOperations(reg: Registry): void {
   const ops: Array<[string, Payload]> = [
     ["plus", { t: "op", op: "plus" }],
     ["minus", { t: "op", op: "minus" }],
@@ -209,7 +218,9 @@ function registerCoreVocab(reg: Registry): void {
   reg.addPhrase("or", { t: "bitop", op: "bor" }, { caseSensitive: false });
   reg.addPhrase("shl", { t: "bitop", op: "shl" }, { caseSensitive: false });
   reg.addPhrase("shr", { t: "bitop", op: "shr" }, { caseSensitive: false });
+}
 
+function registerSpecialAndRepresentations(reg: Registry): void {
   // unix timestamps and extra numeral representations
   for (const v of ["unix", "unixtime", "unix time", "timestamp", "таймстамп"]) {
     reg.addPhrase(v, { t: "special", name: "unix" }, { caseSensitive: false });
@@ -224,6 +235,15 @@ function registerCoreVocab(reg: Registry): void {
     reg.addPhrase(v, { t: "repr", repr: "roman" }, { caseSensitive: false });
   }
 
+  const reprs: Array<[string, NumeralRepr]> = [
+    ["hex", "hex"], ["binary", "binary"], ["octal", "octal"], ["decimal", "decimal"], ["scientific", "scientific"],
+  ];
+  for (const [key, repr] of reprs) {
+    for (const v of vocab.variants("Numbers", `${key}.variants`)) reg.addPhrase(v, { t: "repr", repr }, { caseSensitive: false });
+  }
+}
+
+function registerPercentages(reg: Registry): void {
   for (const v of vocab.variants("Percent", "percent.variants")) reg.addPhrase(v, { t: "percent" });
   const pctOps: Array<[string, PctOp]> = [
     ["percent_of", "of"], ["percent_off", "off"], ["percent_on", "on"],
@@ -233,7 +253,9 @@ function registerCoreVocab(reg: Registry): void {
   for (const [key, op] of pctOps) {
     for (const v of vocab.variants("Percent", `${key}.variants`)) reg.addPhrase(v, { t: "pctop", op }, { caseSensitive: false });
   }
+}
 
+function registerDates(reg: Registry): void {
   const dateWords: Array<[string, DateWord]> = [
     ["today", "today"], ["tomorrow", "tomorrow"], ["yesterday", "yesterday"],
   ];
@@ -242,20 +264,17 @@ function registerCoreVocab(reg: Registry): void {
   }
   for (const v of vocab.variants("Dates", "current_time.variants")) reg.addPhrase(v, { t: "date", word: v.toLowerCase() === "now" || v.toLowerCase() === "сейчас" ? "now" : "time" }, { caseSensitive: false });
   for (const v of vocab.variants("Dates", "local_time.variants")) reg.addPhrase(v, { t: "date", word: "local" }, { caseSensitive: false });
+}
 
-  const reprs: Array<[string, NumeralRepr]> = [
-    ["hex", "hex"], ["binary", "binary"], ["octal", "octal"], ["decimal", "decimal"], ["scientific", "scientific"],
-  ];
-  for (const [key, repr] of reprs) {
-    for (const v of vocab.variants("Numbers", `${key}.variants`)) reg.addPhrase(v, { t: "repr", repr }, { caseSensitive: false });
-  }
-
+function registerScales(reg: Registry): void {
   for (const [id, mult] of Object.entries(SCALE_DATA)) {
     for (const v of vocab.variants("Scales", `${id}.variants`)) {
       reg.addPhrase(v, { t: "scale", mult: new Decimal(mult) });
     }
   }
+}
 
+function registerConstantsAndFuncs(reg: Registry): void {
   reg.addPhrase("pi", { t: "const", name: "pi" }, { caseSensitive: false });
   reg.addPhrase("π", { t: "const", name: "pi" });
   reg.addPhrase("пи", { t: "const", name: "pi" }, { caseSensitive: false });
