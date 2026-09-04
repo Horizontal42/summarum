@@ -355,62 +355,76 @@ function evalPctOp(op: string, l: Value, r: Value): Value {
   throw new EvalError(`bad percent op ${op}`);
 }
 
+function evalConvUnit(v: Value, target: Extract<ConvTarget, { type: "unit" }>): Value {
+  if (v.kind === "percent") return pct(v.value); // "x in %" — keep
+  if (v.kind !== "quantity")
+    throw new EvalError("cannot convert date to unit");
+  if (!v.unit) return qty(v.value, target.unit);
+  return convertQ(v, target.unit);
+}
+
+function evalConvCurrency(v: Value, target: Extract<ConvTarget, { type: "currency" }>, ctx: EvalCtx): Value {
+  let unit;
+  if (target.onDate) {
+    const dateRates = ctx.historicalRates?.get(target.onDate);
+    const rate = dateRates?.get(target.code);
+    if (rate === undefined)
+      throw new EvalError(
+        `no historical rate for ${target.code} on ${target.onDate}`,
+      );
+    unit = ctx.reg.makeCurrencyUnitFromRate(target.code, new Decimal(rate));
+  } else {
+    unit = ctx.reg.makeCurrencyUnit(target.code);
+    if (!unit) throw new EvalError(`no rate for ${target.code}`);
+  }
+  if (v.kind !== "quantity")
+    throw new EvalError("cannot convert to currency");
+  if (!v.unit) return qty(v.value, unit);
+  return convertQ(v, unit);
+}
+
+function evalConvRepr(v: Value, target: Extract<ConvTarget, { type: "repr" }>): Value {
+  if (v.kind !== "quantity") throw new EvalError("bad repr conversion");
+  return { ...v, repr: target.repr };
+}
+
+function evalConvScale(v: Value, target: Extract<ConvTarget, { type: "scale" }>): Value {
+  if (v.kind !== "quantity") throw new EvalError("bad scale conversion");
+  return qty(v.value.div(target.mult), v.unit); // formatter shows plain number
+}
+
+function evalConvTz(v: Value, target: Extract<ConvTarget, { type: "tz" }>): Value {
+  const zone = resolveZone(target.words);
+  if (!zone) throw new EvalError("unknown timezone");
+  if (v.kind !== "date") throw new EvalError("timezone needs a time");
+  return { ...v, timeZone: zone };
+}
+
+function evalConvUnix(v: Value): Value {
+  if (v.kind === "date")
+    return qty(new Decimal(v.ms).div(1000).floor(), null, "plain");
+  throw new EvalError("unix needs a date");
+}
+
+function evalConvToDate(v: Value): Value {
+  if (v.kind !== "quantity" || v.unit)
+    throw new EvalError("date needs a plain number");
+  // heuristics: > 1e12 means milliseconds, else seconds
+  const ms = v.value.gt(1e12)
+    ? v.value.toNumber()
+    : v.value.mul(1000).toNumber();
+  return { kind: "date", ms, hasTime: true };
+}
+
 function evalConv(v: Value, target: ConvTarget, ctx: EvalCtx): Value {
   switch (target.type) {
-    case "unit": {
-      if (v.kind === "percent") return pct(v.value); // "x in %" — keep
-      if (v.kind !== "quantity")
-        throw new EvalError("cannot convert date to unit");
-      if (!v.unit) return qty(v.value, target.unit);
-      return convertQ(v, target.unit);
-    }
-    case "currency": {
-      let unit;
-      if (target.onDate) {
-        const dateRates = ctx.historicalRates?.get(target.onDate);
-        const rate = dateRates?.get(target.code);
-        if (rate === undefined)
-          throw new EvalError(
-            `no historical rate for ${target.code} on ${target.onDate}`,
-          );
-        unit = ctx.reg.makeCurrencyUnitFromRate(target.code, new Decimal(rate));
-      } else {
-        unit = ctx.reg.makeCurrencyUnit(target.code);
-        if (!unit) throw new EvalError(`no rate for ${target.code}`);
-      }
-      if (v.kind !== "quantity")
-        throw new EvalError("cannot convert to currency");
-      if (!v.unit) return qty(v.value, unit);
-      return convertQ(v, unit);
-    }
-    case "repr": {
-      if (v.kind !== "quantity") throw new EvalError("bad repr conversion");
-      return { ...v, repr: target.repr };
-    }
-    case "scale": {
-      if (v.kind !== "quantity") throw new EvalError("bad scale conversion");
-      return qty(v.value.div(target.mult), v.unit); // formatter shows plain number
-    }
-    case "tz": {
-      const zone = resolveZone(target.words);
-      if (!zone) throw new EvalError("unknown timezone");
-      if (v.kind !== "date") throw new EvalError("timezone needs a time");
-      return { ...v, timeZone: zone };
-    }
-    case "unix": {
-      if (v.kind === "date")
-        return qty(new Decimal(v.ms).div(1000).floor(), null, "plain");
-      throw new EvalError("unix needs a date");
-    }
-    case "todate": {
-      if (v.kind !== "quantity" || v.unit)
-        throw new EvalError("date needs a plain number");
-      // heuristics: > 1e12 means milliseconds, else seconds
-      const ms = v.value.gt(1e12)
-        ? v.value.toNumber()
-        : v.value.mul(1000).toNumber();
-      return { kind: "date", ms, hasTime: true };
-    }
+    case "unit": return evalConvUnit(v, target);
+    case "currency": return evalConvCurrency(v, target, ctx);
+    case "repr": return evalConvRepr(v, target);
+    case "scale": return evalConvScale(v, target);
+    case "tz": return evalConvTz(v, target);
+    case "unix": return evalConvUnix(v);
+    case "todate": return evalConvToDate(v);
   }
 }
 
