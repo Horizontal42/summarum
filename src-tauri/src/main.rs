@@ -259,6 +259,11 @@ async fn write_atomic_async(path: PathBuf, contents: String) {
     let _ = tauri::async_runtime::spawn_blocking(move || write_atomic(&path, &contents)).await;
 }
 
+async fn write_atomic_bytes_async(path: PathBuf, contents: Vec<u8>) {
+    let _ =
+        tauri::async_runtime::spawn_blocking(move || write_atomic_bytes(&path, &contents)).await;
+}
+
 /// settings.json and friends; DATA_DIR_FILE is Rust's own authorization record
 /// and must not be forgeable from the frontend.
 fn writable_name(name: &str) -> bool {
@@ -451,6 +456,12 @@ struct MarketCache {
     prices: std::collections::HashMap<String, f64>,
 }
 
+#[derive(Serialize)]
+struct MarketCacheRef<'a> {
+    fetched_at: u64,
+    prices: &'a std::collections::HashMap<String, f64>,
+}
+
 #[tauri::command]
 async fn fetch_market_data(
     app: AppHandle,
@@ -518,12 +529,12 @@ async fn fetch_market_data(
     }
 
     if !prices.is_empty() {
-        let cache = MarketCache {
+        let cache = MarketCacheRef {
             fetched_at: now_secs(),
-            prices: prices.clone(),
+            prices: &prices,
         };
-        if let Ok(raw) = serde_json::to_string(&cache) {
-            write_atomic_async(cache_path, raw).await;
+        if let Ok(raw) = serde_json::to_vec(&cache) {
+            write_atomic_bytes_async(cache_path, raw).await;
         }
     }
 
