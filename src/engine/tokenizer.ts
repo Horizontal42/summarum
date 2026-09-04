@@ -1,7 +1,7 @@
 // Lexes a line and resolves phrases through the registry into semantic tokens.
 import { DateOrder, Decimal, NumeralRepr, Unit } from "./types";
-import { lexLine } from "./lexer";
-import { Registry, PctOp, DateWord, BitOp } from "./registry";
+import { Lex, lexLine } from "./lexer";
+import { Registry, PctOp, DateWord, BitOp, Payload } from "./registry";
 
 export type Token =
   | { t: "num"; v: Decimal; repr: NumeralRepr; start: number; end: number }
@@ -60,55 +60,15 @@ export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dm
     const m = reg.match(lexes, lowers, i);
     if (m) {
       const end = lexes[i + m.length - 1].end;
-      const s = { start: lx.start, end };
-      const p = m.payload;
-      switch (p.t) {
-        case "unit": tokens.push({ t: "unit", unit: p.unit, ...s }); break;
-        case "currency": tokens.push({ t: "currency", code: p.code, ...s }); break;
-        case "op": tokens.push({ t: "op", op: p.op, ...s }); break;
-        case "bitop": tokens.push({ t: "bitop", op: p.op, ...s }); break;
-        case "special": tokens.push({ t: "special", name: p.name, ...s }); break;
-        case "conv": tokens.push({ t: "conv", ...s }); break;
-        case "assign": tokens.push({ t: "assign", ...s }); break;
-        case "pctop": tokens.push({ t: "pctop", op: p.op, ...s }); break;
-        case "percent": tokens.push({ t: "percent", ...s }); break;
-        case "func": tokens.push({ t: "func", name: p.name, ...s }); break;
-        case "agg": tokens.push({ t: "agg", name: p.name, ...s }); break;
-        case "scale": tokens.push({ t: "scale", mult: p.mult, ...s }); break;
-        case "repr": tokens.push({ t: "repr", repr: p.repr, ...s }); break;
-        case "date": tokens.push({ t: "date", word: p.word, ...s }); break;
-        case "const": tokens.push({ t: "const", name: p.name, ...s }); break;
-      }
+      tokens.push(handleRegistryMatch(m.payload, { start: lx.start, end }));
       i += m.length;
       continue;
     }
 
     if (lx.type === "sym") {
-      // << and >> arrive as two single-char lexemes
-      const nextLx = lexes[i + 1];
-      if ((lx.raw === "<" || lx.raw === ">") && nextLx?.type === "sym" && nextLx.raw === lx.raw && nextLx.start === lx.end) {
-        tokens.push({ t: "bitop", op: lx.raw === "<" ? "shl" : "shr", start: lx.start, end: nextLx.end });
-        i += 2;
-        continue;
-      }
-      switch (lx.raw) {
-        case "&": tokens.push({ t: "bitop", op: "band", ...span }); break;
-        case "|": tokens.push({ t: "bitop", op: "bor", ...span }); break;
-        case "+": tokens.push({ t: "op", op: "plus", ...span }); break;
-        case "-": case "−": case "–": tokens.push({ t: "op", op: "minus", ...span }); break;
-        case "*": case "×": case "·": tokens.push({ t: "op", op: "mul", ...span }); break;
-        case "/": case "÷": tokens.push({ t: "op", op: "div", ...span }); break;
-        case "^": tokens.push({ t: "op", op: "pow", ...span }); break;
-        case "%": tokens.push({ t: "percent", ...span }); break;
-        case "(": tokens.push({ t: "lparen", ...span }); break;
-        case ")": tokens.push({ t: "rparen", ...span }); break;
-        case "=": tokens.push({ t: "assign", ...span }); break;
-        case ";": tokens.push({ t: "semicolon", ...span }); break;
-        case "!": tokens.push({ t: "bang", ...span }); break;
-        case "?": tokens.push({ t: "unknown", ...span }); break;
-        default: tokens.push({ t: "junk", raw: lx.raw, ...span });
-      }
-      i++;
+      const [tk, skip] = handleSymbol(lx, lexes, i, span);
+      tokens.push(tk);
+      i += skip;
       continue;
     }
 
@@ -116,6 +76,50 @@ export function tokenize(line: string, reg: Registry, dateOrder: DateOrder = "dm
     i++;
   }
   return disambiguateMinAgg(disambiguateIn(tokens, reg, line), reg, line);
+}
+
+function handleRegistryMatch(p: Payload, s: { start: number; end: number }): Token {
+  switch (p.t) {
+    case "unit": return { t: "unit", unit: p.unit, ...s };
+    case "currency": return { t: "currency", code: p.code, ...s };
+    case "op": return { t: "op", op: p.op, ...s };
+    case "bitop": return { t: "bitop", op: p.op, ...s };
+    case "special": return { t: "special", name: p.name, ...s };
+    case "conv": return { t: "conv", ...s };
+    case "assign": return { t: "assign", ...s };
+    case "pctop": return { t: "pctop", op: p.op, ...s };
+    case "percent": return { t: "percent", ...s };
+    case "func": return { t: "func", name: p.name, ...s };
+    case "agg": return { t: "agg", name: p.name, ...s };
+    case "scale": return { t: "scale", mult: p.mult, ...s };
+    case "repr": return { t: "repr", repr: p.repr, ...s };
+    case "date": return { t: "date", word: p.word, ...s };
+    case "const": return { t: "const", name: p.name, ...s };
+  }
+}
+
+function handleSymbol(lx: Lex, lexes: Lex[], i: number, span: { start: number; end: number }): [Token, number] {
+  const nextLx = lexes[i + 1];
+  if ((lx.raw === "<" || lx.raw === ">") && nextLx?.type === "sym" && nextLx.raw === lx.raw && nextLx.start === lx.end) {
+    return [{ t: "bitop", op: lx.raw === "<" ? "shl" : "shr", start: lx.start, end: nextLx.end }, 2];
+  }
+  switch (lx.raw) {
+    case "&": return [{ t: "bitop", op: "band", ...span }, 1];
+    case "|": return [{ t: "bitop", op: "bor", ...span }, 1];
+    case "+": return [{ t: "op", op: "plus", ...span }, 1];
+    case "-": case "−": case "–": return [{ t: "op", op: "minus", ...span }, 1];
+    case "*": case "×": case "·": return [{ t: "op", op: "mul", ...span }, 1];
+    case "/": case "÷": return [{ t: "op", op: "div", ...span }, 1];
+    case "^": return [{ t: "op", op: "pow", ...span }, 1];
+    case "%": return [{ t: "percent", ...span }, 1];
+    case "(": return [{ t: "lparen", ...span }, 1];
+    case ")": return [{ t: "rparen", ...span }, 1];
+    case "=": return [{ t: "assign", ...span }, 1];
+    case ";": return [{ t: "semicolon", ...span }, 1];
+    case "!": return [{ t: "bang", ...span }, 1];
+    case "?": return [{ t: "unknown", ...span }, 1];
+    default: return [{ t: "junk", raw: lx.raw, ...span }, 1];
+  }
 }
 
 /**
