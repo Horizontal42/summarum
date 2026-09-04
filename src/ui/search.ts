@@ -44,57 +44,55 @@ export function parseResultQuery(
   return { op: m[1], threshold: v };
 }
 
-export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
-  const q = query.trim();
-  if (!q) return [];
-  const docs = deps.docs();
-  const rq = parseResultQuery(deps.engine, q);
-  if (rq && rq.threshold.kind === "quantity") {
-    const th = rq.threshold.value;
-    const hits: SearchHit[] = [];
-    for (const doc of docs) {
-      const results = deps.workspace.getCachedResults(doc);
-      let lines: string[] | undefined;
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
-        if (!r.value || r.value.kind !== "quantity") continue;
-        const v = r.value.value;
-        let match = false;
-        switch (rq.op) {
-          case ">":
-            match = v.gt(th);
-            break;
-          case ">=":
-            match = v.gte(th);
-            break;
-          case "<":
-            match = v.lt(th);
-            break;
-          case "<=":
-            match = v.lte(th);
-            break;
-          case "=":
-            match = v.eq(th);
-            break;
-          case "~":
-            match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01);
-            break;
-        }
-        if (match) {
-          if (!lines) lines = doc.text.split("\n");
-          hits.push({
-            docId: doc.id,
-            docTitle: doc.title,
-            line: i + 1,
-            text: lines[i] ?? "",
-            result: r.text ?? undefined,
-          });
-          if (hits.length >= 200) return hits;
-        }
+function searchNumeric(deps: SearchDeps, docs: SearchDoc[], rq: { op: string; threshold: Value }): SearchHit[] {
+  if (rq.threshold.kind !== "quantity") return [];
+  const th = rq.threshold.value;
+  const hits: SearchHit[] = [];
+  for (const doc of docs) {
+    const results = deps.workspace.getCachedResults(doc);
+    let lines: string[] | undefined;
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r.value || r.value.kind !== "quantity") continue;
+      const v = r.value.value;
+      let match = false;
+      switch (rq.op) {
+        case ">":
+          match = v.gt(th);
+          break;
+        case ">=":
+          match = v.gte(th);
+          break;
+        case "<":
+          match = v.lt(th);
+          break;
+        case "<=":
+          match = v.lte(th);
+          break;
+        case "=":
+          match = v.eq(th);
+          break;
+        case "~":
+          match = !th.isZero() && v.minus(th).abs().div(th.abs()).lte(0.01);
+          break;
+      }
+      if (match) {
+        if (!lines) lines = doc.text.split("\n");
+        hits.push({
+          docId: doc.id,
+          docTitle: doc.title,
+          line: i + 1,
+          text: lines[i] ?? "",
+          result: r.text ?? undefined,
+        });
+        if (hits.length >= 200) return hits;
       }
     }
-    return hits;
   }
+  return hits;
+}
+
+function searchText(docs: SearchDoc[], q: string): SearchHit[] {
   const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
   for (const doc of docs) {
@@ -112,6 +110,17 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     }
   }
   return hits;
+}
+
+export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
+  const q = query.trim();
+  if (!q) return [];
+  const docs = deps.docs();
+  const rq = parseResultQuery(deps.engine, q);
+  if (rq && rq.threshold.kind === "quantity") {
+    return searchNumeric(deps, docs, rq);
+  }
+  return searchText(docs, q);
 }
 
 export function initSearch(deps: SearchDeps): SearchController {
