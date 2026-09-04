@@ -1,6 +1,6 @@
 // Turns values into display strings: unit/currency formats plus
 // precision and grouping settings.
-import { Decimal, DateVal, EngineSettings, Value } from "./types";
+import { Decimal, DateVal, EngineSettings, Value, Quantity } from "./types";
 
 // Intl.DateTimeFormat construction is relatively expensive and every line with
 // a date rebuilds one on each render — cache by locale+options instead.
@@ -50,29 +50,22 @@ export function formatNumber(v: Decimal, s: EngineSettings): string {
   return frac !== undefined ? intG + s.decimalSeparator + frac : intG;
 }
 
-export function formatValue(v: Value, s: EngineSettings): string {
-  if (v.kind === "chart") return "";
-
-  if (v.kind === "percent") {
-    return formatNumber(v.value, s) + "%";
+function formatDate(v: DateVal, s: EngineSettings): string {
+  const opts: Intl.DateTimeFormatOptions = { timeZone: v.timeZone };
+  if (v.timeOnly) {
+    return dtf(undefined, { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).format(v.ms);
   }
-
-  if (v.kind === "date") {
-    const opts: Intl.DateTimeFormatOptions = { timeZone: v.timeZone };
-    if (v.timeOnly) {
-      return dtf(undefined, { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).format(v.ms);
-    }
-    if (s.dateFormat !== "system") return formatDateFixed(v, s.dateFormat);
-    if (v.hasTime) {
-      return dtf(undefined, {
-        ...opts, hour: "2-digit", minute: "2-digit", hour12: false,
-        day: "numeric", month: "short", year: "numeric",
-      }).format(v.ms);
-    }
-    return dtf(undefined, { ...opts, day: "numeric", month: "long", year: "numeric" }).format(v.ms);
+  if (s.dateFormat !== "system") return formatDateFixed(v, s.dateFormat);
+  if (v.hasTime) {
+    return dtf(undefined, {
+      ...opts, hour: "2-digit", minute: "2-digit", hour12: false,
+      day: "numeric", month: "short", year: "numeric",
+    }).format(v.ms);
   }
+  return dtf(undefined, { ...opts, day: "numeric", month: "long", year: "numeric" }).format(v.ms);
+}
 
-  // quantity
+function formatQuantity(v: Quantity, s: EngineSettings): string {
   if (v.repr === "hex" || v.repr === "binary" || v.repr === "octal") {
     if (v.value.abs().gte(new Decimal("1e10000"))) {
       return formatNumber(v.value, s);
@@ -101,6 +94,13 @@ export function formatValue(v: Value, s: EngineSettings): string {
   const num = formatNumber(v.value, s);
   if (!v.unit) return num;
   return withUnit(num, v.unit.format);
+}
+
+export function formatValue(v: Value, s: EngineSettings): string {
+  if (v.kind === "chart") return "";
+  if (v.kind === "percent") return formatNumber(v.value, s) + "%";
+  if (v.kind === "date") return formatDate(v, s);
+  return formatQuantity(v, s);
 }
 
 function withUnit(num: string, f: string): string {
