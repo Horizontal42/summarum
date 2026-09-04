@@ -382,64 +382,75 @@ function applySettings(): void {
   );
 }
 
-function bindFormattingSettings(): void {
-  const themeSel = $<HTMLSelectElement>("#set-theme");
-  const precision = $<HTMLInputElement>("#set-precision");
-  const groupSep = $<HTMLSelectElement>("#set-groupsep");
-  const decimalSep = $<HTMLSelectElement>("#set-decimalsep");
-  const dateFmt = $<HTMLSelectElement>("#set-dateformat");
-  const langSel = $<HTMLSelectElement>("#set-lang");
-  const fontSize = $<HTMLInputElement>("#set-fontsize");
-  const resultsWidth = $<HTMLInputElement>("#set-resultswidth");
-
-  themeSel.value = settings.theme;
-  precision.value = String(settings.precision);
-  groupSep.value = settings.groupSeparator;
-  decimalSep.value = settings.decimalSeparator;
-  dateFmt.value = settings.dateFormat;
-  langSel.value = settings.language;
-  fontSize.value = String(settings.fontSize);
-  resultsWidth.value = String(settings.resultsWidth);
-
-  const save = () => {
-    settings.theme = themeSel.value as SettingsData["theme"];
-    settings.precision = Math.max(
-      0,
-      Math.min(15, Number(precision.value) || 2),
-    );
-    settings.groupSeparator = groupSep.value;
-    settings.decimalSeparator = decimalSep.value;
-    // "1,234,56" is unreadable — a comma decimal forces a space group separator
-    if (settings.decimalSeparator === settings.groupSeparator) {
-      settings.groupSeparator = settings.decimalSeparator === "," ? " " : ",";
-      groupSep.value = settings.groupSeparator;
-    }
-    settings.dateFormat = dateFmt.value as SettingsData["dateFormat"];
-    settings.language = langSel.value;
-    settings.fontSize = Math.max(
-      10,
-      Math.min(32, Number(fontSize.value) || 15),
-    );
-    settings.resultsWidth = Math.max(
-      20,
-      Math.min(60, Number(resultsWidth.value) || 42),
-    );
-    applySettings();
-    void saveSettings(settings);
+function getFormattingElements() {
+  return {
+    themeSel: $<HTMLSelectElement>("#set-theme"),
+    precision: $<HTMLInputElement>("#set-precision"),
+    groupSep: $<HTMLSelectElement>("#set-groupsep"),
+    decimalSep: $<HTMLSelectElement>("#set-decimalsep"),
+    dateFmt: $<HTMLSelectElement>("#set-dateformat"),
+    langSel: $<HTMLSelectElement>("#set-lang"),
+    fontSize: $<HTMLInputElement>("#set-fontsize"),
+    resultsWidth: $<HTMLInputElement>("#set-resultswidth"),
   };
+}
+
+function populateFormattingSettings(): void {
+  const els = getFormattingElements();
+  els.themeSel.value = settings.theme;
+  els.precision.value = String(settings.precision);
+  els.groupSep.value = settings.groupSeparator;
+  els.decimalSep.value = settings.decimalSeparator;
+  els.dateFmt.value = settings.dateFormat;
+  els.langSel.value = settings.language;
+  els.fontSize.value = String(settings.fontSize);
+  els.resultsWidth.value = String(settings.resultsWidth);
+}
+
+function saveFormattingSettings(): void {
+  const els = getFormattingElements();
+  settings.theme = els.themeSel.value as SettingsData["theme"];
+  settings.precision = Math.max(
+    0,
+    Math.min(15, Number(els.precision.value) || 2),
+  );
+  settings.groupSeparator = els.groupSep.value;
+  settings.decimalSeparator = els.decimalSep.value;
+  // "1,234,56" is unreadable — a comma decimal forces a space group separator
+  if (settings.decimalSeparator === settings.groupSeparator) {
+    settings.groupSeparator = settings.decimalSeparator === "," ? " " : ",";
+    els.groupSep.value = settings.groupSeparator;
+  }
+  settings.dateFormat = els.dateFmt.value as SettingsData["dateFormat"];
+  settings.language = els.langSel.value;
+  settings.fontSize = Math.max(
+    10,
+    Math.min(32, Number(els.fontSize.value) || 15),
+  );
+  settings.resultsWidth = Math.max(
+    20,
+    Math.min(60, Number(els.resultsWidth.value) || 42),
+  );
+  applySettings();
+  void saveSettings(settings);
+}
+
+function bindFormattingSettings(): void {
+  populateFormattingSettings();
+  const els = getFormattingElements();
 
   for (const el of [
-    themeSel,
-    precision,
-    groupSep,
-    decimalSep,
-    dateFmt,
-    langSel,
-    fontSize,
+    els.themeSel,
+    els.precision,
+    els.groupSep,
+    els.decimalSep,
+    els.dateFmt,
+    els.langSel,
+    els.fontSize,
   ]) {
-    el.addEventListener("change", save);
+    el.addEventListener("change", saveFormattingSettings);
   }
-  resultsWidth.addEventListener("input", save); // live while sliding
+  els.resultsWidth.addEventListener("input", saveFormattingSettings); // live while sliding
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (settings.theme === "system") applySettings();
