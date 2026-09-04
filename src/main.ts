@@ -140,6 +140,83 @@ function reorderDoc(srcId: string, targetId: string): void {
   renderDocList();
 }
 
+function handleDocDrag(
+  e: MouseEvent,
+  el: HTMLElement,
+  doc: DocMeta,
+  list: HTMLElement,
+  setDraggingState: (isDragging: boolean) => void,
+  setSuppressClick: (suppress: boolean) => void,
+): void {
+  if ((e.target as HTMLElement).closest("button")) return;
+  const startY = e.clientY;
+  let cachedItems: { el: HTMLElement; top: number; bottom: number }[] | null = null;
+  let prevOver: HTMLElement | undefined;
+  let dragging = false;
+
+  const onMove = (ev: MouseEvent) => {
+    if (!cachedItems) {
+      const domItems = [...list.querySelectorAll<HTMLElement>(".doc-item")];
+      cachedItems = domItems.map((item) => {
+        const rect = item.getBoundingClientRect();
+        return { el: item, top: rect.top, bottom: rect.bottom };
+      });
+    }
+    if (!dragging) {
+      if (Math.abs(ev.clientY - startY) < 4) return;
+      dragging = true;
+      setDraggingState(true);
+      setSuppressClick(true);
+      el.classList.add("dragging");
+      document.body.style.cursor = "grabbing";
+    }
+    let over: HTMLElement | undefined;
+    for (const item of cachedItems) {
+      if (!over && item.el !== el) {
+        if (ev.clientY >= item.top && ev.clientY <= item.bottom) {
+          over = item.el;
+        }
+      }
+    }
+    let newOver: HTMLElement | undefined;
+    if (over) {
+      const overDoc = getDocById(over.dataset.docId);
+      if (overDoc && !!overDoc.pinned === !!doc.pinned) newOver = over;
+    }
+    if (prevOver && prevOver !== newOver) {
+      prevOver.classList.remove("drag-over");
+    }
+    if (newOver && prevOver !== newOver) {
+      newOver.classList.add("drag-over");
+    }
+    prevOver = newOver;
+  };
+
+  const onScroll = () => {
+    cachedItems = null;
+  };
+
+  const onUp = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    list.removeEventListener("scroll", onScroll);
+    cachedItems = null;
+    if (dragging) {
+      const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
+      for (const item of list.querySelectorAll(".doc-item"))
+        item.classList.remove("drag-over", "dragging");
+      document.body.style.cursor = "";
+      if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
+    }
+    dragging = false;
+    setDraggingState(false);
+  };
+
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+  list.addEventListener("scroll", onScroll);
+}
+
 function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): void {
   // Reordering uses plain mouse tracking, not the native HTML5 drag API —
   // Tauri's window-level file-drop hook (dragDropEnabled, needed for
@@ -148,69 +225,14 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): 
   // and the OS always shows a "not allowed" cursor.
   let dragging = false;
   let suppressClick = false;
+
   el.addEventListener("mousedown", (e) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    const startY = e.clientY;
-    let cachedItems: { el: HTMLElement; top: number; bottom: number }[] | null =
-      null;
-    let prevOver: HTMLElement | undefined;
-    const onMove = (ev: MouseEvent) => {
-      if (!cachedItems) {
-        const domItems = [...list.querySelectorAll<HTMLElement>(".doc-item")];
-        cachedItems = domItems.map((item) => {
-          const rect = item.getBoundingClientRect();
-          return { el: item, top: rect.top, bottom: rect.bottom };
-        });
-      }
-      if (!dragging) {
-        if (Math.abs(ev.clientY - startY) < 4) return;
-        dragging = true;
-        suppressClick = true;
-        el.classList.add("dragging");
-        document.body.style.cursor = "grabbing";
-      }
-      let over: HTMLElement | undefined;
-      for (const item of cachedItems) {
-        if (!over && item.el !== el) {
-          if (ev.clientY >= item.top && ev.clientY <= item.bottom) {
-            over = item.el;
-          }
-        }
-      }
-      let newOver: HTMLElement | undefined;
-      if (over) {
-        const overDoc = getDocById(over.dataset.docId);
-        if (overDoc && !!overDoc.pinned === !!doc.pinned) newOver = over;
-      }
-      if (prevOver && prevOver !== newOver) {
-        prevOver.classList.remove("drag-over");
-      }
-      if (newOver && prevOver !== newOver) {
-        newOver.classList.add("drag-over");
-      }
-      prevOver = newOver;
-    };
-    const onScroll = () => {
-      cachedItems = null;
-    };
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      list.removeEventListener("scroll", onScroll);
-      cachedItems = null;
-      if (dragging) {
-        const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
-        for (const item of list.querySelectorAll(".doc-item"))
-          item.classList.remove("drag-over", "dragging");
-        document.body.style.cursor = "";
-        if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
-      }
-      dragging = false;
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    list.addEventListener("scroll", onScroll);
+    handleDocDrag(e, el, doc, list,
+      (d) => { dragging = d; },
+      (s) => { suppressClick = s; }
+    );
   });
+
   el.addEventListener("click", () => {
     if (suppressClick) {
       suppressClick = false;
