@@ -310,14 +310,16 @@ export async function onFileDrop(cb: (content: string) => void): Promise<void> {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
     await getCurrentWebview().onDragDropEvent(async (event) => {
       if (event.payload.type !== "drop") return;
-      for (const path of event.payload.paths) {
-        try {
-          const content = await invoke<string>("read_text_file", { path });
-          cb(content);
-        } catch (e) {
-          logger.warn("file drop rejected", path, e);
-        }
-      }
+      await Promise.all(
+        event.payload.paths.map(async (path) => {
+          try {
+            const content = await invoke<string>("read_text_file", { path });
+            cb(content);
+          } catch (e) {
+            logger.warn("file drop rejected", path, e);
+          }
+        })
+      );
     });
     return;
   }
