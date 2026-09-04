@@ -475,25 +475,9 @@ function evalDateArith(op: string, l: Value, r: Value): Value {
   return { ...date, ms, hasTime };
 }
 
-function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
-  const evalF = (x: Decimal): Decimal => {
-    const vars = new Map(ctx.vars);
-    vars.set("__x__", qty(x));
-    const innerCtx: EvalCtx = { ...ctx, vars };
-    const lv = evaluate(lhsNode, innerCtx);
-    const rv = evaluate(rhsNode, innerCtx);
-    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : DEC_ZERO;
-    return toD(lv).minus(toD(rv));
-  };
+type SafeEvalFn = (x: Decimal) => Decimal | null;
 
-  const safeEval = (x: Decimal): Decimal | null => {
-    try {
-      return evalF(x);
-    } catch {
-      return null;
-    }
-  };
-
+function solveLinear(safeEval: SafeEvalFn): Decimal | null {
   const f0 = safeEval(DEC_ZERO);
   const f1 = safeEval(DEC_ONE);
 
@@ -502,12 +486,15 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
     if (!slope.isZero()) {
       const root = f0.neg().div(slope);
       const fRoot = safeEval(root);
-      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9")))
-        return qty(root);
+      if (fRoot !== null && fRoot.abs().lt(new Decimal("1e-9"))) {
+        return root;
+      }
     }
   }
+  return null;
+}
 
-  // Bisection fallback for nonlinear cases
+function solveBisection(safeEval: SafeEvalFn): Decimal {
   let lo = new Decimal(-1e9);
   let hi = new Decimal(1e9);
   let flo = safeEval(lo);
@@ -545,7 +532,7 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
 
   for (let i = 0; i < 100; i++) {
     const mid = lo.plus(hi).div(2);
-    if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return qty(mid);
+    if (hi.minus(lo).abs().lt(new Decimal("1e-10"))) return mid;
     const fm = safeEval(mid);
     if (fm === null) {
       lo = mid.plus("1e-9");
@@ -559,7 +546,36 @@ function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
       flo = fm;
     }
   }
-  return qty(lo.plus(hi).div(2));
+  return lo.plus(hi).div(2);
+}
+
+function evalGoalSeek(lhsNode: Node, rhsNode: Node, ctx: EvalCtx): Value {
+  const evalF = (x: Decimal): Decimal => {
+    const vars = new Map(ctx.vars);
+    vars.set("__x__", qty(x));
+    const innerCtx: EvalCtx = { ...ctx, vars };
+    const lv = evaluate(lhsNode, innerCtx);
+    const rv = evaluate(rhsNode, innerCtx);
+    const toD = (v: Value) => v.kind === "quantity" ? toBase(v) : DEC_ZERO;
+    return toD(lv).minus(toD(rv));
+  };
+
+  const safeEval = (x: Decimal): Decimal | null => {
+    try {
+      return evalF(x);
+    } catch {
+      return null;
+    }
+  };
+
+  const linearRoot = solveLinear(safeEval);
+  if (linearRoot !== null) {
+    return qty(linearRoot);
+  }
+
+  // Bisection fallback for nonlinear cases
+  const bisectionRoot = solveBisection(safeEval);
+  return qty(bisectionRoot);
 }
 
 /** Lines whose unit shares the first line's dimension (mixed-dimension blocks skip the rest). */
