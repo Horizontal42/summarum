@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates } from './storage';
+import { isTauri, loadSettings, saveSettings, defaultSettingsData, loadAppData, saveAppData, flushAppData, setDataDir, runBackups, backupDeletedSheet, openBackupsFolder, chooseFolder, dataDirHasDocuments, migrateDataDir, fetchRates, fetchHistoricalRates, loadExtensionScripts } from './storage';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -414,6 +414,37 @@ describe('storage', () => {
       vi.mocked(fetch).mockResolvedValue({ json: vi.fn().mockResolvedValue(mockResponse) } as unknown as Response);
       const result = await fetchHistoricalRates('2024-01-01');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('loadExtensionScripts', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('returns empty array when not in Tauri', async () => {
+      const result = await loadExtensionScripts();
+      expect(result).toEqual([]);
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it('uses invoke when in Tauri', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      const mockExtensions = [{ name: 'test.js', code: 'console.log("test")' }];
+      vi.mocked(invoke).mockResolvedValue(mockExtensions);
+
+      const result = await loadExtensionScripts();
+      expect(invoke).toHaveBeenCalledWith('load_extensions', undefined);
+      expect(result).toEqual(mockExtensions);
+    });
+
+    it('returns empty array if invoke fails', async () => {
+      vi.stubGlobal('window', { __TAURI_INTERNALS__: {} });
+      vi.mocked(invoke).mockRejectedValue(new Error('invoke error'));
+
+      const result = await loadExtensionScripts();
+      expect(logger.warn).toHaveBeenCalledWith('loadExtensions failed', expect.any(Error));
+      expect(result).toEqual([]);
     });
   });
 });
