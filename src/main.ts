@@ -197,14 +197,23 @@ function setupDocInteraction(el: HTMLElement, doc: DocMeta, list: HTMLElement): 
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       list.removeEventListener("scroll", onScroll);
-      cachedItems = null;
       if (dragging) {
-        const target = list.querySelector<HTMLElement>(".doc-item.drag-over");
-        for (const item of list.querySelectorAll(".doc-item"))
-          item.classList.remove("drag-over", "dragging");
+        let target: HTMLElement | null = null;
+        if (cachedItems) {
+          for (let i = 0, len = cachedItems.length; i < len; i++) {
+            const item = cachedItems[i].el;
+            if (item.classList.contains("drag-over")) target = item;
+            item.classList.remove("drag-over", "dragging");
+          }
+        } else {
+          target = list.querySelector<HTMLElement>(".doc-item.drag-over");
+          for (const item of list.querySelectorAll(".doc-item"))
+            item.classList.remove("drag-over", "dragging");
+        }
         document.body.style.cursor = "";
         if (target?.dataset.docId) reorderDoc(doc.id, target.dataset.docId);
       }
+      cachedItems = null;
       dragging = false;
     };
     window.addEventListener("mousemove", onMove);
