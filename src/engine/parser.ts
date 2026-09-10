@@ -98,14 +98,24 @@ function filterNoiseTokens(toks: Token[], knownVars: Set<string>): Token[] {
 
 function tryParseGoalSeek(filtered: Token[], knownVars: Set<string>): Node | null {
   // Goal seek: `? * 1.2 = 1000` → find x where lhs(x) = rhs(x)
-  const hasUnknown = filtered.some((tk) => tk.t === "unknown");
-  if (hasUnknown) {
-    const assignIdx = filtered.findIndex((tk) => tk.t === "assign");
-    if (assignIdx >= 0) {
-      const lhs = new Parser(filtered.slice(0, assignIdx), knownVars).parseSeq();
-      const rhs = new Parser(filtered.slice(assignIdx + 1), knownVars).parseSeq();
-      if (lhs && rhs) return { k: "goalseek", lhs, rhs };
+  let hasUnknown = false;
+  let assignIdx = -1;
+  const len = filtered.length;
+  for (let i = 0; i < len; i++) {
+    const t = filtered[i].t;
+    if (t === "unknown") {
+      hasUnknown = true;
+      if (assignIdx !== -1) break;
+    } else if (t === "assign" && assignIdx === -1) {
+      assignIdx = i;
+      if (hasUnknown) break;
     }
+  }
+
+  if (hasUnknown && assignIdx >= 0) {
+    const lhs = new Parser(filtered.slice(0, assignIdx), knownVars).parseSeq();
+    const rhs = new Parser(filtered.slice(assignIdx + 1), knownVars).parseSeq();
+    if (lhs && rhs) return { k: "goalseek", lhs, rhs };
   }
   return null;
 }
