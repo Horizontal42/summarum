@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { SumEngine } from "./index";
 import { qty, EvalError, XRefError } from "./types";
 import type { XRefResolution, EvalCtx } from "./evaluator";
+import * as evaluator from "./evaluator";
 import { evaluate } from "./evaluator";
 import { formatValue } from "./formatter";
+import { logger } from "../logger";
 
 let eng: SumEngine;
 
@@ -450,5 +452,22 @@ describe("evaluation errors", () => {
       resolveXRef: () => ({ ok: false, reason: "xref error" }),
     } as unknown as EvalCtx;
     expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
+  });
+
+  it("evaluateDocument captures unexpected errors", () => {
+    const mockEval = vi.spyOn(evaluator, "evaluate").mockImplementation(() => {
+      throw new Error("Boom");
+    });
+
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    const result = eng.evaluateDocument("1 + 1");
+
+    expect(result[0].error).toBe("Boom");
+    expect(result[0].value).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith("evaluate failed:", expect.any(Error));
+
+    warnSpy.mockRestore();
+    mockEval.mockRestore();
   });
 });
