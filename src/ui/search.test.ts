@@ -307,7 +307,7 @@ describe("initSearch", () => {
 
     vi.stubGlobal("document", {
       querySelector: vi.fn((sel: string) => elements[sel]),
-      createElement: vi.fn((tag: string) => new MockElement()),
+      createElement: vi.fn(() => new MockElement()),
       createDocumentFragment: vi.fn(() => {
         const frag = new MockElement();
         frag.isFragment = true;
