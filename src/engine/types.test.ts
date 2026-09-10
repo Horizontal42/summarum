@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { qty, pct, Decimal } from "./types";
+import { qty, pct, Decimal, Unit } from "./types";
 
 describe("types", () => {
   describe("qty", () => {
@@ -13,7 +13,7 @@ describe("types", () => {
     });
 
     it("creates a quantity with all arguments provided", () => {
-      const mockUnit = { id: "meter", dimension: "length", ratio: new Decimal(1), format: "m" } as any;
+      const mockUnit: Unit = { id: "meter", dimension: "length", ratio: new Decimal(1), format: "m" };
       const result = qty("3.14", mockUnit, "hex");
       expect(result.kind).toBe("quantity");
       expect(result.value).toBeInstanceOf(Decimal);
