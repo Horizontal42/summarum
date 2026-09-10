@@ -33,6 +33,18 @@ export interface SearchController {
 const $ = <T extends HTMLElement>(sel: string): T =>
   document.querySelector(sel) as T;
 
+const lineCache = new Map<string, { text: string; lines: string[]; lowerLines: string[] }>();
+
+function getCachedDocLines(id: string, text: string): { lines: string[]; lowerLines: string[] } {
+  let cached = lineCache.get(id);
+  if (cached && cached.text === text) return cached;
+  const lines = text.split("\n");
+  const lowerLines = text.toLowerCase().split("\n");
+  cached = { text, lines, lowerLines };
+  lineCache.set(id, cached);
+  return cached;
+}
+
 export function parseResultQuery(
   engine: SumEngine,
   q: string,
@@ -81,7 +93,7 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
             break;
         }
         if (match) {
-          if (!lines) lines = doc.text.split("\n");
+          if (!lines) lines = getCachedDocLines(doc.id, doc.text).lines;
           hits.push({
             docId: doc.id,
             docTitle: doc.title,
@@ -98,9 +110,9 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
   const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
   for (const doc of docs) {
-    const lines = doc.text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(ql)) {
+    const { lines, lowerLines } = getCachedDocLines(doc.id, doc.text);
+    for (let i = 0; i < lowerLines.length; i++) {
+      if (lowerLines[i].includes(ql)) {
         hits.push({
           docId: doc.id,
           docTitle: doc.title,
