@@ -342,13 +342,49 @@ describe("extension API", () => {
     // the original registration must survive the failed collision
     expect(calc("2 horses in meters")).toBe("4.8 m");
   });
+  it("addUnit throws on unknown baseUnitId", () => {
+    expect(() =>
+      eng.addUnit({ id: "unicorn", phrases: "uni", baseUnitId: "unknown", ratio: 1 })
+    ).toThrow(/unknown baseUnitId unknown/);
+  });
   it("addFunction (zum from Sample.js)", () => {
     eng.addFunction({ id: "zum", phrases: "zum" }, (values) => ({ double: values[0].double + values[1].double }));
     expect(calc("zum(2;3)")).toBe("5");
   });
+  it("addFunction converts percent to ExtensionValue", () => {
+    let capturedPercent: number | undefined;
+    eng.addFunction({ id: "test_percent", phrases: "test_percent" }, (values) => {
+      capturedPercent = values[0].double;
+      return { double: values[0].double };
+    });
+    expect(calc("test_percent(50%)")).toBe("0.5");
+    expect(capturedPercent).toBe(0.5);
+  });
+  it("addFunction converts date to ExtensionValue", () => {
+    let capturedDate: number | undefined;
+    eng.addFunction({ id: "test_date", phrases: "test_date" }, (values) => {
+      capturedDate = values[0].double;
+      return { double: values[0].double };
+    });
+    eng.evaluateDocument("test_date(2024-01-01)");
+    expect(capturedDate).toBe(new Date("2024-01-01T00:00:00Z").getTime());
+  });
   it("setVariable", () => {
     eng.setVariable("myvar", { double: 5, unitId: "USD" });
     expect(calc("myvar * 2")).toBe("$10");
+  });
+  it("setVariable with number without unitId", () => {
+    eng.setVariable("numvar", 42);
+    expect(calc("numvar * 2")).toBe("84");
+  });
+  it("evaluateExpression returns the last value", () => {
+    const val = eng.evaluateExpression("10 + 20");
+    expect(val).not.toBeNull();
+    if (val && val.kind === "quantity") {
+      expect(val.value.toNumber()).toBe(30);
+    } else {
+      throw new Error("expected a quantity");
+    }
   });
 });
 
