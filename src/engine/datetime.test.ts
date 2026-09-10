@@ -28,7 +28,7 @@ describe("datetime", () => {
 
       const mockDateTimeFormat = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => ({
         formatToParts: mockFormatToParts,
-      }) as any);
+      }) as unknown as Intl.DateTimeFormat);
 
       expect(detectDateOrder()).toBe("dmy");
       mockDateTimeFormat.mockRestore();
@@ -40,7 +40,7 @@ describe("datetime", () => {
       const mockResolvedOptions = vi.fn().mockReturnValue({ timeZone: "America/Los_Angeles" });
       const mockDateTimeFormat = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => ({
         resolvedOptions: mockResolvedOptions,
-      }) as any);
+      }) as unknown as Intl.DateTimeFormat);
 
       expect(resolveZone(["local"])).toBe("America/Los_Angeles");
       mockDateTimeFormat.mockRestore();
