@@ -494,7 +494,7 @@ async fn fetch_market_data(
         async move {
             let url = format!(
                 "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d",
-                sym
+                urlencoding::encode(sym)
             );
             if let Ok(resp) = client.get(&url).send().await {
                 if let Ok(body) = resp.json::<serde_json::Value>().await {
