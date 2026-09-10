@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toBase, fromBase, convertQ, attachUnit } from "./evaluator";
-import { qty, pct, EvalError, Decimal } from "./types";
+import { qty, pct, EvalError, Decimal, Quantity } from "./types";
 import { buildRegistry } from "./registry";
 
 const reg = buildRegistry();
@@ -77,9 +77,9 @@ describe("quantity conversion", () => {
     expect(r1).toMatchObject({ kind: "quantity", unit: { id: "meter" } });
 
     // attaching matching dimension does conversion
-    const r2 = attachUnit(qty(2000, m), km);
-    expect((r2 as any).value.toNumber()).toBe(2);
-    expect((r2 as any).unit?.id).toBe("kilo:meter");
+    const r2 = attachUnit(qty(2000, m), km) as Quantity;
+    expect(r2.value.toNumber()).toBe(2);
+    expect(r2.unit?.id).toBe("kilo:meter");
 
     // attaching mismatched dimension throws
     expect(() => attachUnit(qty(1, m), kg)).toThrow(EvalError);
