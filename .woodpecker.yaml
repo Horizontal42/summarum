@@ -1,0 +1,21 @@
+when:
+  - event: [push, manual]
+
+steps:
+  - name: test-engine
+    image: node:22-bookworm-slim
+    commands:
+      - npm ci
+      - npx tsc --noEmit
+      - npx vitest run
+
+  - name: build-tauri-linux
+    image: rust:1-bookworm
+    commands:
+      - apt-get update && apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libxdo-dev libayatana-appindicator3-dev
+      - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      - apt-get install -y nodejs
+      - npm ci
+      - cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - cargo test --manifest-path src-tauri/Cargo.toml
+      - npx tauri build --no-bundle
