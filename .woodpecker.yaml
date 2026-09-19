@@ -12,6 +12,7 @@ steps:
   - name: build-tauri-linux
     image: rust:1-bookworm
     commands:
+      - rustup component add clippy
       - apt-get update && apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libxdo-dev libayatana-appindicator3-dev
       - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
       - apt-get install -y nodejs
