@@ -19,4 +19,4 @@ steps:
       - npm ci
       - cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
       - cargo test --manifest-path src-tauri/Cargo.toml
-      - npx tauri build --no-bundle
+      - CI=true npx tauri build --no-bundle --ci
