@@ -88,7 +88,12 @@ export class Registry {
     const list = this.byFirst.get(key);
     if (list) {
       // first registration of an identical phrase wins (core vocab is added first)
-      if (list.some((e) => e.caseSensitive === caseSensitive && (caseSensitive ? e.lexemes.join(" ") === lexemes.join(" ") : e.lower.join(" ") === entry.lower.join(" ")))) {
+      if (list.some((e) => {
+        if (e.caseSensitive !== caseSensitive || e.lexemes.length !== lexemes.length) return false;
+        const target = caseSensitive ? lexemes : entry.lower;
+        const source = caseSensitive ? e.lexemes : e.lower;
+        return source.every((val, i) => val === target[i]);
+      })) {
         return;
       }
       list.push(entry);
