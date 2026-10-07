@@ -62,7 +62,7 @@ export const UNIT_DATA: UnitData[] = [
   { id: "centner", category: "Weight", dimension: "weight", ratio: "100000" },
   { id: "ounce", category: "Weight", dimension: "weight", ratio: "28.349523125" },
 
-  // Temperature (base: kelvin); base = value*ratio + offset
+  // Temperature (base: kelvin). Formula: base equals value times ratio plus offset
   { id: "celsius", category: "Temperature", dimension: "temperature", ratio: "1", offset: "273.15" },
   { id: "fahrenheit", category: "Temperature", dimension: "temperature", ratio: String(5 / 9), offset: String((459.67 * 5) / 9) },
   { id: "kelvin", category: "Temperature", dimension: "temperature", ratio: "1" },
