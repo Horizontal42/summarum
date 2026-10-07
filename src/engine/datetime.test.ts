@@ -78,6 +78,7 @@ describe("datetime", () => {
     it("should return null for unknown timezones", () => {
       expect(resolveZone(["Unknown", "City"])).toBeNull();
       expect(resolveZone(["Invalid/Timezone"])).toBeNull();
+      expect(resolveZone(["Invalid", "Zone"])).toBeNull();
     });
   });
 
