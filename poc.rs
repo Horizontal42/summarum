@@ -1,0 +1,57 @@
+use std::path::{Path, PathBuf};
+use std::fs;
+
+fn canon_or_raw(p: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in p.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                let can_pop = matches!(
+                    normalized.components().next_back(),
+                    Some(std::path::Component::Normal(_))
+                );
+                if can_pop {
+                    normalized.pop();
+                } else if !normalized.has_root() {
+                    normalized.push(component);
+                }
+            }
+            std::path::Component::CurDir => {}
+            _ => normalized.push(component),
+        }
+    }
+    normalized
+}
+
+fn secure_canonicalize(path: &Path) -> PathBuf {
+    let mut p = PathBuf::new();
+    for component in path.components() {
+        p.push(component);
+        if let Ok(canon) = fs::canonicalize(&p) {
+            p = canon;
+        }
+    }
+    canon_or_raw(&p)
+}
+
+fn main() {
+    let temp = std::env::temp_dir();
+    let real_allowed = temp.join("allowed_dir_abc");
+    fs::create_dir_all(&real_allowed).unwrap();
+    let secret = temp.join("secret_dir_xyz");
+    fs::create_dir_all(&secret).unwrap();
+
+    // Attacker makes a symlink from allowed/sym -> target
+    let symlink = real_allowed.join("sym");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&secret, &symlink).unwrap_or(());
+
+    // Attacker tries to write to allowed/sym/../secret_dir_xyz/new_file
+    let malicious = symlink.join("..").join("secret_dir_xyz").join("new_file");
+    println!("malicious path: {:?}", malicious);
+    println!("secure_canonicalize: {:?}", secure_canonicalize(&malicious));
+    println!("canon_or_raw: {:?}", canon_or_raw(&malicious));
+
+    let allowed = real_allowed.clone();
+    println!("secure_canonicalize(allowed): {:?}", secure_canonicalize(&allowed));
+}
