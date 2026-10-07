@@ -78,19 +78,21 @@ const highlightField = StateField.define<DecorationSet>({
 const varHighlightReCache = new Map<string, { assignment: RegExp; highlight: RegExp }>();
 
 /** Highlights every occurrence of the variable under the cursor. */
-function buildVarHighlight(state: EditorState): DecorationSet {
+function buildVarHighlight(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
-  const sel = state.selection.main;
+  const sel = view.state.selection.main;
   if (!sel.empty) return builder.finish();
-  const text = state.doc.toString();
+  const doc = view.state.doc;
   // expand a word around the cursor
   const isWordCh = (ch: string) => /[\p{L}\d_]/u.test(ch);
-  let a = sel.head;
-  let b = sel.head;
-  while (a > 0 && isWordCh(text[a - 1])) a--;
-  while (b < text.length && isWordCh(text[b])) b++;
-  if (a === b) return builder.finish();
-  const word = text.slice(a, b);
+  const line = doc.lineAt(sel.head);
+  const lineText = line.text;
+  let localA = sel.head - line.from;
+  let localB = sel.head - line.from;
+  while (localA > 0 && isWordCh(lineText[localA - 1])) localA--;
+  while (localB < lineText.length && isWordCh(lineText[localB])) localB++;
+  if (localA === localB) return builder.finish();
+  const word = lineText.slice(localA, localB);
   if (!/^[\p{L}_][\p{L}\d_]*$/u.test(word)) return builder.finish();
 
   let cachedRe = varHighlightReCache.get(word);
@@ -105,9 +107,20 @@ function buildVarHighlight(state: EditorState): DecorationSet {
   }
 
   // only highlight if the word is actually assigned somewhere in the document
-  if (!cachedRe.assignment.test(text)) return builder.finish();
-  for (const m of text.matchAll(cachedRe.highlight)) {
-    builder.add(m.index, m.index + word.length, Decoration.mark({ class: "tok-var-active" }));
+  let hasAssignment = false;
+  for (const line of doc.iterLines()) {
+    if (cachedRe.assignment.test(line)) {
+      hasAssignment = true;
+      break;
+    }
+  }
+  if (!hasAssignment) return builder.finish();
+
+  for (const range of view.visibleRanges) {
+    const chunk = doc.sliceString(range.from, range.to);
+    for (const m of chunk.matchAll(cachedRe.highlight)) {
+      builder.add(range.from + m.index, range.from + m.index + word.length, Decoration.mark({ class: "tok-var-active" }));
+    }
   }
   return builder.finish();
 }
@@ -143,7 +156,7 @@ const varHighlightPlugin = ViewPlugin.fromClass(
     schedule(view: EditorView) {
       if (this.timeout) clearTimeout(this.timeout);
       this.timeout = setTimeout(() => {
-        const decos = buildVarHighlight(view.state);
+        const decos = buildVarHighlight(view);
         view.dispatch({ effects: setVarHighlight.of(decos) });
       }, 150);
     }
