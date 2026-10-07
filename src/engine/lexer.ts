@@ -16,9 +16,9 @@ export interface Lex {
 
 const WORD_RE = /^[\p{L}_]+/u;
 // Number forms, tried in order. Space/NBSP-grouped numbers may use a decimal
-// comma ("1 000,5" — what the app itself prints with the space separator);
-// comma-grouped is the en convention ("1,000"), and a comma that does not
-// form groups of three is a decimal comma ("1,23" → 1.23).
+// comma (e.g., "1 000,5" - what the app itself prints with the space separator).
+// Comma-grouped is the en convention (e.g., "1,000"). A comma that does not
+// form groups of three is a decimal comma (e.g., "1,23" -> 1.23).
 const NUM_SPACE_GROUPED_RE = /^\d{1,3}(?:[   ]\d{3})+(?:[.,]\d+)?(?!\d)/;
 const NUM_COMMA_GROUPED_RE = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)/;
 const NUM_DECIMAL_COMMA_RE = /^\d+,\d+/;
