@@ -599,6 +599,9 @@ async fn fetch_historical_rates_batch(
     app: AppHandle,
     dates: Vec<String>,
 ) -> Result<std::collections::HashMap<String, std::collections::HashMap<String, f64>>, String> {
+    if dates.len() > 100 {
+        return Err("too many dates requested".to_string());
+    }
     let mut results = std::collections::HashMap::new();
     let mut missing_dates = Vec::new();
 
