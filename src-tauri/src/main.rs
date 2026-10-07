@@ -938,12 +938,10 @@ fn load_extensions(app: AppHandle) -> Vec<ExtensionScript> {
 }
 
 fn is_sheet_path(path: &str) -> bool {
-    std::path::Path::new(path)
-        .extension()
-        .map_or(false, |ext| {
-            let ext = ext.to_string_lossy().to_lowercase();
-            ext == "numi" || ext == "sum"
-        })
+    std::path::Path::new(path).extension().map_or(false, |ext| {
+        let ext = ext.to_string_lossy().to_lowercase();
+        ext == "numi" || ext == "sum"
+    })
 }
 
 /// A sheet handed to us by the OS (file association, second launch): same
