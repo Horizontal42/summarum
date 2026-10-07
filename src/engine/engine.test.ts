@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { SumEngine } from "./index";
 import { qty, EvalError, XRefError } from "./types";
 import type { XRefResolution, EvalCtx } from "./evaluator";
 import { evaluate } from "./evaluator";
+import * as evaluator from "./evaluator";
 import { formatValue } from "./formatter";
 
 let eng: SumEngine;
@@ -450,5 +451,18 @@ describe("evaluation errors", () => {
       resolveXRef: () => ({ ok: false, reason: "xref error" }),
     } as unknown as EvalCtx;
     expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
+  });
+
+  it("catches and handles arbitrary errors in evaluateDocument", () => {
+    // Spy on evaluator.evaluate and force an arbitrary error
+    const spy = vi.spyOn(evaluator, "evaluate").mockImplementation(() => {
+      throw new Error("Forced execution anomaly");
+    });
+
+    const results = eng.evaluateDocument("1 + 1");
+    expect(results).toHaveLength(1);
+    expect(results[0].error).toBe("Forced execution anomaly");
+
+    spy.mockRestore();
   });
 });
