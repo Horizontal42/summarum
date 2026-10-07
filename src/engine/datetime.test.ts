@@ -99,61 +99,81 @@ describe("datetime", () => {
 
   describe("addToDate", () => {
     it("should add days", () => {
-      const ms = new Date("2024-01-01T12:00:00Z").getTime();
-      const res = addToDate(ms, 5, "day");
-      expect(new Date(res).toISOString()).toBe("2024-01-06T12:00:00.000Z");
+      const ms = new Date(2024, 0, 1, 12, 0, 0).getTime(); // local Jan 1, 12:00
+      const res = new Date(addToDate(ms, 5, "day"));
+      expect(res.getFullYear()).toBe(2024);
+      expect(res.getMonth()).toBe(0);
+      expect(res.getDate()).toBe(6);
+      expect(res.getHours()).toBe(12);
     });
 
     it("should add weeks", () => {
-      const ms = new Date("2024-01-01T12:00:00Z").getTime();
-      const res = addToDate(ms, 2, "week");
-      expect(new Date(res).toISOString()).toBe("2024-01-15T12:00:00.000Z");
+      const ms = new Date(2024, 0, 1, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 2, "week"));
+      expect(res.getFullYear()).toBe(2024);
+      expect(res.getMonth()).toBe(0);
+      expect(res.getDate()).toBe(15);
+      expect(res.getHours()).toBe(12);
     });
 
     it("should add months", () => {
-      const ms = new Date("2024-01-15T12:00:00Z").getTime();
-      const res = addToDate(ms, 2, "month");
-      expect(new Date(res).toISOString()).toBe("2024-03-15T12:00:00.000Z");
+      const ms = new Date(2024, 0, 15, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 2, "month"));
+      expect(res.getFullYear()).toBe(2024);
+      expect(res.getMonth()).toBe(2); // March
+      expect(res.getDate()).toBe(15);
+      expect(res.getHours()).toBe(12);
     });
 
     it("should clamp end of month correctly", () => {
-      const ms = new Date("2024-01-31T12:00:00Z").getTime();
-      const res = addToDate(ms, 1, "month");
+      const ms = new Date(2024, 0, 31, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 1, "month"));
       // 2024 is a leap year, so Feb 29
-      expect(new Date(res).toISOString()).toBe("2024-02-29T12:00:00.000Z");
+      expect(res.getFullYear()).toBe(2024);
+      expect(res.getMonth()).toBe(1);
+      expect(res.getDate()).toBe(29);
 
-      const ms2 = new Date("2023-01-31T12:00:00Z").getTime();
-      const res2 = addToDate(ms2, 1, "month");
+      const ms2 = new Date(2023, 0, 31, 12, 0, 0).getTime();
+      const res2 = new Date(addToDate(ms2, 1, "month"));
       // 2023 is not a leap year, so Feb 28
-      expect(new Date(res2).toISOString()).toBe("2023-02-28T12:00:00.000Z");
+      expect(res2.getFullYear()).toBe(2023);
+      expect(res2.getMonth()).toBe(1);
+      expect(res2.getDate()).toBe(28);
     });
 
     it("should add years", () => {
-      const ms = new Date("2024-01-15T12:00:00Z").getTime();
-      const res = addToDate(ms, 3, "year");
-      expect(new Date(res).toISOString()).toBe("2027-01-15T12:00:00.000Z");
+      const ms = new Date(2024, 0, 15, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 3, "year"));
+      expect(res.getFullYear()).toBe(2027);
+      expect(res.getMonth()).toBe(0);
+      expect(res.getDate()).toBe(15);
+      expect(res.getHours()).toBe(12);
     });
 
     it("should clamp end of month when adding years to leap day", () => {
-      const ms = new Date("2024-02-29T12:00:00Z").getTime();
-      const res = addToDate(ms, 1, "year");
-      expect(new Date(res).toISOString()).toBe("2025-02-28T12:00:00.000Z");
+      const ms = new Date(2024, 1, 29, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 1, "year"));
+      expect(res.getFullYear()).toBe(2025);
+      expect(res.getMonth()).toBe(1);
+      expect(res.getDate()).toBe(28);
     });
 
     it("should handle unit ids with prefixes", () => {
-      const ms = new Date("2024-01-01T12:00:00Z").getTime();
-      const res = addToDate(ms, 5, "unit:day");
-      expect(new Date(res).toISOString()).toBe("2024-01-06T12:00:00.000Z");
+      const ms = new Date(2024, 0, 1, 12, 0, 0).getTime();
+      const res = new Date(addToDate(ms, 5, "unit:day"));
+      expect(res.getFullYear()).toBe(2024);
+      expect(res.getMonth()).toBe(0);
+      expect(res.getDate()).toBe(6);
     });
 
     it("should return original ms if amount is not an integer", () => {
-      const ms = new Date("2024-01-01T12:00:00Z").getTime();
+      const ms = new Date(2024, 0, 1, 12, 0, 0).getTime();
       const res = addToDate(ms, 1.5, "day");
       expect(res).toBe(ms);
     });
 
     it("should return original ms for unhandled units", () => {
-      const ms = new Date("2024-01-01T12:00:00Z").getTime();
+      const ms = new Date(2024, 0, 1, 12, 0, 0).getTime();
       const res = addToDate(ms, 1, "hour");
       expect(res).toBe(ms);
     });
