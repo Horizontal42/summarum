@@ -1,7 +1,7 @@
 // CodeMirror editor wired to the engine: evaluates on change, highlights
 // engine tokens, renders the results overlay, autocompletes phrases.
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, keymap, drawSelection } from "@codemirror/view";
-import { EditorState, StateEffect, StateField, RangeSetBuilder } from "@codemirror/state";
+import { EditorState, StateEffect, StateField, RangeSetBuilder, Extension } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { autocompletion, CompletionContext, CompletionResult, acceptCompletion } from "@codemirror/autocomplete";
 import { SumEngine, LineResult } from "../engine";
@@ -158,6 +158,7 @@ export class SumEditor {
   view: EditorView;
   private resultsEl: HTMLElement;
   private results: LineResult[] = [];
+  private engineOptions: { label: string; type: string; detail?: string }[] | null = null;
 
   constructor(
     parent: HTMLElement,
@@ -169,87 +170,97 @@ export class SumEditor {
   ) {
     this.resultsEl = resultsEl;
 
-    let engineOptions: { label: string; type: string; detail?: string }[] | null = null;
-    const varPattern = /^\s*([\p{L}_][\p{L}\d_]*)\s*=/u;
-    const completionSource = (ctx: CompletionContext): CompletionResult | null => {
-      const word = ctx.matchBefore(/[\p{L}_]+$/u);
-      if (!word || (word.from === word.to && !ctx.explicit)) return null;
-      if (word.to - word.from < 2 && !ctx.explicit) return null;
-      // the engine's phrase list is fixed after boot — map it once
-      engineOptions ??= this.engine.completions().map((c) => ({
-        label: c.label,
-        type: c.type === "function" ? "function" : c.type === "keyword" ? "keyword" : "constant",
-        detail: c.detail,
-      }));
-      const options = [...engineOptions];
-      // document variables
-      const iter = ctx.state.doc.iterLines();
-      for (let next = iter.next(); !next.done; next = iter.next()) {
-        const line = next.value;
-        if (line.includes("=")) {
-          const m = varPattern.exec(line);
-          if (m) {
-            options.push({ label: m[1], type: "variable" });
-          }
-        }
-      }
-      return { from: word.from, options, validFor: /^[\p{L}_]*$/u };
-    };
-
     this.view = new EditorView({
       parent,
       state: EditorState.create({
         doc: initialText,
-        extensions: [
-          history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-          autocompletion({ override: [completionSource], activateOnTyping: true, defaultKeymap: false }),
-          keymap.of([{ key: "Tab", run: acceptCompletion }]),
-          resultsField,
-          highlightField,
-          varHighlightField,
-          varHighlightPlugin,
-          EditorView.lineWrapping,
-          drawSelection({ cursorBlinkRate: 1000 }),
-          // CM injects its base styles at runtime after app.css, so layout
-          // and cursor styling must live in a theme to take precedence
-          EditorView.theme({
-            ".cm-content": {
-              // --results-width lives on #editor-wrap; the divider drags it
-              paddingRight: "var(--results-width, 42%)",
-              paddingLeft: "16px",
-              overflowWrap: "anywhere",
-            },
-            ".cm-cursor, .cm-dropCursor": {
-              borderLeft: "2px solid var(--caret)",
-            },
-          }),
-          EditorView.updateListener.of((u: ViewUpdate) => {
-            if (u.docChanged) {
-              const text = u.state.doc.toString();
-              this.evaluate(text);
-              this.cb.onChange(text);
-            }
-            if (u.geometryChanged || u.viewportChanged || u.docChanged) {
-              this.renderResults();
-            }
-            if (u.selectionSet || u.docChanged) {
-              const sel = u.state.selection.main;
-              if (sel.empty) {
-                this.cb.onSelection(null);
-              } else {
-                const from = u.state.doc.lineAt(sel.from).number - 1;
-                const to = u.state.doc.lineAt(sel.to).number - 1;
-                this.cb.onSelection([from, to]);
-              }
-            }
-          }),
-        ],
+        extensions: this.buildExtensions(),
       }),
     });
 
     this.evaluate(initialText);
     requestAnimationFrame(() => this.renderResults());
+
+    this.setupEventListeners();
+  }
+
+  private buildExtensions(): Extension[] {
+    return [
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      autocompletion({ override: [this.completionSource.bind(this)], activateOnTyping: true, defaultKeymap: false }),
+      keymap.of([{ key: "Tab", run: acceptCompletion }]),
+      resultsField,
+      highlightField,
+      varHighlightField,
+      varHighlightPlugin,
+      EditorView.lineWrapping,
+      drawSelection({ cursorBlinkRate: 1000 }),
+      // CM injects its base styles at runtime after app.css, so layout
+      // and cursor styling must live in a theme to take precedence
+      EditorView.theme({
+        ".cm-content": {
+          // --results-width lives on #editor-wrap; the divider drags it
+          paddingRight: "var(--results-width, 42%)",
+          paddingLeft: "16px",
+          overflowWrap: "anywhere",
+        },
+        ".cm-cursor, .cm-dropCursor": {
+          borderLeft: "2px solid var(--caret)",
+        },
+      }),
+      EditorView.updateListener.of((u: ViewUpdate) => this.onUpdate(u)),
+    ];
+  }
+
+  private completionSource(ctx: CompletionContext): CompletionResult | null {
+    const varPattern = /^\s*([\p{L}_][\p{L}\d_]*)\s*=/u;
+    const word = ctx.matchBefore(/[\p{L}_]+$/u);
+    if (!word || (word.from === word.to && !ctx.explicit)) return null;
+    if (word.to - word.from < 2 && !ctx.explicit) return null;
+    // the engine's phrase list is fixed after boot — map it once
+    this.engineOptions ??= this.engine.completions().map((c) => ({
+      label: c.label,
+      type: c.type === "function" ? "function" : c.type === "keyword" ? "keyword" : "constant",
+      detail: c.detail,
+    }));
+    const options = [...this.engineOptions];
+    // document variables
+    const iter = ctx.state.doc.iterLines();
+    for (let next = iter.next(); !next.done; next = iter.next()) {
+      const line = next.value;
+      if (line.includes("=")) {
+        const m = varPattern.exec(line);
+        if (m) {
+          options.push({ label: m[1], type: "variable" });
+        }
+      }
+    }
+    return { from: word.from, options, validFor: /^[\p{L}_]*$/u };
+  }
+
+  private onUpdate(u: ViewUpdate) {
+    if (u.docChanged) {
+      const text = u.state.doc.toString();
+      this.evaluate(text);
+      this.cb.onChange(text);
+    }
+    if (u.geometryChanged || u.viewportChanged || u.docChanged) {
+      this.renderResults();
+    }
+    if (u.selectionSet || u.docChanged) {
+      const sel = u.state.selection.main;
+      if (sel.empty) {
+        this.cb.onSelection(null);
+      } else {
+        const from = u.state.doc.lineAt(sel.from).number - 1;
+        const to = u.state.doc.lineAt(sel.to).number - 1;
+        this.cb.onSelection([from, to]);
+      }
+    }
+  }
+
+  private setupEventListeners() {
     this.view.scrollDOM.addEventListener("scroll", () => this.renderResults());
 
     // copying whole lines also copies their results: "5+5 = 10";
