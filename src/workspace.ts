@@ -24,13 +24,57 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export class Workspace {
-  private cache = new Map<string, SheetExports>();
-  private resolving: Set<string> = new Set();
+export class SheetIndex {
   private parsedRefsCache = new Map<string, { text: string; refs: string[] }>();
   private titleCache: Map<string, SheetSource> | null = null;
 
-  constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {}
+  constructor(private sheets: () => SheetSource[]) {}
+
+  invalidateAll(): void {
+    this.titleCache = null;
+    this.parsedRefsCache.clear();
+  }
+
+  invalidate(): void {
+    this.titleCache = null;
+  }
+
+  referencedTitles(text: string, id?: string): string[] {
+    if (id) {
+      const cached = this.parsedRefsCache.get(id);
+      if (cached && cached.text === text) return cached.refs;
+    }
+    const out: string[] = [];
+    for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
+    if (id) {
+      this.parsedRefsCache.set(id, { text, refs: out });
+    }
+    return out;
+  }
+
+  findSheetByTitle(title: string): SheetSource | undefined {
+    const needle = title.trim().toLowerCase();
+    if (this.titleCache === null) {
+      this.titleCache = new Map();
+      for (const s of this.sheets()) {
+        const key = s.title.trim().toLowerCase();
+        if (!this.titleCache.has(key)) {
+          this.titleCache.set(key, s);
+        }
+      }
+    }
+    return this.titleCache.get(needle);
+  }
+}
+
+export class Workspace {
+  private index: SheetIndex;
+  private cache = new Map<string, SheetExports>();
+  private resolving: Set<string> = new Set();
+
+  constructor(private engine: SumEngine, private sheets: () => SheetSource[]) {
+    this.index = new SheetIndex(sheets);
+  }
 
   private doEvaluate(sheetId: string, text: string): LineResult[] {
     this.resolving.add(sheetId);
@@ -52,7 +96,7 @@ export class Workspace {
 
   /** Drop cached exports for a sheet and everything that transitively depends on it. */
   invalidate(sheetId: string): void {
-    this.titleCache = null;
+    this.index.invalidate();
     const dirty = new Set<string>([sheetId]);
     const sheetsList = this.sheets();
     let changed = true;
@@ -60,8 +104,8 @@ export class Workspace {
       changed = false;
       for (const s of sheetsList) {
         if (dirty.has(s.id)) continue;
-        for (const title of this.referencedTitles(s.text, s.id)) {
-          const target = this.findSheetByTitle(title);
+        for (const title of this.index.referencedTitles(s.text, s.id)) {
+          const target = this.index.findSheetByTitle(title);
           if (target && dirty.has(target.id)) {
             dirty.add(s.id);
             changed = true;
@@ -74,9 +118,8 @@ export class Workspace {
   }
 
   invalidateAll(): void {
-    this.titleCache = null;
+    this.index.invalidateAll();
     this.cache.clear();
-    this.parsedRefsCache.clear();
   }
 
   /**
@@ -98,35 +141,8 @@ export class Workspace {
     return out;
   }
 
-  private referencedTitles(text: string, id?: string): string[] {
-    if (id) {
-      const cached = this.parsedRefsCache.get(id);
-      if (cached && cached.text === text) return cached.refs;
-    }
-    const out: string[] = [];
-    for (const m of text.matchAll(XREF_SCAN_RE)) out.push((m[1] ?? m[2]).trim());
-    if (id) {
-      this.parsedRefsCache.set(id, { text, refs: out });
-    }
-    return out;
-  }
-
-  private findSheetByTitle(title: string): SheetSource | undefined {
-    const needle = title.trim().toLowerCase();
-    if (this.titleCache === null) {
-      this.titleCache = new Map();
-      for (const s of this.sheets()) {
-        const key = s.title.trim().toLowerCase();
-        if (!this.titleCache.has(key)) {
-          this.titleCache.set(key, s);
-        }
-      }
-    }
-    return this.titleCache.get(needle);
-  }
-
   private resolveXRef(sheetTitle: string, key: string): XRefResolution {
-    const target = this.findSheetByTitle(sheetTitle);
+    const target = this.index.findSheetByTitle(sheetTitle);
     if (!target) return { ok: false, reason: `sheet "${sheetTitle}" not found` };
     if (this.resolving.has(target.id)) {
       return { ok: false, reason: "circular reference" };
