@@ -44,6 +44,10 @@ export function parseResultQuery(
   return { op: m[1], threshold: v };
 }
 
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
   const q = query.trim();
   if (!q) return [];
@@ -95,20 +99,42 @@ export function searchAllSheets(deps: SearchDeps, query: string): SearchHit[] {
     }
     return hits;
   }
-  const ql = q.toLowerCase();
   const hits: SearchHit[] = [];
+  const regex = new RegExp(escapeRegExp(q), "gi");
+
   for (const doc of docs) {
-    const lines = doc.text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().includes(ql)) {
-        hits.push({
-          docId: doc.id,
-          docTitle: doc.title,
-          line: i + 1,
-          text: lines[i],
-        });
-        if (hits.length >= 200) return hits;
+    const text = doc.text;
+    regex.lastIndex = 0;
+
+    let match;
+    let lastNewlineIdx = -1;
+    let lineIdx = 0;
+
+    while ((match = regex.exec(text)) !== null) {
+      let nextNewline = text.indexOf("\n", lastNewlineIdx + 1);
+      while (nextNewline !== -1 && nextNewline < match.index) {
+        lineIdx++;
+        lastNewlineIdx = nextNewline;
+        nextNewline = text.indexOf("\n", lastNewlineIdx + 1);
       }
+
+      let lineEnd = text.indexOf("\n", match.index);
+      if (lineEnd === -1) lineEnd = text.length;
+
+      const lineStart = lastNewlineIdx + 1;
+      const matchedLine = text.slice(lineStart, lineEnd);
+
+      hits.push({
+        docId: doc.id,
+        docTitle: doc.title,
+        line: lineIdx + 1,
+        text: matchedLine,
+      });
+      if (hits.length >= 200) return hits;
+
+      regex.lastIndex = lineEnd;
+      lastNewlineIdx = lineEnd;
+      lineIdx++;
     }
   }
   return hits;
