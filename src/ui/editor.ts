@@ -224,26 +224,7 @@ export class SumEditor {
               borderLeft: "2px solid var(--caret)",
             },
           }),
-          EditorView.updateListener.of((u: ViewUpdate) => {
-            if (u.docChanged) {
-              const text = u.state.doc.toString();
-              this.evaluate(text);
-              this.cb.onChange(text);
-            }
-            if (u.geometryChanged || u.viewportChanged || u.docChanged) {
-              this.renderResults();
-            }
-            if (u.selectionSet || u.docChanged) {
-              const sel = u.state.selection.main;
-              if (sel.empty) {
-                this.cb.onSelection(null);
-              } else {
-                const from = u.state.doc.lineAt(sel.from).number - 1;
-                const to = u.state.doc.lineAt(sel.to).number - 1;
-                this.cb.onSelection([from, to]);
-              }
-            }
-          }),
+          EditorView.updateListener.of((u: ViewUpdate) => this.handleUpdate(u)),
         ],
       }),
     });
@@ -320,6 +301,27 @@ export class SumEditor {
       scrollIntoView: true,
     });
     this.view.focus();
+  }
+
+  private handleUpdate(u: ViewUpdate): void {
+    if (u.docChanged) {
+      const text = u.state.doc.toString();
+      this.evaluate(text);
+      this.cb.onChange(text);
+    }
+    if (u.geometryChanged || u.viewportChanged || u.docChanged) {
+      this.renderResults();
+    }
+    if (u.selectionSet || u.docChanged) {
+      const sel = u.state.selection.main;
+      if (sel.empty) {
+        this.cb.onSelection(null);
+        return;
+      }
+      const from = u.state.doc.lineAt(sel.from).number - 1;
+      const to = u.state.doc.lineAt(sel.to).number - 1;
+      this.cb.onSelection([from, to]);
+    }
   }
 
   private evaluate(text: string): void {
