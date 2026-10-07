@@ -58,6 +58,27 @@ describe("datetime", () => {
       expect(resolveZone(["london"])).toBe("Europe/London");
       expect(resolveZone(["tokyo"])).toBe("Asia/Tokyo");
       expect(resolveZone(["buenos", "aires"])).toBe("America/Argentina/Buenos_Aires");
+      expect(resolveZone(["ho", "chi", "minh"])).toBe("Asia/Ho_Chi_Minh");
+    });
+
+    it("should resolve longest prefix when trailing words are present", () => {
+      expect(resolveZone(["new", "york", "city"])).toBe("America/New_York");
+      expect(resolveZone(["utc", "time"])).toBe("UTC");
+      expect(resolveZone(["london", "england"])).toBe("Europe/London");
+    });
+
+    it("should handle 'local' even with extra words", () => {
+      const mockResolvedOptions = vi.fn().mockReturnValue({ timeZone: "America/Los_Angeles" });
+      const mockDateTimeFormat = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => ({
+        resolvedOptions: mockResolvedOptions,
+      }) as any);
+
+      expect(resolveZone(["local", "time"])).toBe("America/Los_Angeles");
+      mockDateTimeFormat.mockRestore();
+    });
+
+    it("should handle empty arrays gracefully", () => {
+      expect(resolveZone([])).toBeNull();
     });
 
     it("should resolve russian cities", () => {
