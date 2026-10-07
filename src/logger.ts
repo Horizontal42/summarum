@@ -1,5 +1,11 @@
 export const logger = {
-  info: (...args: any[]) => console.info(...args),
-  warn: (...args: any[]) => console.warn(...args),
-  error: (...args: any[]) => console.error(...args),
+  info: (...args: any[]) => {
+    if (!import.meta.env.PROD) console.info(...args);
+  },
+  warn: (...args: any[]) => {
+    if (!import.meta.env.PROD) console.warn(...args);
+  },
+  error: (...args: any[]) => {
+    if (!import.meta.env.PROD) console.error(...args);
+  },
 };
