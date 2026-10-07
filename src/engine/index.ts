@@ -1,7 +1,7 @@
 import { logger } from "../logger";
 // Public facade: evaluates whole documents line by line and exposes the
 // extension API (numi.addUnit / addFunction / setVariable).
-import { DateOrder, Decimal, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
+import { DateOrder, Decimal, DEC_ZERO, EngineSettings, EvalError, Quantity, Unit, Value, XRefError, defaultSettings, qty } from "./types";
 import { Registry, buildRegistry, Completion } from "./registry";
 import { tokenize, Token } from "./tokenizer";
 import { parseLine, ParsedLine } from "./parser";
@@ -93,82 +93,96 @@ export class SumEngine {
   }
 
   evaluateDocument(text: string, resolveXRef?: XRefResolver): LineResult[] {
-    const lines = text.split("\n");
     const results: LineResult[] = [];
     const vars = new Map<string, Value>(this.globals);
     const lineValues: (Value | null)[] = [];
     const lineKinds: ("empty" | "header" | "normal")[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const rawLine = lines[i];
-      const commentStart = findCommentStart(rawLine);
-      const line = commentStart >= 0 ? rawLine.slice(0, commentStart) : rawLine;
-      const trimmed = line.trim();
-
-      if (trimmed.length === 0) {
-        const kind = commentStart >= 0 ? "comment" : "empty";
-        results.push({ text: null, value: null, kind, tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
-        lineValues.push(null);
-        lineKinds.push("empty");
-        continue;
-      }
-      if (trimmed.startsWith("#")) {
-        results.push({ text: null, value: null, kind: "header", tokens: [], commentStart: commentStart >= 0 ? commentStart : null });
-        lineValues.push(null);
-        lineKinds.push("header");
-        continue;
-      }
-
-      // tokenize/parseLine/evaluate all run under one try/catch: pathological
-      // input (e.g. stack-overflowing nested parens in the parser) must null
-      // out this one line, not throw past evaluateDocument and kill the rest.
-      let tokens: Token[] = [];
-      let parsed: ParsedLine = { expr: null };
-      let value: Value | null = null;
-      let lineError: string | undefined;
-      try {
-        tokens = tokenize(line, this.reg, this.dateOrder);
-        const knownVars = new Set(vars.keys());
-        parsed = parseLine(tokens, knownVars, line);
-        if (parsed.expr) {
-          const ctx: EvalCtx = {
-            reg: this.reg,
-            vars,
-            line: { lineValues, lineKinds, index: i, lineText: rawLine },
-            historicalRates: this.historicalRates,
-            resolveXRef,
-          };
-          value = evaluate(parsed.expr, ctx);
-        }
-      } catch (e) {
-        if (e instanceof XRefError) {
-          lineError = e.message;
-        } else if (e instanceof EvalError) {
-          // Expected evaluation failure; remain silent
-        } else {
-          // Capture unexpected execution anomalies like BigInt or Range errors
-          lineError = e instanceof Error ? e.message : String(e);
-          logger.warn("evaluate failed:", e);
-        }
-        // a line without a result beats a dead sheet.
-        value = null;
-      }
-      if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
-      if (value && parsed.assign) vars.set(parsed.assign, value);
-
-      lineValues.push(value);
-      lineKinds.push("normal");
-      results.push({
-        text: (value && value.kind !== "chart") ? formatValue(value, this.settings) : null,
-        value,
-        kind: "normal",
-        tokens,
-        commentStart: commentStart >= 0 ? commentStart : null,
-        assign: parsed.assign,
-        error: lineError,
-      });
+    let lastIndex = 0;
+    let i = 0;
+    while (lastIndex <= text.length) {
+      let nextIndex = text.indexOf("\n", lastIndex);
+      if (nextIndex === -1) nextIndex = text.length;
+      const rawLine = text.slice(lastIndex, nextIndex);
+      results.push(this.evaluateLine(rawLine, i, vars, lineValues, lineKinds, resolveXRef));
+      lastIndex = nextIndex + 1;
+      i++;
     }
     return results;
+  }
+
+  private evaluateLine(
+    rawLine: string,
+    index: number,
+    vars: Map<string, Value>,
+    lineValues: (Value | null)[],
+    lineKinds: ("empty" | "header" | "normal")[],
+    resolveXRef?: XRefResolver
+  ): LineResult {
+    const commentStart = findCommentStart(rawLine);
+    const line = commentStart >= 0 ? rawLine.slice(0, commentStart) : rawLine;
+    const trimmed = line.trim();
+
+    if (trimmed.length === 0) {
+      const kind = commentStart >= 0 ? "comment" : "empty";
+      lineValues.push(null);
+      lineKinds.push("empty");
+      return { text: null, value: null, kind, tokens: [], commentStart: commentStart >= 0 ? commentStart : null };
+    }
+    if (trimmed.startsWith("#")) {
+      lineValues.push(null);
+      lineKinds.push("header");
+      return { text: null, value: null, kind: "header", tokens: [], commentStart: commentStart >= 0 ? commentStart : null };
+    }
+
+    // tokenize/parseLine/evaluate all run under one try/catch: pathological
+    // input (e.g. stack-overflowing nested parens in the parser) must null
+    // out this one line, not throw past evaluateDocument and kill the rest.
+    let tokens: Token[] = [];
+    let parsed: ParsedLine = { expr: null };
+    let value: Value | null = null;
+    let lineError: string | undefined;
+    try {
+      tokens = tokenize(line, this.reg, this.dateOrder);
+      const knownVars = new Set(vars.keys());
+      parsed = parseLine(tokens, knownVars, line);
+      if (parsed.expr) {
+        const ctx: EvalCtx = {
+          reg: this.reg,
+          vars,
+          line: { lineValues, lineKinds, index, lineText: rawLine },
+          historicalRates: this.historicalRates,
+          resolveXRef,
+        };
+        value = evaluate(parsed.expr, ctx);
+      }
+    } catch (e) {
+      if (e instanceof XRefError) {
+        lineError = e.message;
+      } else if (e instanceof EvalError) {
+        // Expected evaluation failure; remain silent
+      } else {
+        // Capture unexpected execution anomalies like BigInt or Range errors
+        lineError = e instanceof Error ? e.message : String(e);
+        logger.warn("evaluate failed:", e);
+      }
+      // a line without a result beats a dead sheet.
+      value = null;
+    }
+    if (value?.kind === "quantity" && !value.value.isFinite()) value = null;
+    if (value && parsed.assign) vars.set(parsed.assign, value);
+
+    lineValues.push(value);
+    lineKinds.push("normal");
+    return {
+      text: (value && value.kind !== "chart") ? formatValue(value, this.settings) : null,
+      value,
+      kind: "normal",
+      tokens,
+      commentStart: commentStart >= 0 ? commentStart : null,
+      assign: parsed.assign,
+      error: lineError,
+    };
   }
 
   /** Evaluate a single expression (used by the extension runtime and tests). */
@@ -188,7 +202,7 @@ export class SumEngine {
       .filter((v): v is Quantity => v !== null && v.kind === "quantity");
     if (qs.length < 2) return null;
     const anchor = qs.find((q) => q.unit) ?? qs[0];
-    let acc = new Decimal(0);
+    let acc = DEC_ZERO;
     let count = 0;
     for (const q of qs) {
       if (anchor.unit && q.unit && q.unit.dimension === anchor.unit.dimension) {
