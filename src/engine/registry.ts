@@ -1,7 +1,9 @@
-// Phrase registry: maps every phrase the engine understands (units,
-// currencies, word-operators, functions, scales, date words) to a payload
-// for the tokenizer. Longest phrase wins; case-sensitive entries (symbols
-// like "m"/"M", "kB") are tried before the case-insensitive ones.
+/**
+ * Phrase registry: maps every phrase the engine understands (units,
+ * currencies, word-operators, functions, scales, date words) to a payload
+ * for the tokenizer. Longest phrase wins; case-sensitive entries (symbols
+ * like "m"/"M", "kB") are tried before the case-insensitive ones.
+ */
 import { Decimal, Dimension, NumeralRepr, Unit, Value } from "./types";
 import { Lex, lexLine } from "./lexer";
 import * as vocab from "./vocab";
