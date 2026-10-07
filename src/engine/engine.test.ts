@@ -452,3 +452,91 @@ describe("evaluation errors", () => {
     expect(() => evaluate({ k: "xref", sheet: "Sheet", key: "key" }, ctx)).toThrowError(XRefError);
   });
 });
+
+describe("index.ts coverage", () => {
+  it("test evaluateDocument empty line and header behavior", () => {
+    const results = eng.evaluateDocument("   \n // comment\n # header\n # header // c");
+    expect(results[0].kind).toBe("empty");
+    expect(results[1].kind).toBe("comment");
+    expect(results[2].kind).toBe("header");
+    expect(results[3].kind).toBe("header");
+  });
+
+  it("test evaluateExpression with empty document", () => {
+    expect(eng.evaluateExpression("")).toBeNull();
+  });
+
+  it("test updateSettings, completions, hasHistoricalRates", () => {
+    eng.updateSettings({ dateFormat: "dmy" });
+    expect(eng.settings.dateFormat).toBe("dmy");
+
+    eng.updateSettings({ groupSeparator: "" });
+    expect(eng.settings.groupSeparator).toBe("");
+
+    const comps = eng.completions();
+    expect(comps.length).toBeGreaterThan(0);
+
+    eng.setHistoricalRates("2024-01-01", { USD: 1 });
+    expect(eng.hasHistoricalRates("2024-01-01")).toBe(true);
+    expect(eng.hasHistoricalRates("2025-01-01")).toBe(false);
+  });
+
+  it("test addUnit branch coverage", () => {
+    expect(() => {
+      eng.addUnit({ id: "custom1", phrases: "c1", baseUnitId: "nonexistent", ratio: 1 });
+    }).toThrowError(/unknown baseUnitId/);
+
+    eng.addUnit({ id: "custom2", phrases: "c2", baseUnitId: "meter", ratio: 1 });
+    expect(eng.reg.unitsById.get("custom2")?.format).toBe("custom2");
+
+    // Celsius has an offset
+    eng.addUnit({ id: "custom3", phrases: "c3", baseUnitId: "celsius", ratio: 1 });
+    expect(eng.reg.unitsById.get("custom3")?.offset).toBeDefined();
+  });
+
+  it("test totalValueOf without units correctly sums values", () => {
+    const results = eng.evaluateDocument("10\n20\n30");
+    const raw = eng.totalValueOf(results);
+    expect(raw).not.toBeNull();
+    expect(raw?.value.toNumber()).toBe(60);
+    expect(raw?.unit).toBeNull();
+  });
+
+  it("test unexpected execution anomaly (non-EvalError)", () => {
+    eng.addFunction({ id: "throw_err_custom", phrases: "throw_err_custom" }, () => {
+      throw new Error("unexpected error");
+    });
+    const results = eng.evaluateDocument("throw_err_custom(1)");
+    expect(results[0].error).toBe("unexpected error");
+    expect(results[0].value).toBeNull();
+
+    eng.addFunction({ id: "throw_string", phrases: "throw_string" }, () => {
+      throw "just a string";
+    });
+    const results2 = eng.evaluateDocument("throw_string(1)");
+    expect(results2[0].error).toBe("just a string");
+  });
+
+  it("test fromValue mapping with percent, date, chart", () => {
+    let capturedValues: any[] = [];
+    eng.addFunction({ id: "capture_ext", phrases: "capture_ext" }, (values) => {
+      capturedValues = values;
+      return { double: 42 };
+    });
+    eng.evaluateDocument("capture_ext(50%, 2024-01-01)\n10\n20\n30\nmy_chart = chart\ncapture_chart(my_chart)");
+    expect(capturedValues.length).toBe(2);
+    expect(capturedValues[0].double).toBe(0.5);
+    expect(capturedValues[1].double).toBeGreaterThan(1000000000000);
+  });
+
+  it("test fromValue chart via chart value capture", () => {
+    let capturedChart: any[] = [];
+    eng.addFunction({ id: "capture_chart", phrases: "capture_chart" }, (values) => {
+      capturedChart = values;
+      return { double: 42 };
+    });
+    eng.evaluateDocument("10\n20\n30\nmy_chart = chart\ncapture_chart(my_chart)");
+    expect(capturedChart.length).toBe(1);
+    expect(capturedChart[0].double).toBe(0);
+  });
+});
