@@ -331,7 +331,7 @@ function registerUnits(reg: Registry): LengthPhrase[] {
         for (const ph of csPhrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: true });
         for (const ph of phrases) reg.addPhrase(ph, { t: "unit", unit: pUnit }, { caseSensitive: false });
         // collect unambiguous lowercase forms: "KM"/"Km" should still mean km,
-        // while "mm"/"Mm" stay strict (milli vs mega)
+        // whereas "mm"/"Mm" stay strict (milli vs mega)
         for (const ph of csPhrases) {
           const lower = ph.toLowerCase();
           const prev = lenientSym.get(lower);
