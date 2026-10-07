@@ -938,7 +938,7 @@ fn load_extensions(app: AppHandle) -> Vec<ExtensionScript> {
 }
 
 fn is_sheet_path(path: &str) -> bool {
-    std::path::Path::new(path).extension().map_or(false, |ext| {
+    std::path::Path::new(path).extension().is_some_and(|ext| {
         let ext = ext.to_string_lossy().to_lowercase();
         ext == "numi" || ext == "sum"
     })
