@@ -67,12 +67,23 @@ fn canon_or_raw(p: &Path) -> PathBuf {
     normalized
 }
 
+fn secure_canonicalize(path: &Path) -> PathBuf {
+    let mut p = PathBuf::new();
+    for component in path.components() {
+        p.push(component);
+        if let Ok(canon) = fs::canonicalize(&p) {
+            p = canon;
+        }
+    }
+    canon_or_raw(&p)
+}
+
 /// Exact match against an authorized folder, compared canonicalized so a
 /// symlink or ".." spelling cannot stand in for a different path. A subfolder
 /// of an authorized folder is not itself authorized.
 fn path_allowed(candidate: &Path, allowed: &[PathBuf]) -> bool {
-    let c = canon_or_raw(candidate);
-    allowed.iter().any(|a| canon_or_raw(a) == c)
+    let c = secure_canonicalize(candidate);
+    allowed.iter().any(|a| secure_canonicalize(a) == c)
 }
 
 /// The custom folder recorded in the app's own settings.json, if any. Only
